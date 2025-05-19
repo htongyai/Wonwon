@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="WonWon By Reviv - Find repair services nearby">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="WonWon By Reviv">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <!-- Facebook Meta Tags -->
+  <meta property="og:url" content="https://wonwonrepair.com">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="WonWon By Reviv">
+  <meta property="og:description" content="Find expert repair services for all your needs">
+  <meta property="og:image" content="https://iili.io/3PiMVus.webp">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="WonWon By Reviv">
+  <meta property="og:locale" content="en_US">
+  
+  <!-- Instagram/Facebook Specific -->
+  <meta property="fb:app_id" content="your-fb-app-id">
+  <meta property="instapp:owner_id" content="your-instagram-id">
+  
+  <!-- Twitter Card Meta Tags -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@wonwonrepair">
+  <meta name="twitter:title" content="WonWon By Reviv">
+  <meta name="twitter:description" content="Find expert repair services for all your needs">
+  <meta name="twitter:image" content="https://iili.io/3PiMVus.webp">
+  <meta name="twitter:image:alt" content="WonWon By Reviv Logo">
+
+  <title>WonWon By Reviv</title>
+  <link rel="manifest" href="manifest.json">
+  
+  <!-- Google Maps API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBMCHXeHxFlabEQXalD3SLnzwx98MSLyRo"></script>
+  
+  <!-- App Version Checking - Cache Busting Script -->
+  <script>
+    (function() {
+      // Current app version - update this whenever you deploy a new version
+      const APP_VERSION = '1.0.3';
+      
+      function checkAndUpdateCache() {
+        // Get the stored version from localStorage
+        const storedVersion = localStorage.getItem('app_version');
+        
+        // If there's no stored version or the version has changed
+        if (!storedVersion || storedVersion !== APP_VERSION) {
+          console.log('New app version detected. Clearing cache...');
+          
+          // Clear browser caches
+          if ('caches' in window) {
+            caches.keys().then(function(cacheNames) {
+              cacheNames.forEach(function(cacheName) {
+                caches.delete(cacheName);
+              });
+            });
+          }
+          
+          // Also clear application data in localStorage except the version
+          const tempVersion = APP_VERSION;
+          localStorage.clear();
+          localStorage.setItem('app_version', tempVersion);
+          
+          // Hard reload the page to ensure fresh content
+          if (storedVersion) { // Only reload if there was a previous version (not first visit)
+            window.location.reload(true);
+          }
+        }
+      }
+      
+      // Run the version check when the page loads
+      window.addEventListener('load', checkAndUpdateCache);
+    })();
+  </script>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
