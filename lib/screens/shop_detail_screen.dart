@@ -16,8 +16,13 @@ import 'dart:ui';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
+/// Screen that displays detailed information about a repair shop
+/// Shows shop information, hours, contact details, services, and reviews
 class ShopDetailScreen extends StatefulWidget {
+  // The repair shop to display details for
   final RepairShop shop;
+
+  // Optional parameter for pre-selected service category
   final String? selectedCategory;
 
   const ShopDetailScreen({Key? key, required this.shop, this.selectedCategory})
@@ -28,12 +33,16 @@ class ShopDetailScreen extends StatefulWidget {
 }
 
 class _ShopDetailScreenState extends State<ShopDetailScreen> {
+  // Controller for the scrollable content
   final ScrollController _scrollController = ScrollController();
+
+  // Services for data operations
   final ReviewService _reviewService = ReviewService();
   final ReportService _reportService = ReportService();
   final SavedShopService _savedShopService = SavedShopService();
   final AuthService _authService = AuthService();
 
+  // State variables for shop data
   List<Review> _reviews = [];
   List<ShopReport> _reports = [];
   bool _isLoadingReviews = true;
@@ -45,11 +54,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   @override
   void initState() {
     super.initState();
+    // Load all necessary data when screen initializes
     _checkLoginStatus();
     _loadReviews();
     _loadReports();
   }
 
+  /// Check if user is logged in and update UI accordingly
   Future<void> _checkLoginStatus() async {
     final isLoggedIn = await _authService.isLoggedIn();
 
@@ -58,6 +69,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         _isLoggedIn = isLoggedIn;
       });
 
+      // If logged in, check if this shop is saved
       if (isLoggedIn) {
         _checkIfSaved();
       } else {
@@ -68,6 +80,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     }
   }
 
+  /// Check if this shop is saved by the logged-in user
   Future<void> _checkIfSaved() async {
     try {
       final isSaved = await _savedShopService.isShopSaved(widget.shop.id);
@@ -86,6 +99,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     }
   }
 
+  /// Toggle the saved status of the shop
+  /// Redirects to login if user is not logged in
   Future<void> _toggleSaved() async {
     if (_isLoadingSavedState) return;
 
@@ -117,6 +132,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     try {
       bool success;
       if (_isSaved) {
+        // Remove shop from saved locations
         success = await _savedShopService.removeShop(widget.shop.id);
         if (success && mounted) {
           setState(() {
@@ -130,6 +146,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           );
         }
       } else {
+        // Add shop to saved locations
         success = await _savedShopService.saveShop(widget.shop.id);
         if (success && mounted) {
           setState(() {
@@ -161,6 +178,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     }
   }
 
+  /// Load reviews for this shop
   Future<void> _loadReviews() async {
     try {
       final reviews = await _reviewService.getReviewsForShop(widget.shop.id);
@@ -179,6 +197,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     }
   }
 
+  /// Load existing reports for this shop
   Future<void> _loadReports() async {
     try {
       final reports = await _reportService.getReportsByShopId(widget.shop.id);
@@ -199,6 +218,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
 
   @override
   void dispose() {
+    // Clean up resources
     _scrollController.dispose();
     super.dispose();
   }
@@ -236,6 +256,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           ],
         ),
       ),
+      // Bottom navigation bar with action buttons
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
         child: Row(
@@ -263,7 +284,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            // Save button
+            // Save location button
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: _toggleSaved,
@@ -299,10 +320,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     );
   }
 
+  /// Build the header section with shop image and name
   Widget _buildHeader() {
     return Stack(
       children: [
-        // Shop image
+        // Shop image or placeholder
         Container(
           height: 200,
           width: double.infinity,
@@ -318,7 +340,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                   : AssetHelpers.getShopPlaceholder(widget.shop.name),
         ),
 
-        // Shop name overlay
+        // Shop name overlay with gradient background
         Positioned(
           bottom: 0,
           left: 0,
@@ -357,7 +379,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           ),
         ),
 
-        // Report button
+        // Report button with counter for existing reports
         Positioned(
           top: 8,
           right: 8,
@@ -375,6 +397,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                   ),
                   onPressed: _showReportDialog,
                 ),
+                // Show count badge if there are existing reports
                 if (!_isLoadingReports && _reports.isNotEmpty)
                   Positioned(
                     right: 0,

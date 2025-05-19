@@ -30,7 +30,7 @@ class MockShopData {
         latitude: 13.7563,
         longitude: 100.5018,
         photos: [
-          'https://images.unsplash.com/photo-1570310635050-39576cf72397?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80',
+          'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80',
         ],
       ),
       RepairShop(

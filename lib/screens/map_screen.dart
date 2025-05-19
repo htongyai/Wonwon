@@ -14,6 +14,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:ui' as ui;
 import 'package:wonwonw2/screens/shop_details_screen.dart';
 
+/// Map Screen that displays repair shops on Google Maps
+/// Provides interactive markers, location tracking, and navigation to shop details
 class MapScreen extends StatefulWidget {
   const MapScreen({Key? key}) : super(key: key);
 
@@ -22,41 +24,41 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
-  // Bangkok coordinates (default center)
+  // Default center coordinates (Bangkok)
   final LatLng bangkokLocation = const LatLng(13.7563, 100.5018);
 
   // Controller for Google Map
   final Completer<GoogleMapController> _controller =
       Completer<GoogleMapController>();
 
-  // Current map center
+  // Current map center position
   LatLng _mapCenter = const LatLng(13.7563, 100.5018);
 
-  // Define map colors
+  // Map accent color for custom markers and UI elements
   final Color mapAccentColor = Colors.green;
 
-  // Location service
+  // Location service for tracking user position
   late LocationService _locationService;
 
-  // Set of markers to display on the map
+  // Set of shop markers to display on the map
   final Set<Marker> _markers = {};
 
-  // User location marker
+  // User location marker (separate from shop markers)
   Marker? _userMarker;
 
-  // Map of BitmapDescriptor icons for different categories
+  // Map of BitmapDescriptor icons for different shop categories
   final Map<String, BitmapDescriptor> _categoryIcons = {};
 
-  // Selected repair shop
+  // Currently selected repair shop
   RepairShop? _selectedShop;
 
-  // Is map following user location
+  // Flag to track if map is automatically following user location
   bool _isFollowingUser = false;
 
-  // Is loading user location
+  // Flag to show loading state during location fetching
   bool _isLoadingLocation = false;
 
-  // Zoom level
+  // Current zoom level of the map
   double _currentZoom = 13.0;
 
   // Custom marker icon for user location
@@ -65,28 +67,36 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    // Add observer for app lifecycle changes (to check permissions when app resumes)
     WidgetsBinding.instance.addObserver(this);
-    _locationService = locationService; // Use the shared instance
+    // Get shared location service instance
+    _locationService = locationService;
+    // Initialize map markers
     _loadMarkers();
+    // Create custom marker for user location
     _createCustomMarkerIcon();
+    // Setup location tracking
     _initLocationTracking();
   }
 
   @override
   void dispose() {
+    // Clean up resources when widget is removed
     WidgetsBinding.instance.removeObserver(this);
-    _locationService.dispose();
+    // Remove the listener but don't dispose the service since it's shared
+    _locationService.removeListener(_onLocationChanged);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Check for permission changes when app is resumed
+      // Check for permission changes when app is resumed from background
       _checkPermissionsOnResume();
     }
   }
 
+  /// Check if location permissions were granted while app was in background
   Future<void> _checkPermissionsOnResume() async {
     final isGranted = await Permission.location.isGranted;
     if (isGranted && !_locationService.isTracking) {
@@ -94,6 +104,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Initialize location tracking with user's current position
   Future<void> _initLocationTracking() async {
     // First try to get user's current position
     final position = await _locationService.getCurrentPosition();
@@ -112,6 +123,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _locationService.addListener(_onLocationChanged);
   }
 
+  /// Start tracking user location updates
   Future<void> _startLocationTracking() async {
     final success = await _locationService.startTracking();
     if (mounted) {
@@ -121,6 +133,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Handle location changes from location service
   void _onLocationChanged() {
     _updateUserLocationMarker();
     if (_isFollowingUser) {
@@ -128,6 +141,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Create a custom marker icon for user's location
   Future<void> _createCustomMarkerIcon() async {
     // Create a custom person icon with green background
     final customMarker = await _createUserLocationMarker();
@@ -140,11 +154,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Generate a custom user location marker with a person icon
   Future<BitmapDescriptor> _createUserLocationMarker() async {
-    // Canvas size
-    const size = 40.0; // Reduced from 120.0 (30% of original size)
+    // Canvas size (reduced to 40.0 - smaller than original size)
+    const size = 40.0;
 
-    // Create a picture recorder
+    // Create a picture recorder to draw the custom marker
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(
       recorder,
@@ -154,13 +169,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       ),
     );
 
-    // Background circle
+    // Background circle paint
     final bgPaint =
         Paint()
           ..color = mapAccentColor.withOpacity(0.8)
           ..style = PaintingStyle.fill;
 
-    // White border
+    // White border paint
     final borderPaint =
         Paint()
           ..color = Colors.white
@@ -173,16 +188,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     // Draw white border
     canvas.drawCircle(Offset(size / 2, size / 2), size / 2 - 4, borderPaint);
 
-    // Draw person icon
+    // Paint for the person icon
     final personIconPaint =
         Paint()
           ..color = Colors.white
           ..style = PaintingStyle.fill;
 
-    // Head (circle)
+    // Draw head (circle)
     canvas.drawCircle(Offset(size / 2, size / 3), size / 8, personIconPaint);
 
-    // Body (rounded rectangle)
+    // Draw body (rounded rectangle)
     final bodyRect = RRect.fromRectAndRadius(
       Rect.fromLTWH(
         size / 2 - size / 10,
@@ -194,7 +209,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
     canvas.drawRRect(bodyRect, personIconPaint);
 
-    // End recording and create image
+    // End recording and convert to image
     final picture = recorder.endRecording();
     final img = await picture.toImage(size.toInt(), size.toInt());
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
@@ -207,6 +222,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     return BitmapDescriptor.fromBytes(byteData.buffer.asUint8List());
   }
 
+  /// Update the user's location marker with current position
   void _updateUserLocationMarker() {
     final currentLatLng = _locationService.currentLatLng;
     if (currentLatLng != null) {
@@ -224,6 +240,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Animate the map camera to user's current location
   Future<void> _animateToUserLocation() async {
     final currentLatLng = _locationService.currentLatLng;
     if (currentLatLng != null && _controller.isCompleted) {
@@ -239,6 +256,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Load all repair shop markers onto the map
   Future<void> _loadMarkers() async {
     // Add shop markers
     for (final shop in MockShops.shops) {
@@ -285,6 +303,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     setState(() {});
   }
 
+  /// Go to user's current location on the map
   Future<void> _goToCurrentLocation() async {
     setState(() {
       _isLoadingLocation = true;
@@ -320,6 +339,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Show dialog requesting location permission
   void _showLocationPermissionDialog() {
     showDialog(
       context: context,
@@ -353,6 +373,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Go to a specific shop location on the map
   Future<void> _goToShopLocation(LatLng location) async {
     final GoogleMapController controller = await _controller.future;
     controller.animateCamera(
@@ -367,10 +388,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     });
   }
 
+  /// Called when the Google Map is created
   void _onMapCreated(GoogleMapController controller) {
     _controller.complete(controller);
   }
 
+  /// Called when the map camera position changes
   void _onCameraMove(CameraPosition position) {
     _mapCenter = position.target;
     _currentZoom = position.zoom;
@@ -456,9 +479,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
+      // Floating action buttons for map navigation
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Show shop location button only when a shop is selected
           if (_selectedShop != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -474,6 +499,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 child: const Icon(Icons.location_searching),
               ),
             ),
+          // My location button with loading indicator
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: FloatingActionButton(
@@ -502,6 +528,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Launch Google Maps app with current location
   Future<void> _launchMapsUrl() async {
     // Use user location if available, otherwise use Bangkok
     final location = _locationService.currentLatLng ?? bangkokLocation;

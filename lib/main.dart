@@ -9,23 +9,41 @@ import 'dart:math';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/services/service_providers.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:geolocator_web/geolocator_web.dart'
+    if (dart.library.io) 'dart:io';
+import 'package:flutter_web_plugins/flutter_web_plugins.dart';
+import 'package:geolocator/geolocator.dart';
 
+/// Entry point for the WonWon Repair Finder application
+/// Initializes app services and configurations before launching the UI
 void main() async {
+  // Ensure Flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Set preferred orientations
+  // Web specific configuration
+  if (kIsWeb) {
+    // Use URL path strategy instead of hash strategy for cleaner URLs
+    setUrlStrategy(PathUrlStrategy());
+  }
+
+  // Lock the app to portrait orientation only
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Get stored locale
+  // Retrieve the user's preferred language setting from local storage
   final locale = await AppLocalizationsService.getLocale();
 
+  // Launch the app with the retrieved locale
   runApp(MyApp(locale: locale));
 }
 
+/// Root widget of the application
+/// Manages global state, theming, and internationalization
 class MyApp extends StatefulWidget {
+  // The user's preferred locale/language setting
   final Locale locale;
 
   const MyApp({super.key, required this.locale});
@@ -35,14 +53,16 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  // Default to English locale if none is provided
   Locale _locale = const Locale('en');
 
   @override
   void initState() {
     super.initState();
+    // Set the locale from the widget parameter
     _locale = widget.locale;
 
-    // Listen for language changes
+    // Subscribe to locale changes to update the UI when language changes
     AppLocalizationsService().localeStream.listen((locale) {
       setState(() {
         _locale = locale;
@@ -53,21 +73,26 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return ServiceProvider(
+      // Provide location services to the entire app
       locationService: locationService,
       child: MaterialApp(
         title: AppConstants.appName,
         locale: _locale,
+        // Define supported languages (English and Thai)
         supportedLocales: const [
           Locale('en', ''), // English
           Locale('th', ''), // Thai
         ],
+        // Register localization delegates for app-wide translation support
         localizationsDelegates: [
           AppLocalizations.delegate,
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
+        // App-wide theme configuration
         theme: ThemeData(
+          // Create a consistent color scheme based on the app's primary color
           colorScheme: ColorScheme.fromSeed(
             seedColor: AppConstants.primaryColor,
             primary: AppConstants.primaryColor,
@@ -82,6 +107,7 @@ class _MyAppState extends State<MyApp> {
           ),
           scaffoldBackgroundColor: Colors.white,
           cardColor: Colors.white,
+          // AppBar styling
           appBarTheme: AppBarTheme(
             backgroundColor: Colors.white,
             elevation: 0,
@@ -92,6 +118,7 @@ class _MyAppState extends State<MyApp> {
               color: AppConstants.darkColor,
             ),
           ),
+          // Button styling
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppConstants.accentColor,
@@ -100,31 +127,34 @@ class _MyAppState extends State<MyApp> {
           ),
           useMaterial3: true,
         ),
+        // Custom builder to handle responsive layout and text scaling
         builder: (context, child) {
-          // Initialize ResponsiveSize on app start
+          // Initialize responsive sizing utility
           ResponsiveSize.init(context);
 
-          // Apply responsive text scaling
+          // Get current media query and text scaling
           final mediaQuery = MediaQuery.of(context);
           final textScaler = MediaQuery.textScalerOf(context);
 
-          // Limit maximum text scaling to prevent layout issues on very large font settings
+          // Constrain text scaling to prevent layout issues with very large font settings
           final constrainedTextScaler = textScaler.clamp(
             minScaleFactor: 0.8,
             maxScaleFactor: 1.2,
           );
 
-          // Constrain app width on large screens to maintain mobile perspective
+          // Apply constrained text scaling to the app
           return MediaQuery(
             data: mediaQuery.copyWith(textScaler: constrainedTextScaler),
             child: Builder(
               builder: (context) {
                 final screenWidth = MediaQuery.of(context).size.width;
+                // Determine if we're on a desktop-sized screen
                 final bool isDesktop = screenWidth > 900;
 
+                // Create a container with appropriate styling based on device size
                 return Container(
                   decoration: BoxDecoration(
-                    // Gradient background for desktop, solid color for mobile/tablet
+                    // Apply gradient background for desktop, solid color for mobile/tablet
                     gradient:
                         isDesktop
                             ? const LinearGradient(
@@ -141,22 +171,24 @@ class _MyAppState extends State<MyApp> {
                         // Get the current screen width
                         final screenWidth = MediaQuery.of(context).size.width;
 
-                        // Define different max widths based on screen size
-                        // For tablet (600-900): slightly wider than mobile (540px)
-                        // For desktop (>900): slightly wider (560px) for better desktop experience
+                        // Calculate the maximum width for the app container based on screen size
+                        // This ensures proper display across different device types
                         final double maxWidth =
                             screenWidth < 600
-                                ? screenWidth
+                                ? screenWidth // Full width on phones
                                 : screenWidth < 900
                                 ? 540 // Slightly wider for tablets
                                 : 560; // Slightly wider for desktop
 
+                        // Create a container with appropriate styling and constraints
                         return Container(
                           constraints: BoxConstraints(maxWidth: maxWidth),
                           decoration: BoxDecoration(
                             color: Colors.white,
+                            // Apply rounded corners only on desktop
                             borderRadius:
                                 isDesktop ? BorderRadius.circular(8) : null,
+                            // Apply border only on desktop
                             border:
                                 isDesktop
                                     ? Border.all(
@@ -164,6 +196,7 @@ class _MyAppState extends State<MyApp> {
                                       width: 1,
                                     )
                                     : null,
+                            // Apply shadow with different intensity based on device type
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(
@@ -185,7 +218,9 @@ class _MyAppState extends State<MyApp> {
             ),
           );
         },
+        // Set the initial screen to the splash screen
         home: const SplashScreen(),
+        // Remove the debug banner
         debugShowCheckedModeBanner: false,
       ),
     );

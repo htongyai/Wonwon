@@ -1,25 +1,34 @@
+// Import necessary packages for localization support
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Main localization class responsible for loading and providing translations
+/// Loads language strings from JSON files in assets/lang directory
 class AppLocalizations {
+  // The locale this instance is providing translations for
   final Locale locale;
 
   AppLocalizations(this.locale);
 
-  // Helper method to keep the code in the widgets concise
+  /// Helper method to easily access localization from any widget
+  /// Usage: AppLocalizations.of(context).translate('key')
   static AppLocalizations of(BuildContext context) {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  // Static member to have a simple access to the delegate from the MaterialApp
+  /// Static delegate that will be used in the app's localization delegates
+  /// This connects the app to the localization system
   static const LocalizationsDelegate<AppLocalizations> delegate =
       _AppLocalizationsDelegate();
 
+  // Map to store the loaded translations
   late Map<String, String> _localizedStrings;
 
+  /// Load the localization data from JSON files
+  /// Returns true when loading is complete
   Future<bool> load() async {
     // Load the language JSON file from the "lang" folder
     String jsonString = await rootBundle.loadString(
@@ -27,6 +36,7 @@ class AppLocalizations {
     );
     Map<String, dynamic> jsonMap = json.decode(jsonString);
 
+    // Convert all values to strings
     _localizedStrings = jsonMap.map((key, value) {
       return MapEntry(key, value.toString());
     });
@@ -34,18 +44,21 @@ class AppLocalizations {
     return true;
   }
 
-  // This method will be called from every widget that needs a localized text
+  /// Translate a key to the corresponding string in the current locale
+  /// If the key is not found, returns the key itself as fallback
   String translate(String key) {
     return _localizedStrings[key] ?? key;
   }
 
-  // Singleton factory
+  // Singleton instance for global access
   static final AppLocalizations _instance = AppLocalizations(
     const Locale('en'),
   );
   factory AppLocalizations.instance() => _instance;
 }
 
+/// Delegate class that creates AppLocalizations instances
+/// This is used by Flutter's localization system
 class _AppLocalizationsDelegate
     extends LocalizationsDelegate<AppLocalizations> {
   // This delegate instance will never change
@@ -53,13 +66,14 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) {
-    // Include all of the supported language codes here
+    // List of supported language codes
+    // Add new languages here when supporting additional translations
     return ['en', 'th'].contains(locale.languageCode);
   }
 
   @override
   Future<AppLocalizations> load(Locale locale) async {
-    // AppLocalizations class is where the JSON loading actually occurs
+    // Create and load a new AppLocalizations instance for the requested locale
     AppLocalizations localizations = AppLocalizations(locale);
     await localizations.load();
     return localizations;
@@ -69,33 +83,45 @@ class _AppLocalizationsDelegate
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
+/// Service to manage locale changes throughout the app
+/// Provides methods to get/set the app's locale and notifies listeners of changes
 class AppLocalizationsService {
+  // Key for storing the language preference
   static const String LANGUAGE_CODE = 'languageCode';
 
-  // Private constructor
+  // Private constructor for singleton pattern
   AppLocalizationsService._();
 
+  // Singleton instance
   static final AppLocalizationsService _instance = AppLocalizationsService._();
 
-  // Singleton access
+  // Factory constructor to return the singleton instance
   factory AppLocalizationsService() => _instance;
 
+  // Stream controller for broadcasting locale changes
   static final StreamController<Locale> _controller =
       StreamController<Locale>.broadcast();
+
+  // Public stream that widgets can listen to for locale changes
   Stream<Locale> get localeStream => _controller.stream;
 
+  /// Get the user's preferred locale from persistent storage
+  /// Defaults to English ('en') if not set
   static Future<Locale> getLocale() async {
     final prefs = await SharedPreferences.getInstance();
     String languageCode = prefs.getString(LANGUAGE_CODE) ?? 'en';
     return Locale(languageCode);
   }
 
+  /// Set a new locale and notify all listeners
+  /// Persists the selection to SharedPreferences
   static Future<void> setLocale(String languageCode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(LANGUAGE_CODE, languageCode);
     _controller.add(Locale(languageCode));
   }
 
+  /// Close the stream controller when the service is no longer needed
   void dispose() {
     _controller.close();
   }

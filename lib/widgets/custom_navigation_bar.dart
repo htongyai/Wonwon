@@ -69,38 +69,44 @@ class CustomNavigationBar extends StatelessWidget {
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildNavItem(
-                      context,
-                      0,
-                      FontAwesomeIcons.house,
-                      'home',
-                      availableHeight,
-                      iconSize,
-                      textSize,
-                      dotSize,
-                      topIndicatorHeight,
+                    Expanded(
+                      child: _buildNavItem(
+                        context,
+                        0,
+                        FontAwesomeIcons.house,
+                        'home',
+                        availableHeight,
+                        iconSize,
+                        textSize,
+                        dotSize,
+                        topIndicatorHeight,
+                      ),
                     ),
-                    _buildNavItem(
-                      context,
-                      1,
-                      FontAwesomeIcons.mapLocationDot,
-                      'search',
-                      availableHeight,
-                      iconSize,
-                      textSize,
-                      dotSize,
-                      topIndicatorHeight,
+                    Expanded(
+                      child: _buildNavItem(
+                        context,
+                        1,
+                        FontAwesomeIcons.mapLocationDot,
+                        'search',
+                        availableHeight,
+                        iconSize,
+                        textSize,
+                        dotSize,
+                        topIndicatorHeight,
+                      ),
                     ),
-                    _buildNavItem(
-                      context,
-                      2,
-                      FontAwesomeIcons.bookmark,
-                      'saved_locations',
-                      availableHeight,
-                      iconSize,
-                      textSize,
-                      dotSize,
-                      topIndicatorHeight,
+                    Expanded(
+                      child: _buildNavItem(
+                        context,
+                        2,
+                        FontAwesomeIcons.bookmark,
+                        'saved_locations',
+                        availableHeight,
+                        iconSize,
+                        textSize,
+                        dotSize,
+                        topIndicatorHeight,
+                      ),
                     ),
                   ],
                 );
@@ -139,7 +145,7 @@ class CustomNavigationBar extends StatelessWidget {
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOut,
             height: topIndicatorHeight,
-            width: ResponsiveSize.getWidth(8),
+            width: availableHeight * 0.6, // Make width relative to height
             margin: EdgeInsets.only(
               bottom: verticalPadding,
               top: verticalPadding / 2,
@@ -153,7 +159,6 @@ class CustomNavigationBar extends StatelessWidget {
 
           // Main navigation item container
           Container(
-            width: ResponsiveSize.getWidth(25),
             padding: EdgeInsets.symmetric(vertical: verticalPadding),
             decoration: BoxDecoration(
               color:
@@ -183,6 +188,9 @@ class CustomNavigationBar extends StatelessWidget {
                             ? AppConstants.primaryColor
                             : Colors.grey[500],
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
 
                 // Dot indicator
