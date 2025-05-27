@@ -55,4 +55,19 @@ class IconHelper {
       return FaIcon(iconData, size: size, color: color);
     }
   }
+
+  static Widget getSafeIcon(
+    IconData fontAwesomeIcon,
+    IconData fallbackIcon, {
+    double size = 24.0,
+    Color? color,
+  }) {
+    try {
+      // Try to use FontAwesome icon
+      return FaIcon(fontAwesomeIcon, size: size, color: color);
+    } catch (e) {
+      // Fallback to Material icon if FontAwesome fails
+      return Icon(fallbackIcon, size: size, color: color);
+    }
+  }
 }

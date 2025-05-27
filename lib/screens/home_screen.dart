@@ -8,12 +8,14 @@ import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/utils/asset_helpers.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
+import 'package:wonwonw2/utils/icon_helper.dart';
 import 'package:wonwonw2/widgets/search_bar_widget.dart';
 import 'package:go_router/go_router.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -33,6 +35,9 @@ class _HomeScreenState extends State<HomeScreen>
   String _searchQuery = '';
   String _selectedCategoryId = 'all';
 
+  // Current language code (en or th)
+  String _currentLanguage = 'en';
+
   // Controller and variables for pull to refresh
   final ScrollController _scrollController = ScrollController();
   bool _isRefreshing = false;
@@ -42,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
     _loadShops();
+    _loadCurrentLanguage();
 
     // Initialize animation controller
     _animationController = AnimationController(
@@ -52,6 +58,25 @@ class _HomeScreenState extends State<HomeScreen>
 
     // Add scroll listener for custom refresh indicator
     _scrollController.addListener(_scrollListener);
+
+    // Listen for language changes
+    AppLocalizationsService().localeStream.listen((locale) {
+      if (mounted) {
+        setState(() {
+          _currentLanguage = locale.languageCode;
+        });
+      }
+    });
+  }
+
+  // Load the current language from SharedPreferences
+  Future<void> _loadCurrentLanguage() async {
+    final locale = await AppLocalizationsService.getLocale();
+    if (mounted) {
+      setState(() {
+        _currentLanguage = locale.languageCode;
+      });
+    }
   }
 
   void _scrollListener() {
@@ -261,12 +286,11 @@ class _HomeScreenState extends State<HomeScreen>
                     // Logo and settings row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Logo on the left
                         SizedBox(
-                          height: ResponsiveSize.getHeight(
-                            5,
-                          ), // 40px on standard screen
+                          height: ResponsiveSize.getHeight(5),
                           child: Image.asset(
                             'assets/images/wwg.png',
                             fit: BoxFit.contain,
@@ -292,36 +316,55 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ),
 
-                        // Settings icon at the right
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: Container(
-                            padding: EdgeInsets.all(ResponsiveSize.getWidth(2)),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: FaIcon(
-                              FontAwesomeIcons.gear,
-                              color: AppConstants.darkColor,
-                              size: ResponsiveSize.getWidth(3.5),
-                            ),
-                          ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SettingsScreen(),
+                        // Language dropdown and icons
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Language selector
+                            _buildSimpleLanguageSelector(),
+                            const SizedBox(width: 4),
+                            // Feedback icon
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
                               ),
-                            );
-                          },
+                              icon: IconHelper.getSafeIcon(
+                                FontAwesomeIcons.comment,
+                                Icons.comment,
+                                color: AppConstants.primaryColor,
+                                size: 16,
+                              ),
+                              onPressed: () {
+                                _launchFeedbackForm();
+                              },
+                            ),
+                            // Settings icon
+                            IconButton(
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              icon: IconHelper.getSafeIcon(
+                                FontAwesomeIcons.gear,
+                                Icons.settings,
+                                color: AppConstants.darkColor,
+                                size: 16,
+                              ),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => const SettingsScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -1019,5 +1062,100 @@ class _HomeScreenState extends State<HomeScreen>
       _selectedCategoryId = 'all';
       _filteredShops = _shops;
     });
+  }
+
+  Widget _buildSimpleLanguageSelector() {
+    return InkWell(
+      onTap: () {
+        // Toggle between languages
+        final newLang = _currentLanguage == 'en' ? 'th' : 'en';
+        _changeLanguage(newLang);
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade300, width: 1),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _currentLanguage == 'en' ? 'English' : 'ไทย',
+              style: GoogleFonts.montserrat(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppConstants.primaryColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changeLanguage(String languageCode) async {
+    // Set the new language
+    await AppLocalizationsService.setLocale(languageCode);
+
+    setState(() {
+      _currentLanguage = languageCode;
+    });
+
+    // Show a short confirmation message
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            languageCode == 'en'
+                ? 'Language changed to English'
+                : 'เปลี่ยนภาษาเป็นภาษาไทย',
+          ),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppConstants.primaryColor,
+        ),
+      );
+    }
+  }
+
+  void _launchFeedbackForm() async {
+    final Uri url = Uri.parse(
+      'https://docs.google.com/forms/d/e/1FAIpQLScIEoSedtD3w-cvMDp6U4h_pe2aIUpWaE4tpf14maPhZUTlRQ/viewform?usp=pp_url',
+    );
+
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        // If unable to launch URL, show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Could not open feedback form. Please try again later.',
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Handle any exceptions
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 }

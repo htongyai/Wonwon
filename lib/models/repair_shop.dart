@@ -17,6 +17,8 @@ class RepairShop {
   final List<String> photos;
   final String priceRange;
   final Map<String, bool> features;
+  final bool approved;
+  final bool irregularHours;
 
   RepairShop({
     required this.id,
@@ -37,6 +39,8 @@ class RepairShop {
     this.photos = const [],
     this.priceRange = '₿',
     this.features = const {},
+    this.approved = false,
+    this.irregularHours = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -58,6 +62,8 @@ class RepairShop {
       'photos': photos,
       'priceRange': priceRange,
       'features': features,
+      'approved': approved,
+      'irregularHours': irregularHours,
     };
   }
 }

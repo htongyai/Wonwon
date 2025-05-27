@@ -1,4 +1,5 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:wonwonw2/models/repair_shop.dart' as app_model;
 
 class RepairShop {
   final String id;
@@ -12,6 +13,7 @@ class RepairShop {
   final Map<String, String> openingHours;
   final String description;
   final int reviewCount;
+  final bool approved;
 
   RepairShop({
     required this.id,
@@ -25,7 +27,29 @@ class RepairShop {
     this.openingHours = const {},
     this.description = '',
     this.reviewCount = 0,
+    this.approved = true,
   });
+
+  // Convert this RepairShop to the app_model.RepairShop
+  app_model.RepairShop toAppModel() {
+    return app_model.RepairShop(
+      id: id,
+      name: name,
+      description: description,
+      address: address,
+      area: '', // Default area
+      categories: categories,
+      rating: rating,
+      reviewCount: reviewCount,
+      hours: Map.fromEntries(
+        openingHours.entries.map((e) => MapEntry(e.key, e.value)),
+      ),
+      latitude: location.latitude,
+      longitude: location.longitude,
+      photos: imageUrl.isNotEmpty ? [imageUrl] : [],
+      approved: approved,
+    );
+  }
 }
 
 class MockShops {

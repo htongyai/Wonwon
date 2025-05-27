@@ -49,6 +49,7 @@ class _SignupScreenState extends State<SignupScreen> {
       });
 
       try {
+        // Register the user
         final success = await _authService.register(
           _nameController.text.trim(),
           _emailController.text.trim(),
@@ -56,13 +57,17 @@ class _SignupScreenState extends State<SignupScreen> {
         );
 
         if (success && mounted) {
+          // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('account_created'.tr(context)),
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.pop(context, true); // Return success
+
+          // User is already logged in after registration in Firebase Auth
+          // Navigate directly back to the previous screen with success flag
+          Navigator.pop(context, true);
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

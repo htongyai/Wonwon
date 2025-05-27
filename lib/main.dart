@@ -14,12 +14,28 @@ import 'package:geolocator_web/geolocator_web.dart'
     if (dart.library.io) 'dart:io';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'package:wonwonw2/services/auth_state_service.dart';
 
 /// Entry point for the WonWon Repair Finder application
 /// Initializes app services and configurations before launching the UI
 void main() async {
   // Ensure Flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('Firebase initialized successfully');
+  } catch (e) {
+    print('Error initializing Firebase: $e');
+  }
+
+  // Initialize AuthStateService
+  await authStateService.initialize();
 
   // Web specific configuration
   if (kIsWeb) {
@@ -73,8 +89,9 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return ServiceProvider(
-      // Provide location services to the entire app
+      // Provide services to the entire app
       locationService: locationService,
+      authStateService: authStateService,
       child: MaterialApp(
         title: AppConstants.appName,
         locale: _locale,
@@ -94,7 +111,7 @@ class _MyAppState extends State<MyApp> {
         theme: ThemeData(
           // Create a consistent color scheme based on the app's primary color
           colorScheme: ColorScheme.fromSeed(
-            seedColor: AppConstants.primaryColor,
+            seedColor: const Color(0xFFC3C130),
             primary: AppConstants.primaryColor,
             secondary: AppConstants.accentColor,
             tertiary: AppConstants.tertiaryColor,

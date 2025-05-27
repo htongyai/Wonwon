@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
-import 'package:wonwonw2/screens/main_navigation.dart';
+import 'package:wonwonw2/widgets/auth_wrapper.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -51,8 +51,7 @@ class _SplashScreenState extends State<SplashScreen>
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder:
-              (context, animation, secondaryAnimation) =>
-                  const MainNavigation(),
+              (context, animation, secondaryAnimation) => const AuthWrapper(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             const begin = Offset(1.0, 0.0);
             const end = Offset.zero;
@@ -79,80 +78,104 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          AppConstants.primaryColor, // Lime yellow/green background
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Logo animation
-            AnimatedBuilder(
-              animation: _animationController,
-              builder: (context, child) {
-                return FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: ScaleTransition(scale: _scaleAnimation, child: child),
-                );
-              },
-              child: SizedBox(
-                width: 180,
-                height: 160,
-                child: Image.asset(
-                  'assets/images/www.png',
-                  fit: BoxFit.contain,
-                  //color: Colors.white, // Make the logo white
-                  colorBlendMode: BlendMode.srcIn,
-                  errorBuilder: (context, error, stackTrace) {
-                    // Fallback if logo image is missing
-                    return FaIcon(
-                      FontAwesomeIcons.screwdriverWrench,
-                      size: 120,
+      backgroundColor: AppConstants.primaryColor,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Spacer(flex: 1),
+
+              // Logo animation
+              AnimatedBuilder(
+                animation: _animationController,
+                builder: (context, child) {
+                  return FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: ScaleTransition(
+                      scale: _scaleAnimation,
+                      child: child,
+                    ),
+                  );
+                },
+                child: SizedBox(
+                  width: 180,
+                  height: 160,
+                  child: Image.asset(
+                    'assets/images/www.png',
+                    fit: BoxFit.contain,
+                    colorBlendMode: BlendMode.srcIn,
+                    errorBuilder: (context, error, stackTrace) {
+                      // Fallback if logo image is missing
+                      return FaIcon(
+                        FontAwesomeIcons.screwdriverWrench,
+                        size: 120,
+                        color: Colors.white,
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              // App name
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: const Text(
+                  'WonWon',
+                  style: TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Tagline
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: const Text(
+                  'by Reviv',
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
+              ),
+
+              const SizedBox(height: 50),
+
+              // Loading indicator
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: const SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    strokeWidth: 3,
+                  ),
+                ),
+              ),
+
+              Spacer(flex: 1),
+
+              // Support text at the bottom
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 24.0),
+                  child: Text(
+                    'Supported by Repair Community Thailand',
+                    style: TextStyle(
+                      fontSize: 14,
                       color: Colors.white,
-                    );
-                  },
+                      fontWeight: FontWeight.w300,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
-            ),
-
-            // App name
-            FadeTransition(
-              opacity: _fadeAnimation,
-              child: const Text(
-                'WonWon',
-                style: TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 1),
-
-            // Tagline
-            FadeTransition(
-              opacity: _fadeAnimation,
-              child: const Text(
-                'by Reviv',
-                style: TextStyle(fontSize: 16, color: Colors.white),
-              ),
-            ),
-
-            const SizedBox(height: 50),
-
-            // Loading indicator
-            FadeTransition(
-              opacity: _fadeAnimation,
-              child: const SizedBox(
-                width: 40,
-                height: 40,
-                child: CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  strokeWidth: 3,
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

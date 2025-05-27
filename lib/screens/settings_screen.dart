@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/screens/login_screen.dart';
 import 'package:wonwonw2/screens/saved_locations_screen.dart';
+import 'package:wonwonw2/screens/add_shop_screen.dart';
 import 'package:wonwonw2/services/auth_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
@@ -116,7 +117,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             : _buildSettingsCard(child: _buildLoginTile()),
                         const SizedBox(height: 32),
 
-                        // Features Section - REMOVED
+                        // Features Section
+                        _buildSectionTitle('features'.tr(context)),
+                        const SizedBox(height: 12),
+                        _buildSettingsCard(
+                          child: Column(
+                            children: [
+                              _buildFeatureTile(
+                                'add_new_place'.tr(context),
+                                FontAwesomeIcons.plus,
+                                AppConstants.primaryColor,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => const AddShopScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const Divider(height: 1, thickness: 0.5),
+                              _buildFeatureTile(
+                                'saved_locations'.tr(context),
+                                FontAwesomeIcons.bookmark,
+                                AppConstants.primaryColor,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) =>
+                                              const SavedLocationsScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
 
                         // Language Section
                         _buildSectionTitle('language'.tr(context)),
@@ -534,6 +574,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontWeight: FontWeight.w500,
           color: iconColor,
         ),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildFeatureTile(
+    String title,
+    IconData icon,
+    Color iconColor, {
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: iconColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(child: FaIcon(icon, color: iconColor, size: 16)),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+      ),
+      trailing: const Icon(
+        Icons.arrow_forward_ios,
+        size: 14,
+        color: Colors.grey,
       ),
       onTap: onTap,
     );

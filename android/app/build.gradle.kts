@@ -19,6 +19,16 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
+    // Add code shrinker options
+    buildFeatures {
+        buildConfig = true
+    }
+
+    // Configure the code shrinker
+    dependenciesInfo {
+        includeInApk = false
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.wonwonw2"
@@ -35,6 +45,10 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            
+            // Enable R8 shrinking but use our proguard rules
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
         }
     }
 }

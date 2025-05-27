@@ -11,6 +11,7 @@
   "notifications": "Notifications",
   "language": "Language",
   "account": "Account",
+  "features": "Features",
   "login": "Login",
   "logout": "Log Out",
   "delete_account": "Delete Account",
@@ -54,6 +55,8 @@
   "report_select_reason": "Select a reason",
   "report_additional_details": "Additional details",
   "report_details_hint": "Please provide more details...",
+  "report_correct_info": "Correct Information",
+  "report_correct_info_hint": "Please provide the correct information...",
 
   "thank_you_review": "Thank you for your review!",
   "confirm_logout": "Are you sure you want to log out?",
@@ -140,10 +143,15 @@
   "remove_from_saved": "Remove {shop_name} from your saved locations?",
   "remove": "REMOVE",
   "removed_from_saved": "Removed {shop_name} from saved locations",
+  "saved_to_locations": "Added {shop_name} to your saved locations",
   "failed_to_remove": "Failed to remove location",
+  "failed_to_update_saved": "Failed to update saved location",
   "error_loading_saved": "Error loading saved locations",
   "try_again": "Try Again",
   "refresh": "Refresh",
+  "no_matching_category": "No saved places in this category",
+  "try_different_category": "Try selecting a different category or save more places",
+  "search_saved_locations": "Search saved locations...",
   
   "repair_shops_map": "Repair Shops Map",
   "map_coming_soon": "Map View Coming Soon",
@@ -152,6 +160,7 @@
   "could_not_open_map": "Could not open map",
   "could_not_open_directions": "Could not open map directions",
   "open_in_google_maps": "Open in Google Maps",
+  "opening_maps": "Opening maps...",
   
   "location_permission_required": "Location Permission Required",
   "location_permission_explanation": "We need your location permission to show repair shops near you and provide directions",
@@ -159,5 +168,10 @@
   "my_location": "My Location",
   "your_location": "Your Location",
   "meters_away": "meters away",
-  "km_away": "km away"
+  "km_away": "km away",
+  
+  "coming_soon": "Coming Soon",
+  "add_place_coming_soon": "The ability to add new repair shops will be available in a future update. Stay tuned!",
+  "add_new_place": "Add New Place",
+  "ok": "OK"
 } 

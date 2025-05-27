@@ -7,14 +7,22 @@ import 'package:wonwonw2/utils/responsive_size.dart';
 import 'package:wonwonw2/widgets/custom_navigation_bar.dart';
 
 class MainNavigation extends StatefulWidget {
-  const MainNavigation({Key? key}) : super(key: key);
+  final int initialIndex;
+
+  const MainNavigation({Key? key, this.initialIndex = 0}) : super(key: key);
 
   @override
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
 class _MainNavigationState extends State<MainNavigation> {
-  int _currentIndex = 0;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+  }
 
   final List<Widget> _screens = [
     const HomeScreen(),

@@ -12,7 +12,7 @@ import 'package:wonwonw2/services/location_service.dart';
 import 'package:wonwonw2/services/service_providers.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:ui' as ui;
-import 'package:wonwonw2/screens/shop_details_screen.dart';
+import 'package:wonwonw2/screens/shop_detail_screen.dart';
 
 /// Map Screen that displays repair shops on Google Maps
 /// Provides interactive markers, location tracking, and navigation to shop details
@@ -24,6 +24,188 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
+  // Custom map style JSON string
+  static const String _mapStyle = '''
+[
+  {
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#f5f5f5"
+      }
+    ]
+  },
+  {
+    "elementType": "labels.icon",
+    "stylers": [
+      {
+        "visibility": "off"
+      }
+    ]
+  },
+  {
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#616161"
+      }
+    ]
+  },
+  {
+    "elementType": "labels.text.stroke",
+    "stylers": [
+      {
+        "color": "#f5f5f5"
+      }
+    ]
+  },
+  {
+    "featureType": "administrative.land_parcel",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#bdbdbd"
+      }
+    ]
+  },
+  {
+    "featureType": "landscape.natural",
+    "elementType": "geometry.fill",
+    "stylers": [
+      {
+        "color": "#bac6b9"
+      }
+    ]
+  },
+  {
+    "featureType": "poi",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#eeeeee"
+      }
+    ]
+  },
+  {
+    "featureType": "poi",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#757575"
+      }
+    ]
+  },
+  {
+    "featureType": "poi.park",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#e5e5e5"
+      }
+    ]
+  },
+  {
+    "featureType": "poi.park",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#9e9e9e"
+      }
+    ]
+  },
+  {
+    "featureType": "road",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#ffffff"
+      }
+    ]
+  },
+  {
+    "featureType": "road.arterial",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#757575"
+      }
+    ]
+  },
+  {
+    "featureType": "road.highway",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#dadada"
+      }
+    ]
+  },
+  {
+    "featureType": "road.highway",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#616161"
+      }
+    ]
+  },
+  {
+    "featureType": "road.local",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#9e9e9e"
+      }
+    ]
+  },
+  {
+    "featureType": "transit.line",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#e5e5e5"
+      }
+    ]
+  },
+  {
+    "featureType": "transit.station",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#eeeeee"
+      }
+    ]
+  },
+  {
+    "featureType": "water",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#c9c9c9"
+      }
+    ]
+  },
+  {
+    "featureType": "water",
+    "elementType": "geometry.fill",
+    "stylers": [
+      {
+        "color": "#b7cad2"
+      }
+    ]
+  },
+  {
+    "featureType": "water",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#9e9e9e"
+      }
+    ]
+  }
+]
+  ''';
+
   // Default center coordinates (Bangkok)
   final LatLng bangkokLocation = const LatLng(13.7563, 100.5018);
 
@@ -35,7 +217,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   LatLng _mapCenter = const LatLng(13.7563, 100.5018);
 
   // Map accent color for custom markers and UI elements
-  final Color mapAccentColor = Colors.green;
+  final Color mapAccentColor = const Color(0xFFC3C130);
 
   // Location service for tracking user position
   late LocationService _locationService;
@@ -64,6 +246,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   // Custom marker icon for user location
   BitmapDescriptor? _userLocationIcon;
 
+  // Flag to track if map style is loaded
+  bool _isMapStyleLoaded = false;
+
+  // Completely hide map and show preloader
+  bool _showMap = false;
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +265,25 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _createCustomMarkerIcon();
     // Setup location tracking
     _initLocationTracking();
+
+    // Allow a short delay before starting to show the map
+    // This gives the map time to initialize properly before being visible
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _showMap = true;
+        });
+      }
+    });
+
+    // Safety timeout to prevent infinite loading
+    Future.delayed(const Duration(milliseconds: 3000), () {
+      if (mounted && !_isMapStyleLoaded) {
+        setState(() {
+          _isMapStyleLoaded = true;
+        });
+      }
+    });
   }
 
   @override
@@ -278,16 +485,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               _isFollowingUser = false;
             });
 
-            // Navigate to shop details screen
+            // Navigate to shop details screen using the same ShopDetailScreen as the home page
             Navigator.of(context)
                 .push(
                   MaterialPageRoute(
                     builder:
-                        (context) => ShopDetailsScreen(
-                          shop: shop,
-                          userLocation: _locationService.currentLatLng,
-                          mapAccentColor: mapAccentColor,
-                        ),
+                        (context) => ShopDetailScreen(shop: shop.toAppModel()),
                   ),
                 )
                 .then((_) {
@@ -390,7 +593,31 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Called when the Google Map is created
   void _onMapCreated(GoogleMapController controller) {
-    _controller.complete(controller);
+    // Apply the map style immediately, before completing the controller
+    controller
+        .setMapStyle(_mapStyle)
+        .then((_) {
+          // Complete the controller first
+          _controller.complete(controller);
+
+          // Then update the state once map style is loaded
+          if (mounted) {
+            setState(() {
+              _isMapStyleLoaded = true;
+            });
+          }
+        })
+        .catchError((error) {
+          debugPrint("Error setting map style: $error");
+          // Complete the controller even if there's an error
+          _controller.complete(controller);
+
+          if (mounted) {
+            setState(() {
+              _isMapStyleLoaded = true;
+            });
+          }
+        });
   }
 
   /// Called when the map camera position changes
@@ -422,31 +649,65 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          // Map takes full screen
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _mapCenter,
-              zoom: 13.0,
+          // Map container - completely hidden until _showMap is true
+          if (_showMap)
+            Visibility(
+              visible: _isMapStyleLoaded,
+              maintainState: true,
+              child: GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: _mapCenter,
+                  zoom: 13.0,
+                ),
+                markers: allMarkers,
+                myLocationEnabled: false,
+                myLocationButtonEnabled: false,
+                mapType: MapType.normal,
+                zoomControlsEnabled: false,
+                compassEnabled: true,
+                mapToolbarEnabled: false,
+                onMapCreated: _onMapCreated,
+                onCameraMove: _onCameraMove,
+                trafficEnabled: false,
+                buildingsEnabled: true,
+                padding: const EdgeInsets.only(
+                  left: 0,
+                  top: 80,
+                  right: 0,
+                  bottom: 0,
+                ),
+              ),
             ),
-            markers: allMarkers,
-            myLocationEnabled:
-                false, // We'll handle this ourselves with a custom marker
-            myLocationButtonEnabled: false,
-            mapType: MapType.normal,
-            zoomControlsEnabled: false,
-            compassEnabled: true,
-            mapToolbarEnabled: false,
-            onMapCreated: _onMapCreated,
-            onCameraMove: _onCameraMove,
-            trafficEnabled: false,
-            buildingsEnabled: true,
-            padding: const EdgeInsets.only(
-              left: 0,
-              top: 80,
-              right: 0,
-              bottom: 0,
+
+          // Loading overlay
+          if (!_isMapStyleLoaded)
+            Container(
+              color: Colors.white,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 50,
+                      height: 50,
+                      child: CircularProgressIndicator(
+                        color: AppConstants.primaryColor,
+                        strokeWidth: 3,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Loading map...',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: AppConstants.darkColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
 
           // Title bar overlay
           Positioned(
@@ -479,52 +740,60 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-      // Floating action buttons for map navigation
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Show shop location button only when a shop is selected
-          if (_selectedShop != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: FloatingActionButton.small(
-                heroTag: 'shop_location',
-                onPressed: () {
-                  if (_selectedShop != null) {
-                    _goToShopLocation(_selectedShop!.location);
-                  }
-                },
-                backgroundColor: Colors.white,
-                foregroundColor: mapAccentColor,
-                child: const Icon(Icons.location_searching),
-              ),
-            ),
-          // My location button with loading indicator
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: FloatingActionButton(
-              heroTag: 'my_location',
-              onPressed: _isLoadingLocation ? null : _goToCurrentLocation,
-              backgroundColor: _isFollowingUser ? mapAccentColor : Colors.white,
-              foregroundColor: _isFollowingUser ? Colors.white : mapAccentColor,
-              child:
-                  _isLoadingLocation
-                      ? SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            _isFollowingUser ? Colors.white : mapAccentColor,
-                          ),
-                        ),
-                      )
-                      : const Icon(Icons.my_location),
-              tooltip: 'my_location'.tr(context),
-            ),
-          ),
-        ],
-      ),
+      // Floating action buttons for map navigation - only show when map is loaded
+      floatingActionButton:
+          _isMapStyleLoaded
+              ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Show shop location button only when a shop is selected
+                  if (_selectedShop != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: FloatingActionButton.small(
+                        heroTag: 'shop_location',
+                        onPressed: () {
+                          if (_selectedShop != null) {
+                            _goToShopLocation(_selectedShop!.location);
+                          }
+                        },
+                        backgroundColor: Colors.white,
+                        foregroundColor: mapAccentColor,
+                        child: const Icon(Icons.location_searching),
+                      ),
+                    ),
+                  // My location button with loading indicator
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: FloatingActionButton(
+                      heroTag: 'my_location',
+                      onPressed:
+                          _isLoadingLocation ? null : _goToCurrentLocation,
+                      backgroundColor:
+                          _isFollowingUser ? mapAccentColor : Colors.white,
+                      foregroundColor:
+                          _isFollowingUser ? Colors.white : mapAccentColor,
+                      child:
+                          _isLoadingLocation
+                              ? SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    _isFollowingUser
+                                        ? Colors.white
+                                        : mapAccentColor,
+                                  ),
+                                ),
+                              )
+                              : const Icon(Icons.my_location),
+                      tooltip: 'my_location'.tr(context),
+                    ),
+                  ),
+                ],
+              )
+              : null,
     );
   }
 

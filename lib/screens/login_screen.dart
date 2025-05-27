@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/services/auth_service.dart';
+import 'package:wonwonw2/services/auth_state_service.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/screens/signup_screen.dart';
 import 'package:wonwonw2/screens/forgot_password_screen.dart';
+import 'package:wonwonw2/screens/main_navigation.dart';
+import 'package:wonwonw2/services/service_providers.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -18,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = AuthService();
+  final _authStateService = authStateService;
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -93,7 +97,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             Icons.arrow_back,
                             color: Colors.brown,
                           ),
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () {
+                            // Navigate back to the main app without logging in
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MainNavigation(),
+                              ),
+                            );
+                          },
                         ),
                         const Spacer(),
                       ],
@@ -279,7 +291,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 16),
 
                   // Register link
                   Row(
@@ -290,13 +302,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                       TextButton(
-                        onPressed: () {
-                          Navigator.push(
+                        onPressed: () async {
+                          final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => const SignupScreen(),
                             ),
                           );
+
+                          // If registration was successful, user is already logged in
+                          // Return to previous screen with success
+                          if (result == true && mounted) {
+                            Navigator.pop(context, true);
+                          }
                         },
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.brown,
@@ -309,7 +327,28 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 16),
+
+                  // Continue without login
+                  TextButton(
+                    onPressed: () {
+                      // Navigate to main app without login
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MainNavigation(),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'Continue without logging in',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),

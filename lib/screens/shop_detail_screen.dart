@@ -15,6 +15,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Screen that displays detailed information about a repair shop
 /// Shows shop information, hours, contact details, services, and reviews
@@ -140,7 +141,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Removed from saved locations'),
+              content: Text(
+                'removed_from_saved'
+                    .tr(context)
+                    .replaceAll('{shop_name}', widget.shop.name),
+              ),
               backgroundColor: Colors.red[400],
             ),
           );
@@ -154,7 +159,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Saved to your locations'),
+              content: Text(
+                'saved_to_locations'
+                    .tr(context)
+                    .replaceAll('{shop_name}', widget.shop.name),
+              ),
               backgroundColor: AppConstants.primaryColor,
             ),
           );
@@ -162,9 +171,10 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
+        debugPrint('Error toggling saved shop: $e');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to update saved location'),
+          SnackBar(
+            content: Text('failed_to_update_saved'.tr(context)),
             backgroundColor: Colors.red,
           ),
         );
@@ -212,6 +222,62 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         setState(() {
           _isLoadingReports = false;
         });
+      }
+    }
+  }
+
+  /// Open maps with directions to the shop
+  Future<void> _openMapsWithDirections() async {
+    // Show loading message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('opening_maps'.tr(context)),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+
+    // Get the shop's coordinates
+    final double latitude = widget.shop.latitude;
+    final double longitude = widget.shop.longitude;
+
+    // Create Google Maps URL with directions
+    final Uri googleMapsUrl = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$latitude,$longitude&travelmode=driving',
+    );
+
+    // Create Apple Maps URL for iOS devices
+    final Uri appleMapsUrl = Uri.parse(
+      'https://maps.apple.com/?daddr=$latitude,$longitude&dirflg=d',
+    );
+
+    try {
+      // Try to launch Google Maps first
+      if (await canLaunchUrl(googleMapsUrl)) {
+        await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
+      }
+      // If Google Maps can't be launched, try Apple Maps
+      else if (await canLaunchUrl(appleMapsUrl)) {
+        await launchUrl(appleMapsUrl, mode: LaunchMode.externalApplication);
+      }
+      // If neither can be launched, show error message
+      else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('could_not_open_directions'.tr(context)),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('could_not_open_directions'.tr(context)),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -264,11 +330,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
             // Get Directions button
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Opening maps...')),
-                  );
-                },
+                onPressed: _openMapsWithDirections,
                 icon: const Icon(Icons.directions, color: Colors.white),
                 label: Text(
                   'directions'.tr(context),
@@ -561,6 +623,37 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
+              // Show warning for irregular hours
+              if (widget.shop.irregularHours)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.amber[800],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Please call and check if the shop is open',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.amber[900],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               _buildHourRow(
                 'day_monday'.tr(context),
                 '9:00 AM - 6:00 PM',
@@ -1061,6 +1154,7 @@ class _ReportDialog extends StatefulWidget {
 class _ReportDialogState extends State<_ReportDialog> {
   String _selectedReason = '';
   String _details = '';
+  String _correctInfo = '';
 
   @override
   Widget build(BuildContext context) {
@@ -1116,6 +1210,26 @@ class _ReportDialogState extends State<_ReportDialog> {
               ),
               const SizedBox(height: 16),
               Text(
+                'report_correct_info'.tr(context),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                maxLines: 5,
+                decoration: InputDecoration(
+                  hintText: 'report_correct_info_hint'.tr(context),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _correctInfo = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+              Text(
                 'report_additional_details'.tr(context),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
@@ -1150,7 +1264,9 @@ class _ReportDialogState extends State<_ReportDialog> {
           ),
           child: Text('submit'.tr(context)),
           onPressed: () {
-            widget.onSubmit(_selectedReason, _details);
+            final combinedDetails =
+                'Correct Information:\n${_correctInfo}\n\nAdditional Details:\n${_details}';
+            widget.onSubmit(_selectedReason, combinedDetails);
           },
         ),
       ],
