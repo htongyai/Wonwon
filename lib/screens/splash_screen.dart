@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/widgets/auth_wrapper.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:wonwonw2/localization/app_localizations.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -16,6 +18,7 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  String _selectedLanguage = 'en';
 
   @override
   void initState() {
@@ -117,12 +120,12 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
 
-              // App name
+              // App name (localized)
               FadeTransition(
                 opacity: _fadeAnimation,
-                child: const Text(
-                  'WonWon',
-                  style: TextStyle(
+                child: Text(
+                  'app_name'.tr(context),
+                  style: const TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -132,16 +135,75 @@ class _SplashScreenState extends State<SplashScreen>
 
               const SizedBox(height: 8),
 
-              // Tagline
+              // Tagline (localized)
               FadeTransition(
                 opacity: _fadeAnimation,
-                child: const Text(
-                  'by Reviv',
-                  style: TextStyle(fontSize: 16, color: Colors.white),
+                child: Text(
+                  'tagline'.tr(context),
+                  style: const TextStyle(fontSize: 16, color: Colors.white),
                 ),
               ),
 
-              const SizedBox(height: 50),
+              const SizedBox(height: 24),
+
+              // Language selector
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () async {
+                        await AppLocalizationsService.setLocale('en');
+                        setState(() {
+                          _selectedLanguage = 'en';
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            _selectedLanguage == 'en'
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.5),
+                        foregroundColor: AppConstants.primaryColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8,
+                          horizontal: 20,
+                        ),
+                      ),
+                      child: Text('english'.tr(context)),
+                    ),
+                    const SizedBox(width: 16),
+                    ElevatedButton(
+                      onPressed: () async {
+                        await AppLocalizationsService.setLocale('th');
+                        setState(() {
+                          _selectedLanguage = 'th';
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            _selectedLanguage == 'th'
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.5),
+                        foregroundColor: AppConstants.primaryColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 8,
+                          horizontal: 20,
+                        ),
+                      ),
+                      child: Text('thai'.tr(context)),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
 
               // Loading indicator
               FadeTransition(
@@ -164,8 +226,8 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 24.0),
                   child: Text(
-                    'Supported by Repair Community Thailand',
-                    style: TextStyle(
+                    'supported_by_community'.tr(context),
+                    style: const TextStyle(
                       fontSize: 14,
                       color: Colors.white,
                       fontWeight: FontWeight.w300,

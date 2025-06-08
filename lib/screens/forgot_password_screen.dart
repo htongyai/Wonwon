@@ -3,6 +3,7 @@ import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/services/auth_service.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/utils/responsive_size.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({Key? key}) : super(key: key);
@@ -132,13 +133,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: ResponsiveSize.getHeight(2)),
                   Text(
                     'reset_password_description'.tr(context),
                     style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 40),
+                  SizedBox(height: ResponsiveSize.getHeight(10)),
 
                   // Email field
                   TextFormField(
@@ -164,9 +165,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           width: 2,
                         ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 16,
-                        horizontal: 16,
+                      contentPadding: ResponsiveSize.getScaledPadding(
+                        const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 16,
+                        ),
                       ),
                       filled: true,
                       fillColor: Colors.grey.shade50,
@@ -184,15 +187,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 32),
+                  SizedBox(height: ResponsiveSize.getHeight(8)),
 
                   // Reset Password button
                   ElevatedButton(
                     onPressed: _isLoading ? null : _handleResetPassword,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.brown,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      minimumSize: Size(
+                        double.infinity,
+                        ResponsiveSize.getHeight(12),
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -216,7 +221,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               ),
                             ),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
 
                   // Success message if email was sent
                   if (_emailSent)

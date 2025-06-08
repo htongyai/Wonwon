@@ -17,6 +17,7 @@ import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/widgets/auth_wrapper.dart';
 import 'package:wonwonw2/models/repair_category.dart';
 import 'package:wonwonw2/widgets/search_bar_widget.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 class SavedLocationsScreen extends StatefulWidget {
   const SavedLocationsScreen({Key? key}) : super(key: key);
@@ -89,7 +90,7 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Error loading saved shops: $e');
+      appLog('Error loading saved shops: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;

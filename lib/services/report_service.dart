@@ -1,11 +1,13 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ShopReport {
   final String id;
   final String shopId;
   final String reason;
-  final String details;
+  final String correctInfo;
+  final String additionalDetails;
   final DateTime createdAt;
   final String userId;
   final bool resolved;
@@ -14,7 +16,8 @@ class ShopReport {
     required this.id,
     required this.shopId,
     required this.reason,
-    required this.details,
+    required this.correctInfo,
+    required this.additionalDetails,
     required this.createdAt,
     this.userId = 'anonymous',
     this.resolved = false,
@@ -25,7 +28,8 @@ class ShopReport {
       'id': id,
       'shopId': shopId,
       'reason': reason,
-      'details': details,
+      'correctInfo': correctInfo,
+      'additionalDetails': additionalDetails,
       'createdAt': createdAt.toIso8601String(),
       'userId': userId,
       'resolved': resolved,
@@ -37,7 +41,8 @@ class ShopReport {
       id: json['id'],
       shopId: json['shopId'],
       reason: json['reason'],
-      details: json['details'],
+      correctInfo: json['correctInfo'] ?? '',
+      additionalDetails: json['additionalDetails'] ?? '',
       createdAt: DateTime.parse(json['createdAt']),
       userId: json['userId'],
       resolved: json['resolved'],
@@ -46,74 +51,42 @@ class ShopReport {
 }
 
 class ReportService {
-  static const String _reportsKey = 'shop_reports';
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final String _collection = 'report';
 
-  // Add a new report
+  // Add a new report to Firestore
   Future<void> addReport(ShopReport report) async {
-    final prefs = await SharedPreferences.getInstance();
-    final reportsJson = prefs.getStringList(_reportsKey) ?? [];
-
-    // Convert the report to JSON
-    final reportJson = jsonEncode(report.toJson());
-
-    // Add to the list
-    reportsJson.add(reportJson);
-
-    // Save back to SharedPreferences
-    await prefs.setStringList(_reportsKey, reportsJson);
+    await _firestore
+        .collection(_collection)
+        .doc(report.id)
+        .set(report.toJson());
   }
 
-  // Get all reports
+  // Get all reports from Firestore
   Future<List<ShopReport>> getAllReports() async {
-    final prefs = await SharedPreferences.getInstance();
-    final reportsJson = prefs.getStringList(_reportsKey) ?? [];
-
-    // Convert JSON strings to ShopReport objects
-    return reportsJson.map((jsonStr) {
-      final json = jsonDecode(jsonStr) as Map<String, dynamic>;
-      return ShopReport.fromJson(json);
-    }).toList();
+    final snapshot =
+        await _firestore
+            .collection(_collection)
+            .orderBy('createdAt', descending: true)
+            .get();
+    return snapshot.docs.map((doc) => ShopReport.fromJson(doc.data())).toList();
   }
 
-  // Get reports by shop ID
+  // Get reports by shop ID from Firestore
   Future<List<ShopReport>> getReportsByShopId(String shopId) async {
-    final reports = await getAllReports();
-    return reports.where((report) => report.shopId == shopId).toList();
+    final snapshot =
+        await _firestore
+            .collection(_collection)
+            .where('shopId', isEqualTo: shopId)
+            .orderBy('createdAt', descending: true)
+            .get();
+    return snapshot.docs.map((doc) => ShopReport.fromJson(doc.data())).toList();
   }
 
-  // Mark a report as resolved
+  // Mark a report as resolved in Firestore
   Future<void> resolveReport(String reportId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final reportsJson = prefs.getStringList(_reportsKey) ?? [];
-
-    // Convert all reports
-    final reports =
-        reportsJson.map((jsonStr) {
-          final json = jsonDecode(jsonStr) as Map<String, dynamic>;
-          return ShopReport.fromJson(json);
-        }).toList();
-
-    // Find and update the specific report
-    for (int i = 0; i < reports.length; i++) {
-      if (reports[i].id == reportId) {
-        // Create a new report with resolved = true
-        final updatedReport = ShopReport(
-          id: reports[i].id,
-          shopId: reports[i].shopId,
-          reason: reports[i].reason,
-          details: reports[i].details,
-          createdAt: reports[i].createdAt,
-          userId: reports[i].userId,
-          resolved: true,
-        );
-
-        // Update the reports list
-        reportsJson[i] = jsonEncode(updatedReport.toJson());
-        break;
-      }
-    }
-
-    // Save back to SharedPreferences
-    await prefs.setStringList(_reportsKey, reportsJson);
+    await _firestore.collection(_collection).doc(reportId).update({
+      'resolved': true,
+    });
   }
 }

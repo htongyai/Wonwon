@@ -7,12 +7,15 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'dart:math';
-import 'package:wonwonw2/data/mock_shops.dart';
 import 'package:wonwonw2/services/location_service.dart';
 import 'package:wonwonw2/services/service_providers.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:ui' as ui;
 import 'package:wonwonw2/screens/shop_detail_screen.dart';
+import 'package:wonwonw2/services/shop_service.dart';
+import 'package:wonwonw2/models/repair_shop.dart';
+import 'package:wonwonw2/screens/add_shop_screen.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 /// Map Screen that displays repair shops on Google Maps
 /// Provides interactive markers, location tracking, and navigation to shop details
@@ -465,12 +468,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Load all repair shop markers onto the map
   Future<void> _loadMarkers() async {
+    final shopService = ShopService();
+    final shops = await shopService.getAllShops();
+
     // Add shop markers
-    for (final shop in MockShops.shops) {
+    for (final shop in shops) {
       _markers.add(
         Marker(
           markerId: MarkerId(shop.id),
-          position: shop.location,
+          position: LatLng(shop.latitude, shop.longitude),
           icon: BitmapDescriptor.defaultMarkerWithHue(
             BitmapDescriptor.hueAzure,
           ),
@@ -481,20 +487,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           onTap: () {
             setState(() {
               _selectedShop = shop;
-              // Stop following user when a shop is selected
               _isFollowingUser = false;
             });
 
-            // Navigate to shop details screen using the same ShopDetailScreen as the home page
             Navigator.of(context)
                 .push(
                   MaterialPageRoute(
-                    builder:
-                        (context) => ShopDetailScreen(shop: shop.toAppModel()),
+                    builder: (context) => ShopDetailScreen(shop: shop),
                   ),
                 )
                 .then((_) {
-                  // When returning from details, clear selected shop
                   setState(() {
                     _selectedShop = null;
                   });
@@ -608,7 +610,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           }
         })
         .catchError((error) {
-          debugPrint("Error setting map style: $error");
+          appLog("Error setting map style: $error");
           // Complete the controller even if there's an error
           _controller.complete(controller);
 
@@ -697,7 +699,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      'Loading map...',
+                      'loading_map'.tr(context),
                       style: GoogleFonts.montserrat(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
@@ -746,6 +748,23 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Add Shop button
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: FloatingActionButton(
+                      heroTag: 'add_shop',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AddShopScreen(),
+                          ),
+                        );
+                      },
+                      backgroundColor: Colors.grey[800],
+                      child: const Icon(Icons.add, color: Colors.white),
+                    ),
+                  ),
                   // Show shop location button only when a shop is selected
                   if (_selectedShop != null)
                     Padding(
@@ -754,7 +773,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                         heroTag: 'shop_location',
                         onPressed: () {
                           if (_selectedShop != null) {
-                            _goToShopLocation(_selectedShop!.location);
+                            _goToShopLocation(
+                              LatLng(
+                                _selectedShop!.latitude,
+                                _selectedShop!.longitude,
+                              ),
+                            );
                           }
                         },
                         backgroundColor: Colors.white,

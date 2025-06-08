@@ -76,4 +76,15 @@ class AssetHelpers {
       ),
     );
   }
+
+  static String getStockImageUrl(String type) {
+    switch (type) {
+      case 'shop':
+        return 'https://iili.io/3PiMVus.webp';
+      case 'user':
+        return 'https://iili.io/3PiMVus.webp';
+      default:
+        return 'https://iili.io/3PiMVus.webp';
+    }
+  }
 }

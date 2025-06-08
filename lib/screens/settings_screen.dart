@@ -1,12 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:wonwonw2/constants/app_colors.dart';
+import 'package:wonwonw2/constants/app_text_styles.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/screens/login_screen.dart';
 import 'package:wonwonw2/screens/saved_locations_screen.dart';
 import 'package:wonwonw2/screens/add_shop_screen.dart';
+import 'package:wonwonw2/screens/unapproved_shops_screen.dart';
+import 'package:wonwonw2/screens/view_reports_screen.dart';
 import 'package:wonwonw2/services/auth_service.dart';
+import 'package:wonwonw2/services/app_localizations_service.dart' as service;
+import 'package:wonwonw2/services/theme_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:wonwonw2/localization/app_localizations.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/widgets/section_title.dart';
+import 'package:wonwonw2/utils/responsive_size.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -16,17 +33,21 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  String _selectedLanguage = 'English'; // Default language
+  String _selectedLanguage = 'en'; // Default language code
   final AuthService _authService = AuthService();
   bool _isLoggedIn = false;
   String? _userEmail;
   bool _isLoading = true;
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
     _checkLoginStatus();
     _loadSelectedLanguage();
+    _checkAdminStatus();
   }
 
   Future<void> _checkLoginStatus() async {
@@ -62,8 +83,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You have been logged out'),
+        SnackBar(
+          content: Text('logged_out_message'.tr(context)),
           backgroundColor: Colors.green,
         ),
       );
@@ -71,219 +92,245 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSelectedLanguage() async {
-    final locale = await AppLocalizationsService.getLocale();
+    final languageCode = await service.AppLocalizationsService.getLocale();
     if (mounted) {
       setState(() {
-        _selectedLanguage = locale.languageCode == 'en' ? 'English' : 'Thai';
+        _selectedLanguage = languageCode; // 'en' or 'th'
       });
+    }
+  }
+
+  Future<void> _checkAdminStatus() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        final userDoc =
+            await _firestore.collection('users').doc(user.uid).get();
+        setState(() {
+          _isAdmin = userDoc.data()?['admin'] ?? false;
+        });
+      }
+    } catch (e) {
+      appLog('Error checking admin status', e);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'Settings',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w500),
+        title: Text(
+          'settings'.tr(context),
+          style: AppTextStyles.heading.copyWith(color: AppColors.text),
         ),
         centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        backgroundColor: Colors.white,
-        elevation: 0,
       ),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : SafeArea(
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 24,
-                    ),
+      body: SafeArea(
+        child: Padding(
+          padding: ResponsiveSize.getScaledPadding(const EdgeInsets.all(16.0)),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Only show Features section if user is logged in
+                if (user != null) ...[
+                  SectionTitle(text: 'features'.tr(context)),
+                  SizedBox(height: ResponsiveSize.getHeight(2)),
+                  _buildSettingsCard(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Account Section
-                        _buildSectionTitle('account'.tr(context)),
-                        const SizedBox(height: 12),
-                        _isLoggedIn
-                            ? _buildSettingsCard(child: _buildProfileTile())
-                            : _buildSettingsCard(child: _buildLoginTile()),
-                        const SizedBox(height: 32),
-
-                        // Features Section
-                        _buildSectionTitle('features'.tr(context)),
-                        const SizedBox(height: 12),
-                        _buildSettingsCard(
-                          child: Column(
-                            children: [
-                              _buildFeatureTile(
-                                'add_new_place'.tr(context),
-                                FontAwesomeIcons.plus,
-                                AppConstants.primaryColor,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) => const AddShopScreen(),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const Divider(height: 1, thickness: 0.5),
-                              _buildFeatureTile(
-                                'saved_locations'.tr(context),
-                                FontAwesomeIcons.bookmark,
-                                AppConstants.primaryColor,
+                        _buildFeatureTile(
+                          Icons.add,
+                          'add_new_place'.tr(context),
+                          onTap: () {},
+                        ),
+                        _buildFeatureTile(
+                          Icons.bookmark_border,
+                          'saved_locations'.tr(context),
+                          onTap: () {},
+                        ),
+                        if (_isAdmin)
+                          _buildFeatureTile(
+                            Icons.access_time,
+                            'unapproved_shops'.tr(context),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) =>
+                                          const UnapprovedShopsScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        FutureBuilder<bool>(
+                          future: _isAdminUser(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return SizedBox.shrink();
+                            }
+                            if (snapshot.data == true) {
+                              return _buildFeatureTile(
+                                Icons.report_problem,
+                                'view_reports'.tr(context),
                                 onTap: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder:
                                           (context) =>
-                                              const SavedLocationsScreen(),
+                                              const ViewReportsScreen(),
                                     ),
                                   );
                                 },
-                              ),
-                            ],
-                          ),
+                              );
+                            }
+                            return SizedBox.shrink();
+                          },
                         ),
-                        const SizedBox(height: 32),
-
-                        // Language Section
-                        _buildSectionTitle('language'.tr(context)),
-                        const SizedBox(height: 12),
-                        _buildSettingsCard(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 8,
-                            ),
-                            child: _buildLanguageDropdown(),
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-
-                        // Legal Section
-                        _buildSectionTitle('legal'.tr(context)),
-                        const SizedBox(height: 12),
-                        _buildSettingsCard(
-                          child: Column(
-                            children: [
-                              _buildLegalTile(
-                                'terms_of_use'.tr(context),
-                                FontAwesomeIcons.fileLines,
-                                AppConstants.primaryColor.withOpacity(0.7),
-                              ),
-                              const Divider(height: 1, thickness: 0.5),
-                              _buildLegalTile(
-                                'privacy_policy'.tr(context),
-                                FontAwesomeIcons.shieldHalved,
-                                AppConstants.primaryColor.withOpacity(0.7),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-
-                        // Account Actions Section - Only show if logged in
-                        if (_isLoggedIn) ...[
-                          _buildSectionTitle('Account Actions'),
-                          const SizedBox(height: 12),
-                          _buildSettingsCard(
-                            child: Column(
-                              children: [
-                                _buildActionTile(
-                                  'logout',
-                                  FontAwesomeIcons.rightFromBracket,
-                                  Colors.red.shade700,
-                                  onTap: () {
-                                    _showLogoutConfirmation(context);
-                                  },
-                                ),
-                                const Divider(height: 1, thickness: 0.5),
-                                _buildActionTile(
-                                  'delete_account',
-                                  FontAwesomeIcons.trash,
-                                  Colors.red.shade700,
-                                  onTap: () {
-                                    _showDeleteAccountConfirmation(context);
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                        ],
-
-                        // App Version
-                        Center(
-                          child: Column(
-                            children: [
-                              Container(
-                                width: 60,
-                                height: 60,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.brown,
-                                    width: 2,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(30),
-                                  child: Image.asset(
-                                    'assets/rlogo.jpg',
-                                    width: 60,
-                                    height: 60,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'version'.tr(context) + ' 1.0.3',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 40),
                       ],
                     ),
                   ),
-                ),
-              ),
-    );
-  }
+                  SizedBox(height: ResponsiveSize.getHeight(2)),
+                ],
+                // Account Section
+                SectionTitle(text: 'account'.tr(context)),
+                SizedBox(height: ResponsiveSize.getHeight(2)),
+                _isLoggedIn
+                    ? _buildSettingsCard(child: _buildProfileTile())
+                    : _buildSettingsCard(child: _buildLoginTile()),
+                SizedBox(height: ResponsiveSize.getHeight(2)),
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: AppConstants.darkColor,
+                // Language Section
+                SectionTitle(text: 'language'.tr(context)),
+                SizedBox(height: ResponsiveSize.getHeight(2)),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildLanguageOption(
+                        context,
+                        'thai'.tr(context),
+                        'th',
+                        'th',
+                      ),
+                      SizedBox(height: ResponsiveSize.getHeight(0.25)),
+                      _buildLanguageOption(
+                        context,
+                        'english'.tr(context),
+                        'en',
+                        'en',
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: ResponsiveSize.getHeight(2)),
+
+                // Legal Section
+                SectionTitle(text: 'legal'.tr(context)),
+                SizedBox(height: ResponsiveSize.getHeight(2)),
+                _buildSettingsCard(
+                  child: Column(
+                    children: [
+                      _buildLegalTile(
+                        'terms_of_use'.tr(context),
+                        FontAwesomeIcons.fileLines,
+                        AppConstants.primaryColor.withOpacity(0.7),
+                      ),
+                      const Divider(height: 1, thickness: 0.5),
+                      _buildLegalTile(
+                        'privacy_policy'.tr(context),
+                        FontAwesomeIcons.shieldHalved,
+                        AppConstants.primaryColor.withOpacity(0.7),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: ResponsiveSize.getHeight(2)),
+
+                // Account Actions Section - Only show if logged in
+                if (_isLoggedIn) ...[
+                  SectionTitle(text: 'account_actions'.tr(context)),
+                  SizedBox(height: ResponsiveSize.getHeight(2)),
+                  _buildSettingsCard(
+                    child: Column(
+                      children: [
+                        _buildActionTile(
+                          'logout',
+                          FontAwesomeIcons.rightFromBracket,
+                          Colors.red.shade700,
+                          onTap: () {
+                            _showLogoutConfirmation(context);
+                          },
+                        ),
+                        const Divider(height: 1, thickness: 0.5),
+                        _buildActionTile(
+                          'delete_account',
+                          FontAwesomeIcons.trash,
+                          Colors.red.shade700,
+                          onTap: () {
+                            _showDeleteAccountConfirmation(context);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(2)),
+                ],
+
+                // App Version
+                Center(
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.brown, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(30),
+                          child: Image.asset(
+                            'assets/rlogo.jpg',
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: ResponsiveSize.getHeight(2)),
+                      Text(
+                        'version'.tr(context) + ' 1.0.3',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: ResponsiveSize.getHeight(2)),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -308,7 +355,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildLoginTile() {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      contentPadding: ResponsiveSize.getScaledPadding(
+        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      ),
       leading: Container(
         width: 50,
         height: 50,
@@ -340,7 +389,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildProfileTile() {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      contentPadding: ResponsiveSize.getScaledPadding(
+        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      ),
       leading: Container(
         width: 50,
         height: 50,
@@ -359,14 +410,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
             );
           }
-          return const Text(
-            'Profile',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+          return Text(
+            'profile_label'.tr(context),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
           );
         },
       ),
       subtitle: Text(
-        _userEmail ?? 'User',
+        _userEmail ?? 'user_label'.tr(context),
         style: const TextStyle(fontSize: 14, color: Colors.grey),
       ),
       onTap: () {
@@ -375,157 +426,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildLanguageDropdown() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          // English language button
-          Container(
-            width:
-                MediaQuery.of(context).size.width * 0.45 -
-                40, // 45% of width minus padding
-            child: ElevatedButton(
-              onPressed: () async {
-                if (_selectedLanguage != 'English') {
-                  setState(() {
-                    _selectedLanguage = 'English';
-                  });
-                  await AppLocalizationsService.setLocale('en');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    _selectedLanguage == 'English'
-                        ? Colors.brown
-                        : Colors.grey.shade100,
-                foregroundColor:
-                    _selectedLanguage == 'English'
-                        ? Colors.white
-                        : Colors.grey.shade700,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 8,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  side: BorderSide(
-                    color:
-                        _selectedLanguage == 'English'
-                            ? Colors.brown
-                            : Colors.grey.shade300,
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Image.asset(
-                      'assets/images/flag_us.png',
-                      width: 24,
-                      height: 20,
-                      fit: BoxFit.cover,
-                      errorBuilder:
-                          (context, error, stackTrace) =>
-                              const Icon(Icons.flag, size: 24),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'english'.tr(context),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight:
-                          _selectedLanguage == 'English'
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+  Widget _buildLanguageOption(
+    BuildContext context,
+    String languageName,
+    String languageCode,
+    String selectedLanguage,
+  ) {
+    return ListTile(
+      contentPadding: ResponsiveSize.getScaledPadding(
+        const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      ),
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: AppConstants.primaryColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: FaIcon(
+            Icons.language,
+            color: AppConstants.primaryColor,
+            size: 16,
           ),
-
-          // Thai language button
-          Container(
-            width:
-                MediaQuery.of(context).size.width * 0.45 -
-                40, // 45% of width minus padding
-            child: ElevatedButton(
-              onPressed: () async {
-                if (_selectedLanguage != 'Thai') {
-                  setState(() {
-                    _selectedLanguage = 'Thai';
-                  });
-                  await AppLocalizationsService.setLocale('th');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    _selectedLanguage == 'Thai'
-                        ? Colors.brown
-                        : Colors.grey.shade100,
-                foregroundColor:
-                    _selectedLanguage == 'Thai'
-                        ? Colors.white
-                        : Colors.grey.shade700,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 8,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  side: BorderSide(
-                    color:
-                        _selectedLanguage == 'Thai'
-                            ? Colors.brown
-                            : Colors.grey.shade300,
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Image.asset(
-                      'assets/images/flag_th.png',
-                      width: 24,
-                      height: 20,
-                      fit: BoxFit.cover,
-                      errorBuilder:
-                          (context, error, stackTrace) =>
-                              const Icon(Icons.flag, size: 24),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'thai'.tr(context),
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight:
-                          _selectedLanguage == 'Thai'
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
+      ),
+      title: Text(
+        languageName,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight:
+              _selectedLanguage == languageCode
+                  ? FontWeight.bold
+                  : FontWeight.normal,
+        ),
+      ),
+      trailing: Radio(
+        value: languageCode,
+        groupValue: _selectedLanguage,
+        onChanged: (value) {
+          if (value != null) {
+            setState(() {
+              _selectedLanguage = value as String;
+            });
+            service.AppLocalizationsService.setLocale(value);
+          }
+        },
       ),
     );
   }
 
   Widget _buildLegalTile(String title, IconData icon, Color iconColor) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      contentPadding: ResponsiveSize.getScaledPadding(
+        const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      ),
       leading: Container(
         width: 36,
         height: 36,
@@ -557,7 +512,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      contentPadding: ResponsiveSize.getScaledPadding(
+        const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      ),
       leading: Container(
         width: 36,
         height: 36,
@@ -580,9 +537,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildFeatureTile(
-    String title,
     IconData icon,
-    Color iconColor, {
+    String title, {
     required VoidCallback onTap,
   }) {
     return ListTile(
@@ -591,10 +547,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
+          color: AppConstants.primaryColor.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Center(child: FaIcon(icon, color: iconColor, size: 16)),
+        child: Center(
+          child: FaIcon(icon, color: AppConstants.primaryColor, size: 16),
+        ),
       ),
       title: Text(
         title,
@@ -683,5 +641,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       },
     );
+  }
+
+  Future<bool> _isAdminUser() async {
+    final authService = AuthService();
+    final userId = await authService.getUserId();
+    if (userId == null) return false;
+    final userDoc =
+        await FirebaseFirestore.instance.collection('users').doc(userId).get();
+    return userDoc.data()?['admin'] == true;
   }
 }

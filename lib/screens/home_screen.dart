@@ -5,6 +5,7 @@ import 'package:wonwonw2/models/repair_category.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/screens/settings_screen.dart';
 import 'package:wonwonw2/screens/shop_detail_screen.dart';
+import 'package:wonwonw2/screens/add_shop_screen.dart';
 import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/utils/asset_helpers.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
@@ -16,6 +17,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/models/repair_sub_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -34,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   String _searchQuery = '';
   String _selectedCategoryId = 'all';
+  String? _selectedSubServiceId;
 
   // Current language code (en or th)
   String _currentLanguage = 'en';
@@ -42,6 +46,8 @@ class _HomeScreenState extends State<HomeScreen>
   final ScrollController _scrollController = ScrollController();
   bool _isRefreshing = false;
   double _refreshIndicatorExtent = 0;
+
+  bool _showLoadingOverlay = false;
 
   @override
   void initState() {
@@ -60,11 +66,18 @@ class _HomeScreenState extends State<HomeScreen>
     _scrollController.addListener(_scrollListener);
 
     // Listen for language changes
-    AppLocalizationsService().localeStream.listen((locale) {
+    AppLocalizationsService().localeStream.listen((locale) async {
       if (mounted) {
         setState(() {
+          _showLoadingOverlay = true;
           _currentLanguage = locale.languageCode;
         });
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted) {
+          setState(() {
+            _showLoadingOverlay = false;
+          });
+        }
       }
     });
   }
@@ -147,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       );
     } catch (e) {
-      debugPrint('Error loading shops: $e');
+      appLog('Error loading shops: $e');
       setState(() {
         _isLoading = false;
       });
@@ -194,39 +207,61 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadShops,
-          color: AppConstants.primaryColor,
-          displacement: 40.0,
-          strokeWidth: 3.0,
-          edgeOffset: 20.0,
-          triggerMode: RefreshIndicatorTriggerMode.anywhere,
-          child: Stack(
-            children: [
-              if (_isLoading)
-                Center(
-                  child: CircularProgressIndicator(
-                    color: AppConstants.primaryColor,
+    return Stack(
+      children: [
+        Scaffold(
+          body: SafeArea(
+            child: RefreshIndicator(
+              onRefresh: _loadShops,
+              color: AppConstants.primaryColor,
+              displacement: 40.0,
+              strokeWidth: 3.0,
+              edgeOffset: 20.0,
+              triggerMode: RefreshIndicatorTriggerMode.anywhere,
+              child: Stack(
+                children: [
+                  if (_isLoading)
+                    Center(
+                      child: CircularProgressIndicator(
+                        color: AppConstants.primaryColor,
+                      ),
+                    )
+                  else
+                    _buildMainContent(),
+                  // Pull to refresh indicator at the top
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 0, // Hidden initially
+                      alignment: Alignment.center,
+                    ),
                   ),
-                )
-              else
-                _buildMainContent(),
-              // Pull to refresh indicator at the top
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  height: 0, // Hidden initially
-                  alignment: Alignment.center,
-                ),
+                ],
               ),
-            ],
+            ),
+          ),
+          floatingActionButton: FloatingActionButton(
+            heroTag: 'add_shop_home',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AddShopScreen()),
+              );
+            },
+            backgroundColor: Colors.grey[800],
+            child: const Icon(Icons.add, color: Colors.white),
           ),
         ),
-      ),
+        if (_showLoadingOverlay)
+          Positioned.fill(
+            child: Container(
+              color: Colors.white,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+          ),
+      ],
     );
   }
 
@@ -274,11 +309,8 @@ class _HomeScreenState extends State<HomeScreen>
 
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  ResponsiveSize.getWidth(6), // 24px on standard screen
-                  ResponsiveSize.getHeight(1.2), // 10px on standard screen
-                  ResponsiveSize.getWidth(6),
-                  0,
+                padding: ResponsiveSize.getScaledPadding(
+                  const EdgeInsets.fromLTRB(24, 10, 24, 0),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,7 +355,7 @@ class _HomeScreenState extends State<HomeScreen>
                           children: [
                             // Language selector
                             _buildSimpleLanguageSelector(),
-                            const SizedBox(width: 4),
+                            SizedBox(width: ResponsiveSize.getWidth(1)),
                             // Feedback icon
                             IconButton(
                               padding: EdgeInsets.zero,
@@ -368,9 +400,10 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       ],
                     ),
-                    SizedBox(height: ResponsiveSize.getHeight(3)),
+                    SizedBox(height: ResponsiveSize.getHeight(0.5)),
 
-                    // Greeting with animations
+                    // Add spacing above the homepage title
+                    SizedBox(height: ResponsiveSize.getHeight(4)),
                     FadeTransition(
                       opacity: Tween<double>(begin: 0, end: 1).animate(
                         CurvedAnimation(
@@ -515,21 +548,24 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 child: SizedBox(
                   height: ResponsiveSize.getHeight(
-                    15,
-                  ), // Taller height for the categories section
+                    10,
+                  ), // Reduced height for the categories section
                   child: _buildCategoriesSection(),
                 ),
               ),
             ),
 
+            // Add sub-services section after categories
+            SliverToBoxAdapter(child: _buildSubServicesSection()),
+
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: ResponsiveSize.getScaledPadding(
+                  const EdgeInsets.symmetric(horizontal: 16.0),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    //  const SizedBox(height: 1),
-
                     // Recommended shops heading with clear filter button
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -553,16 +589,17 @@ class _HomeScreenState extends State<HomeScreen>
                             label: Text('clear'.tr(context)),
                             style: TextButton.styleFrom(
                               foregroundColor: AppConstants.primaryColor,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                              padding: ResponsiveSize.getScaledPadding(
+                                const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                               ),
                               visualDensity: VisualDensity.compact,
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 8),
                   ],
                 ),
               ),
@@ -660,23 +697,17 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildCategoryCard(RepairCategory category) {
-    // Check if this category is currently selected
     final isSelected = _selectedCategoryId == category.id;
-
     return GestureDetector(
-      onTap: () {
-        // If All category, clear filters
+      onTap: () async {
+        _showTemporaryLoadingOverlay();
+        await Future.delayed(const Duration(milliseconds: 200));
         if (category.id == 'all') {
           _clearFilters();
           setState(() {
             _selectedCategoryId = 'all';
           });
-        }
-        // If already selected, don't do anything
-        else if (isSelected) {
-          // Keep the same filter
-        } else {
-          // Filter shops by category
+        } else if (!isSelected) {
           _filterShopsByCategory(category.id);
           setState(() {
             _selectedCategoryId = category.id;
@@ -714,7 +745,7 @@ class _HomeScreenState extends State<HomeScreen>
                 size: 24, // Fixed size
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: ResponsiveSize.getHeight(1)),
             Text(
               category.getLocalizedName(context),
               textAlign: TextAlign.center,
@@ -817,6 +848,7 @@ class _HomeScreenState extends State<HomeScreen>
                             shop.photos.first,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
+                              appLog('Image loading error: $error');
                               return AssetHelpers.getShopPlaceholder(shop.name);
                             },
                             loadingBuilder: (context, child, loadingProgress) {
@@ -872,24 +904,131 @@ class _HomeScreenState extends State<HomeScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Shop name
-                  Text(
-                    shop.name,
-                    style: GoogleFonts.montserrat(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppConstants.darkColor,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Address
+                  // Name and rating row
                   Row(
                     children: [
-                      FaIcon(
-                        FontAwesomeIcons.locationDot,
-                        color: AppConstants.tertiaryColor,
-                        size: 14,
+                      Expanded(
+                        child: Text(
+                          shop.name,
+                          style: GoogleFonts.montserrat(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppConstants.darkColor,
+                            letterSpacing: 0.1,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          const Icon(Icons.star, color: Colors.amber, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            shop.rating.toStringAsFixed(1),
+                            style: GoogleFonts.montserrat(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: AppConstants.darkColor,
+                            ),
+                          ),
+                          if (shop.reviewCount > 0) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              '(${shop.reviewCount})',
+                              style: GoogleFonts.montserrat(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Categories under name
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children:
+                        shop.categories.map((category) {
+                          return Container(
+                            padding: ResponsiveSize.getScaledPadding(
+                              const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppConstants.primaryColor.withOpacity(
+                                0.13,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Text(
+                              'category_${category.toLowerCase()}'.tr(context),
+                              style: GoogleFonts.montserrat(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppConstants.primaryColor,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                  const SizedBox(height: 10),
+                  // Subservices available
+                  Builder(
+                    builder: (context) {
+                      final subServiceNames = <String>[];
+                      shop.subServices.forEach((cat, subs) {
+                        subServiceNames.addAll(
+                          subs.map(
+                            (id) => RepairSubService(
+                              categoryId: cat,
+                              id: id,
+                              name: '',
+                              description: '',
+                            ).getLocalizedName(context),
+                          ),
+                        );
+                      });
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.build, color: Colors.grey, size: 16),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              subServiceNames.isNotEmpty
+                                  ? subServiceNames.take(3).join(', ') +
+                                      (subServiceNames.length > 3 ? '...' : '')
+                                  : 'no_subservices'.tr(context),
+                              style: GoogleFonts.montserrat(
+                                fontSize: 13,
+                                color: Colors.grey[800],
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.1,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  // Address
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        color: Colors.grey,
+                        size: 16,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -897,82 +1036,22 @@ class _HomeScreenState extends State<HomeScreen>
                           shop.address,
                           style: GoogleFonts.montserrat(
                             fontSize: 14,
-                            color: Colors.grey[600],
+                            color: Colors.grey[700],
+                            letterSpacing: 0.1,
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-
-                  // Rating
-                  Row(
-                    children: [
-                      FaIcon(
-                        FontAwesomeIcons.solidStar,
-                        color: Colors.amber,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${shop.rating.toStringAsFixed(1)} (${shop.reviewCount})',
-                        style: GoogleFonts.montserrat(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Categories
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children:
-                        shop.categories.map((category) {
-                          return InkWell(
-                            onTap: () {
-                              _filterShopsByCategory(category);
-                            },
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppConstants.primaryColor.withOpacity(
-                                  0.1,
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text(
-                                'category_${category.toLowerCase()}'.tr(
-                                  context,
-                                ),
-                                style: GoogleFonts.montserrat(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppConstants.primaryColor,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                  ),
                   const SizedBox(height: 16),
-
-                  // View details button
+                  // View Details button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () async {
-                        // Get the currently selected category
                         final selectedCategory = _getSelectedCategory();
-
                         final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -983,8 +1062,6 @@ class _HomeScreenState extends State<HomeScreen>
                                 ),
                           ),
                         );
-
-                        // Handle returning with category filter
                         if (result is Map<String, dynamic> &&
                             result.containsKey('filterCategory')) {
                           final category = result['filterCategory'] as String;
@@ -995,16 +1072,19 @@ class _HomeScreenState extends State<HomeScreen>
                         }
                       },
                       style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConstants.primaryColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
                       ),
                       child: Text(
                         'view_details'.tr(context),
                         style: GoogleFonts.montserrat(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
+                          fontSize: 15,
                         ),
                       ),
                     ),
@@ -1025,12 +1105,14 @@ class _HomeScreenState extends State<HomeScreen>
       _clearFilters();
       setState(() {
         _selectedCategoryId = 'all';
+        _selectedSubServiceId = null;
       });
       return;
     }
 
     setState(() {
       _selectedCategoryId = categoryId;
+      _selectedSubServiceId = null;
       _filteredShops =
           _shops.where((shop) {
             return shop.categories.any(
@@ -1042,11 +1124,13 @@ class _HomeScreenState extends State<HomeScreen>
     // Scroll to the top to show filtered results
     if (_filteredShops.isNotEmpty) {
       Future.delayed(const Duration(milliseconds: 100), () {
-        PrimaryScrollController.of(context).animateTo(
-          0,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeOut,
-        );
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOut,
+          );
+        }
       });
     }
   }
@@ -1060,6 +1144,7 @@ class _HomeScreenState extends State<HomeScreen>
   void _clearFilters() {
     setState(() {
       _selectedCategoryId = 'all';
+      _selectedSubServiceId = null;
       _filteredShops = _shops;
     });
   }
@@ -1156,6 +1241,137 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         );
       }
+    }
+  }
+
+  // Add this new method to build sub-services section
+  Widget _buildSubServicesSection() {
+    if (_selectedCategoryId == 'all') return const SizedBox.shrink();
+
+    final categories = RepairCategory.getCategories();
+    final selectedCategory = categories.firstWhere(
+      (cat) => cat.id == _selectedCategoryId,
+      orElse: () => categories.first,
+    );
+
+    if (selectedCategory.subServices.isEmpty) return const SizedBox.shrink();
+
+    return Stack(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'available_subservices_label'.tr(context),
+                style: GoogleFonts.montserrat(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppConstants.darkColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    selectedCategory.subServices.map((subService) {
+                      final isSelected = _selectedSubServiceId == subService.id;
+                      return InkWell(
+                        onTap: () async {
+                          _showTemporaryLoadingOverlay();
+                          await Future.delayed(
+                            const Duration(milliseconds: 200),
+                          );
+                          setState(() {
+                            _selectedSubServiceId =
+                                isSelected ? null : subService.id;
+                          });
+                          _filterShopsBySubService(subService.id);
+                        },
+                        child: Container(
+                          padding: ResponsiveSize.getScaledPadding(
+                            const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                isSelected
+                                    ? AppConstants.primaryColor
+                                    : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color:
+                                  isSelected
+                                      ? AppConstants.primaryColor
+                                      : AppConstants.primaryColor.withOpacity(
+                                        0.3,
+                                      ),
+                            ),
+                          ),
+                          child: Text(
+                            RepairSubService(
+                              categoryId: selectedCategory.id,
+                              id: subService.id,
+                              name: '',
+                              description: '',
+                            ).getLocalizedName(context),
+                            style: GoogleFonts.montserrat(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color:
+                                  isSelected
+                                      ? Colors.white
+                                      : AppConstants.darkColor,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Add this new method to filter shops by sub-service
+  void _filterShopsBySubService(String subServiceId) {
+    setState(() {
+      _filteredShops =
+          _shops.where((shop) {
+            final shopSubServices = shop.subServices[_selectedCategoryId] ?? [];
+            return shopSubServices.contains(subServiceId);
+          }).toList();
+    });
+
+    // Scroll to the top to show filtered results
+    if (_filteredShops.isNotEmpty) {
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  void _showTemporaryLoadingOverlay() async {
+    setState(() {
+      _showLoadingOverlay = true;
+    });
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      setState(() {
+        _showLoadingOverlay = false;
+      });
     }
   }
 }

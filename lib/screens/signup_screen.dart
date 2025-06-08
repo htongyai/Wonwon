@@ -3,6 +3,9 @@ import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/services/auth_service.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/screens/terms_of_use_screen.dart';
+import 'package:wonwonw2/screens/privacy_policy_screen.dart';
+import 'package:wonwonw2/utils/responsive_size.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -102,7 +105,9 @@ class _SignupScreenState extends State<SignupScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: ResponsiveSize.getScaledPadding(
+              const EdgeInsets.symmetric(horizontal: 24.0),
+            ),
             child: Form(
               key: _formKey,
               child: Column(
@@ -354,7 +359,45 @@ class _SignupScreenState extends State<SignupScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 16),
+
+                  // Agreement text
+                  Text(
+                    'signup_agreement_text'.tr(context),
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Terms and Privacy buttons
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TermsOfUseScreen(),
+                            ),
+                          );
+                        },
+                        child: Text('terms_of_use_button'.tr(context)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PrivacyPolicyScreen(),
+                            ),
+                          );
+                        },
+                        child: Text('privacy_policy_button'.tr(context)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
                   // Create Account button
                   ElevatedButton(
@@ -406,7 +449,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         child: Text(
                           'login'.tr(context),
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/repair_shop.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 class SavedShopService {
   static const String _savedShopsKey = 'saved_shops';
@@ -28,7 +29,7 @@ class SavedShopService {
         // Return shop IDs
         return snapshot.docs.map((doc) => doc.id).toList();
       } catch (e) {
-        print('Error getting saved shops from Firestore: $e');
+        appLog('Error getting saved shops from Firestore: $e');
         // Fallback to SharedPreferences if Firestore fails
         return _getSavedShopsFromPrefs();
       }
@@ -54,7 +55,7 @@ class SavedShopService {
 
         return true;
       } catch (e) {
-        print('Error saving shop to Firestore: $e');
+        appLog('Error saving shop to Firestore: $e');
         // Fallback to SharedPreferences if Firestore fails
         return _saveShopToPrefs(shopId);
       }
@@ -80,7 +81,7 @@ class SavedShopService {
 
         return true;
       } catch (e) {
-        print('Error removing shop from Firestore: $e');
+        appLog('Error removing shop from Firestore: $e');
         // Fallback to SharedPreferences if Firestore fails
         return _removeShopFromPrefs(shopId);
       }
@@ -107,7 +108,7 @@ class SavedShopService {
 
         return doc.exists;
       } catch (e) {
-        print('Error checking if shop is saved in Firestore: $e');
+        appLog('Error checking if shop is saved in Firestore: $e');
         // Fallback to SharedPreferences if Firestore fails
         final savedShops = await _getSavedShopsFromPrefs();
         return savedShops.contains(shopId);

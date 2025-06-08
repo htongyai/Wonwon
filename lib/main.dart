@@ -24,6 +24,20 @@ void main() async {
   // Ensure Flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Web specific configuration
+  if (kIsWeb) {
+    // Use URL path strategy instead of hash strategy for cleaner URLs
+    setUrlStrategy(PathUrlStrategy());
+
+    // Initialize web renderer settings
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    // Configure web renderer
+    await Future.delayed(Duration.zero); // Ensure web renderer is ready
+  }
+
   // Initialize Firebase
   try {
     await Firebase.initializeApp(
@@ -36,12 +50,6 @@ void main() async {
 
   // Initialize AuthStateService
   await authStateService.initialize();
-
-  // Web specific configuration
-  if (kIsWeb) {
-    // Use URL path strategy instead of hash strategy for cleaner URLs
-    setUrlStrategy(PathUrlStrategy());
-  }
 
   // Lock the app to portrait orientation only
   SystemChrome.setPreferredOrientations([

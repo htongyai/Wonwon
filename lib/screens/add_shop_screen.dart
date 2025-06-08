@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
+import 'package:wonwonw2/models/repair_sub_service.dart';
 import 'package:wonwonw2/services/shop_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
@@ -9,8 +10,15 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
-import 'dart:async';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/widgets/section_title.dart';
+import 'package:wonwonw2/utils/responsive_size.dart';
 
 class AddShopScreen extends StatefulWidget {
   const AddShopScreen({Key? key}) : super(key: key);
@@ -28,9 +36,22 @@ class _AddShopScreenState extends State<AddShopScreen> {
   final _latitudeController = TextEditingController();
   final _longitudeController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _buildingNumberController = TextEditingController();
+  final _buildingNameController = TextEditingController();
+  final _soiController = TextEditingController();
+  final _districtController = TextEditingController();
+  final _landmarkController = TextEditingController();
+  final _lineIdController = TextEditingController();
+  final _facebookPageController = TextEditingController();
+  final _otherContactsController = TextEditingController();
+  final _notesOrConditionsController = TextEditingController();
+  final _usualOpeningTimeController = TextEditingController();
+  final _usualClosingTimeController = TextEditingController();
+  final _instagramPageController = TextEditingController();
+  final _buildingFloorController = TextEditingController();
 
   // Image variables
-  File? _selectedImage;
+  Uint8List? _selectedImageBytes;
   String? _imageError;
   bool _isProcessingImage = false;
 
@@ -42,8 +63,10 @@ class _AddShopScreenState extends State<AddShopScreen> {
     'bag',
     'electronics',
     'appliance',
-    'jewelry',
   ];
+
+  // Map to store selected sub-services for each category
+  final Map<String, List<String>> _selectedSubServices = {};
 
   final Map<String, TextEditingController> _hoursControllers = {
     'Monday': TextEditingController(),
@@ -116,6 +139,90 @@ class _AddShopScreenState extends State<AddShopScreen> {
 
   bool _isSubmitting = false;
 
+  List<String> _selectedPaymentMethods = [];
+  bool _tryOnAreaAvailable = false;
+
+  final List<String> _provinces = [
+    'Bangkok',
+    'Amnat Charoen',
+    'Ang Thong',
+    'Bueng Kan',
+    'Buri Ram',
+    'Chachoengsao',
+    'Chai Nat',
+    'Chaiyaphum',
+    'Chanthaburi',
+    'Chiang Mai',
+    'Chiang Rai',
+    'Chonburi',
+    'Chumphon',
+    'Kalasin',
+    'Kamphaeng Phet',
+    'Kanchanaburi',
+    'Khon Kaen',
+    'Krabi',
+    'Lampang',
+    'Lamphun',
+    'Loei',
+    'Lopburi',
+    'Mae Hong Son',
+    'Maha Sarakham',
+    'Mukdahan',
+    'Nakhon Nayok',
+    'Nakhon Pathom',
+    'Nakhon Phanom',
+    'Nakhon Ratchasima',
+    'Nakhon Sawan',
+    'Nakhon Si Thammarat',
+    'Nan',
+    'Narathiwat',
+    'Nong Bua Lamphu',
+    'Nong Khai',
+    'Nonthaburi',
+    'Pathum Thani',
+    'Pattani',
+    'Phang Nga',
+    'Phatthalung',
+    'Phayao',
+    'Phetchabun',
+    'Phetchaburi',
+    'Phichit',
+    'Phitsanulok',
+    'Phra Nakhon Si Ayutthaya',
+    'Phrae',
+    'Phuket',
+    'Prachinburi',
+    'Prachuap Khiri Khan',
+    'Ranong',
+    'Ratchaburi',
+    'Rayong',
+    'Roi Et',
+    'Sa Kaeo',
+    'Sakon Nakhon',
+    'Samut Prakan',
+    'Samut Sakhon',
+    'Samut Songkhram',
+    'Saraburi',
+    'Satun',
+    'Sing Buri',
+    'Sisaket',
+    'Songkhla',
+    'Sukhothai',
+    'Suphan Buri',
+    'Surat Thani',
+    'Surin',
+    'Tak',
+    'Trang',
+    'Trat',
+    'Ubon Ratchathani',
+    'Udon Thani',
+    'Uthai Thani',
+    'Uttaradit',
+    'Yala',
+    'Yasothon',
+  ];
+  String? _selectedProvince;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -125,6 +232,19 @@ class _AddShopScreenState extends State<AddShopScreen> {
     _latitudeController.dispose();
     _longitudeController.dispose();
     _phoneController.dispose();
+    _buildingNumberController.dispose();
+    _buildingNameController.dispose();
+    _soiController.dispose();
+    _districtController.dispose();
+    _landmarkController.dispose();
+    _lineIdController.dispose();
+    _facebookPageController.dispose();
+    _otherContactsController.dispose();
+    _notesOrConditionsController.dispose();
+    _usualOpeningTimeController.dispose();
+    _usualClosingTimeController.dispose();
+    _instagramPageController.dispose();
+    _buildingFloorController.dispose();
 
     _hoursControllers.forEach((_, controller) => controller.dispose());
     _openingTimeControllers.forEach((_, controller) => controller.dispose());
@@ -137,7 +257,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Add New Shop',
+          'add_shop'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -154,42 +274,72 @@ class _AddShopScreenState extends State<AddShopScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: ResponsiveSize.getScaledPadding(
+              const EdgeInsets.all(16.0),
+            ),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Warning message
+                  Container(
+                    padding: ResponsiveSize.getScaledPadding(
+                      const EdgeInsets.all(12),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.amber[800]),
+                        SizedBox(width: ResponsiveSize.getWidth(3)),
+                        Expanded(
+                          child: Text(
+                            'shop_review_notice'.tr(context),
+                            style: TextStyle(
+                              color: Colors.amber[900],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(6)),
+
                   // Introduction
                   Text(
-                    'Add a new repair shop to our directory',
+                    'add_shop_directory'.tr(context),
                     style: TextStyle(fontSize: 16, color: Colors.grey[700]),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: ResponsiveSize.getHeight(6)),
 
                   // Basic Information Section
-                  _buildSectionTitle('Basic Information'),
-                  const SizedBox(height: 16),
+                  SectionTitle(text: 'basic_info_label'.tr(context)),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
 
                   // Shop Name
                   _buildTextFormField(
                     controller: _nameController,
-                    label: 'Shop Name',
-                    hint: 'Enter the shop name',
+                    label: 'shop_name_label'.tr(context),
+                    hint: 'shop_name_hint'.tr(context),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter the shop name';
+                        return 'name_required'.tr(context);
                       }
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
 
                   // Description
                   _buildTextFormField(
                     controller: _descriptionController,
-                    label: 'Description',
-                    hint: 'Enter a description of the shop services',
+                    label: 'shop_description_label'.tr(context),
+                    hint: 'enter_description_hint'.tr(context),
                     maxLines: 3,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -198,21 +348,21 @@ class _AddShopScreenState extends State<AddShopScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
 
                   // Shop Photo Upload
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Shop Photo',
+                        'shop_photo_label'.tr(context),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                           color: Colors.grey[800],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: ResponsiveSize.getHeight(2)),
                       GestureDetector(
                         onTap: _isProcessingImage ? null : _pickAndCropImage,
                         child: Container(
@@ -226,101 +376,14 @@ class _AddShopScreenState extends State<AddShopScreen> {
                               width: 1,
                             ),
                           ),
-                          child:
-                              _isProcessingImage
-                                  ? Center(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        CircularProgressIndicator(
-                                          color: AppConstants.primaryColor,
-                                        ),
-                                        const SizedBox(height: 12),
-                                        Text(
-                                          'Processing image...',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                  : (_selectedImage != null
-                                      ? Stack(
-                                        fit: StackFit.expand,
-                                        children: [
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                            child: Image.file(
-                                              _selectedImage!,
-                                              fit: BoxFit.cover,
-                                            ),
-                                          ),
-                                          Positioned(
-                                            top: 8,
-                                            right: 8,
-                                            child: GestureDetector(
-                                              onTap: () {
-                                                setState(() {
-                                                  _selectedImage = null;
-                                                });
-                                              },
-                                              child: Container(
-                                                padding: const EdgeInsets.all(
-                                                  4,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white
-                                                      .withOpacity(0.8),
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: const Icon(
-                                                  Icons.close,
-                                                  size: 18,
-                                                  color: Colors.black,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      )
-                                      : Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.add_photo_alternate,
-                                            size: 48,
-                                            color: Colors.grey[400],
-                                          ),
-                                          const SizedBox(height: 12),
-                                          Text(
-                                            'Upload Shop Photo',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            '6x4 landscape format recommended',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
-                                        ],
-                                      )),
+                          child: _buildImageDisplay(),
                         ),
                       ),
                       if (_imageError != null)
                         Padding(
-                          padding: const EdgeInsets.only(top: 8),
+                          padding: EdgeInsets.only(
+                            top: ResponsiveSize.getHeight(2),
+                          ),
                           child: Text(
                             _imageError!,
                             style: TextStyle(
@@ -331,64 +394,38 @@ class _AddShopScreenState extends State<AddShopScreen> {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: ResponsiveSize.getHeight(6)),
 
                   // Categories
                   _buildCategoriesSelector(),
-                  const SizedBox(height: 24),
+                  SizedBox(height: ResponsiveSize.getHeight(6)),
 
                   // Location Section
-                  _buildSectionTitle('Location Information'),
-                  const SizedBox(height: 16),
+                  SectionTitle(text: 'location_info_label'.tr(context)),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
 
-                  // Address
-                  _buildTextFormField(
-                    controller: _addressController,
-                    label: 'Address',
-                    hint: 'Enter the full address',
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter the address';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Area
-                  _buildTextFormField(
-                    controller: _areaController,
-                    label: 'Area/District',
-                    hint: 'Enter the area or district',
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter the area';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Map Location Picker (replaces latitude/longitude fields)
+                  // Map Location Picker
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Location',
+                        'location_label'.tr(context),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                           color: Colors.grey[800],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: ResponsiveSize.getHeight(2)),
                       Row(
                         children: [
                           // Left side: Coordinates display
                           Expanded(
                             flex: 3,
                             child: Container(
-                              padding: const EdgeInsets.all(12),
+                              padding: ResponsiveSize.getScaledPadding(
+                                const EdgeInsets.all(12),
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.grey[100],
                                 borderRadius: BorderRadius.circular(8),
@@ -412,7 +449,11 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                                 color:
                                                     AppConstants.primaryColor,
                                               ),
-                                              const SizedBox(width: 4),
+                                              SizedBox(
+                                                width: ResponsiveSize.getWidth(
+                                                  1,
+                                                ),
+                                              ),
                                               Text(
                                                 'Coordinates:',
                                                 style: TextStyle(
@@ -423,7 +464,9 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 4),
+                                          SizedBox(
+                                            height: ResponsiveSize.getHeight(1),
+                                          ),
                                           Text(
                                             'Lat: ${_latitudeController.text}',
                                             style: TextStyle(
@@ -442,7 +485,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                       )
                                       : Center(
                                         child: Text(
-                                          'No location selected',
+                                          'no_location_selected'.tr(context),
                                           style: TextStyle(
                                             color: Colors.grey[500],
                                             fontStyle: FontStyle.italic,
@@ -451,7 +494,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                       ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: ResponsiveSize.getWidth(3)),
                           // Right side: Select button
                           Expanded(
                             flex: 2,
@@ -460,14 +503,14 @@ class _AddShopScreenState extends State<AddShopScreen> {
                               icon: const Icon(Icons.map),
                               label: Text(
                                 _latitudeController.text.isEmpty
-                                    ? 'Select'
-                                    : 'Change',
+                                    ? 'select_button'.tr(context)
+                                    : 'change_button'.tr(context),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppConstants.primaryColor,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
+                                padding: ResponsiveSize.getScaledPadding(
+                                  const EdgeInsets.symmetric(vertical: 16),
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
@@ -479,39 +522,207 @@ class _AddShopScreenState extends State<AddShopScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: ResponsiveSize.getHeight(6)),
 
-                  // Contact Section
-                  _buildSectionTitle('Contact Information'),
-                  const SizedBox(height: 16),
-
-                  // Phone
+                  // Additional Location Details
                   _buildTextFormField(
-                    controller: _phoneController,
-                    label: 'Phone Number',
-                    hint: 'Enter the contact phone number',
-                    keyboardType: TextInputType.phone,
+                    controller: _buildingNumberController,
+                    label: 'building_number_and_name_label'.tr(context),
+                    hint: 'enter_building_number_and_name_hint'.tr(context),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+                  _buildTextFormField(
+                    controller: _soiController,
+                    label: 'soi_label'.tr(context),
+                    hint: 'enter_soi_hint'.tr(context),
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+                  _buildTextFormField(
+                    controller: _districtController,
+                    label: 'district_label'.tr(context),
+                    hint: 'enter_district_hint'.tr(context),
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+                  DropdownButtonFormField<String>(
+                    value: _selectedProvince,
+                    items:
+                        _provinces
+                            .map(
+                              (province) => DropdownMenuItem(
+                                value: province,
+                                child: Text(province),
+                              ),
+                            )
+                            .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedProvince = value;
+                      });
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'province_label'.tr(context),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      contentPadding: ResponsiveSize.getScaledPadding(
+                        const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                    validator:
+                        (value) =>
+                            value == null || value.isEmpty
+                                ? 'please_select_province'.tr(context)
+                                : null,
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+                  _buildTextFormField(
+                    controller: _landmarkController,
+                    label: 'landmark_label'.tr(context),
+                    hint: 'enter_landmark_hint'.tr(context),
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+                  // Contact Channels
+                  SectionTitle(text: 'contact_information'.tr(context)),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
 
-                  // Hours Section
-                  _buildSectionTitle('Opening Hours'),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8, bottom: 16),
-                    child: Text(
-                      'Specify shop hours for each day or mark days as closed.',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  // Line ID (Optional)
+                  _buildTextFormField(
+                    controller: _lineIdController,
+                    label: 'line_id_label'.tr(context),
+                    hint: 'enter_line_id_hint'.tr(context),
+                    prefixIcon: Icon(
+                      FontAwesomeIcons.line,
+                      color: Colors.green,
                     ),
                   ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+
+                  // Facebook Page (Optional)
+                  _buildTextFormField(
+                    controller: _facebookPageController,
+                    label: 'facebook_optional_label'.tr(context),
+                    hint: 'enter_facebook_url'.tr(context),
+                    prefixIcon: Icon(
+                      FontAwesomeIcons.facebook,
+                      color: Colors.blue,
+                    ),
+                    keyboardType: TextInputType.url,
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+
+                  // Instagram Page (Optional)
+                  _buildTextFormField(
+                    controller: _instagramPageController,
+                    label: 'instagram_label'.tr(context),
+                    hint: 'enter_instagram_url'.tr(context),
+                    prefixIcon: Icon(
+                      FontAwesomeIcons.instagram,
+                      color: Colors.purple,
+                    ),
+                    keyboardType: TextInputType.url,
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+
+                  // Other Contacts
+                  _buildTextFormField(
+                    controller: _otherContactsController,
+                    label: 'other_contacts_label'.tr(context),
+                    hint: 'enter_other_contacts_hint'.tr(context),
+                    maxLines: 2,
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(6)),
+
+                  // Payment Methods (multi-select)
+                  Text(
+                    'select_payment_method'.tr(context),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    children:
+                        [
+                              'payment_cash'.tr(context),
+                              'payment_card'.tr(context),
+                              'payment_qr'.tr(context),
+                              'payment_bank_transfer'.tr(context),
+                            ]
+                            .map(
+                              (method) => FilterChip(
+                                label: Text(method),
+                                selected: _selectedPaymentMethods.contains(
+                                  method,
+                                ),
+                                onSelected: (selected) {
+                                  setState(() {
+                                    if (selected) {
+                                      _selectedPaymentMethods.add(method);
+                                    } else {
+                                      _selectedPaymentMethods.remove(method);
+                                    }
+                                  });
+                                },
+                              ),
+                            )
+                            .toList(),
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+                  // Trial Area Available (yes/no)
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _tryOnAreaAvailable,
+                        onChanged: (val) {
+                          setState(() {
+                            _tryOnAreaAvailable = val ?? false;
+                          });
+                        },
+                      ),
+                      Text('trial_area_available'.tr(context)),
+                    ],
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+                  // Notes or Service Conditions
+                  _buildTextFormField(
+                    controller: _notesOrConditionsController,
+                    label: 'notes_or_conditions_label'.tr(context),
+                    hint: 'enter_notes_or_conditions_hint'.tr(context),
+                    maxLines: 2,
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+                  // Building Floor
+                  _buildTextFormField(
+                    controller: _buildingFloorController,
+                    label: 'building_floor_label'.tr(context),
+                    hint: 'enter_building_floor_hint'.tr(context),
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+
+                  // Contact Section
+                  SectionTitle(text: 'contact_information'.tr(context)),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+
+                  // Hours Section
+                  SectionTitle(text: 'opening_hours_label'.tr(context)),
+                  SizedBox(height: ResponsiveSize.getHeight(2)),
 
                   // Same time every day checkbox
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                    padding: ResponsiveSize.getScaledPadding(
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
-                    margin: const EdgeInsets.only(bottom: 16),
+                    margin: EdgeInsets.only(
+                      bottom: ResponsiveSize.getHeight(4),
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -552,7 +763,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                 } else {
                                   // Show a message that Monday's times need to be set first
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
                                         "Please set Monday's opening and closing times first",
                                       ),
@@ -570,7 +781,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Same Time Every Day',
+                                'same_time_every_day'.tr(context),
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
@@ -579,7 +790,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                "Use Monday's hours for all days except those marked as closed",
+                                'use_monday_hours'.tr(context),
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey[600],
@@ -598,9 +809,8 @@ class _AddShopScreenState extends State<AddShopScreen> {
 
                   // Irregular hours checkbox
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                    padding: ResponsiveSize.getScaledPadding(
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade50,
@@ -623,7 +833,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Irregular Opening Hours',
+                                'irregular_hours_label'.tr(context),
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
@@ -632,7 +842,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Check this if the shop\'s hours may vary. A notice will be displayed to remind customers to call before visiting.',
+                                'irregular_hours_hint'.tr(context),
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey[600],
@@ -671,7 +881,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                 ),
                               )
                               : Text(
-                                'Submit Shop',
+                                'submit_shop_button'.tr(context),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -689,17 +899,6 @@ class _AddShopScreenState extends State<AddShopScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: AppConstants.darkColor,
-      ),
-    );
-  }
-
   Widget _buildTextFormField({
     required TextEditingController controller,
     required String label,
@@ -707,6 +906,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    Widget? prefixIcon,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -735,6 +935,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
               horizontal: 16,
               vertical: 12,
             ),
+            prefixIcon: prefixIcon,
           ),
           maxLines: maxLines,
           keyboardType: keyboardType,
@@ -749,7 +950,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Categories',
+          'Select Category',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
@@ -768,8 +969,10 @@ class _AddShopScreenState extends State<AddShopScreen> {
                     setState(() {
                       if (isSelected) {
                         _selectedCategories.remove(category);
+                        _selectedSubServices.remove(category);
                       } else {
                         _selectedCategories.add(category);
+                        _selectedSubServices[category] = [];
                       }
                     });
                   },
@@ -784,6 +987,13 @@ class _AddShopScreenState extends State<AddShopScreen> {
                               ? AppConstants.primaryColor
                               : Colors.grey[100],
                       borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color:
+                            isSelected
+                                ? AppConstants.primaryColor
+                                : Colors.grey[300]!,
+                        width: 1,
+                      ),
                     ),
                     child: Text(
                       _getCategoryDisplayName(category),
@@ -801,17 +1011,172 @@ class _AddShopScreenState extends State<AddShopScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              'Please select at least one category',
+              'please_select_at_least_one_category'.tr(context),
               style: TextStyle(color: Colors.red[700], fontSize: 12),
             ),
           ),
+        const SizedBox(height: 24),
+        // Display sub-services for selected categories
+        ..._selectedCategories.map((category) {
+          final subServices = RepairSubService.getSubServices()[category] ?? [];
+          if (subServices.isEmpty) return const SizedBox.shrink();
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      _getCategoryIcon(category),
+                      color: AppConstants.primaryColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${_getCategoryDisplayName(category)} Services',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'select_specific_services_hint'.tr(context),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children:
+                      subServices.map((subService) {
+                        final isSelected =
+                            _selectedSubServices[category]?.contains(
+                              subService.id,
+                            ) ??
+                            false;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              if (isSelected) {
+                                _selectedSubServices[category]?.remove(
+                                  subService.id,
+                                );
+                              } else {
+                                _selectedSubServices[category]?.add(
+                                  subService.id,
+                                );
+                              }
+                            });
+                          },
+                          child: Container(
+                            padding: ResponsiveSize.getScaledPadding(
+                              const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  isSelected
+                                      ? AppConstants.primaryColor
+                                      : Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color:
+                                    isSelected
+                                        ? AppConstants.primaryColor
+                                        : Colors.grey[300]!,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isSelected
+                                      ? Icons.check_circle
+                                      : Icons.circle_outlined,
+                                  size: 16,
+                                  color:
+                                      isSelected
+                                          ? Colors.white
+                                          : Colors.grey[600],
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  subService.getLocalizedName(context),
+                                  style: TextStyle(
+                                    color:
+                                        isSelected
+                                            ? Colors.white
+                                            : Colors.grey[800],
+                                    fontWeight:
+                                        isSelected
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ],
     );
   }
 
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'clothing':
+        return Icons.checkroom;
+      case 'footwear':
+        return Icons.shopping_bag;
+      case 'watch':
+        return Icons.watch;
+      case 'bag':
+        return Icons.backpack;
+      case 'appliance':
+        return Icons.blender;
+      case 'electronics':
+        return Icons.devices;
+      default:
+        return Icons.category;
+    }
+  }
+
   String _getCategoryDisplayName(String category) {
-    // Capitalize first letter
-    return category[0].toUpperCase() + category.substring(1);
+    switch (category.toLowerCase()) {
+      case 'clothing':
+        return 'category_clothing'.tr(context);
+      case 'footwear':
+        return 'category_footwear'.tr(context);
+      case 'watch':
+        return 'category_watch'.tr(context);
+      case 'bag':
+        return 'category_bag'.tr(context);
+      case 'appliance':
+        return 'category_appliance'.tr(context);
+      case 'electronics':
+        return 'category_electronics'.tr(context);
+      default:
+        return category.tr(context);
+    }
   }
 
   Widget _buildOpeningHoursFields() {
@@ -842,7 +1207,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                       SizedBox(
                         width: 90,
                         child: Text(
-                          day,
+                          _getDayDisplayName(day),
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
                             color: Colors.grey[800],
@@ -880,7 +1245,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                         },
                       ),
                       Text(
-                        'Closed',
+                        'closed_label'.tr(context),
                         style: TextStyle(
                           color: isClosed ? Colors.red[700] : Colors.grey[800],
                           fontWeight:
@@ -889,7 +1254,9 @@ class _AddShopScreenState extends State<AddShopScreen> {
                       ),
                       if (isSyncedWithMonday && !isClosed)
                         Padding(
-                          padding: const EdgeInsets.only(left: 8),
+                          padding: EdgeInsets.only(
+                            left: ResponsiveSize.getWidth(2),
+                          ),
                           child: Row(
                             children: [
                               Icon(
@@ -897,9 +1264,9 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                 size: 14,
                                 color: AppConstants.primaryColor,
                               ),
-                              const SizedBox(width: 4),
+                              SizedBox(width: ResponsiveSize.getWidth(1)),
                               Text(
-                                'Synced with Monday',
+                                'synced_with_monday'.tr(context),
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontStyle: FontStyle.italic,
@@ -925,7 +1292,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Opening Time',
+                                  'opening_time_label'.tr(context),
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey[600],
@@ -935,9 +1302,11 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                 InkWell(
                                   onTap: () => _selectTime(context, day, true),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 12,
+                                    padding: ResponsiveSize.getScaledPadding(
+                                      const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 12,
+                                      ),
                                     ),
                                     decoration: BoxDecoration(
                                       color:
@@ -962,7 +1331,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                         Text(
                                           openingController.text.isNotEmpty
                                               ? openingController.text
-                                              : 'Select time',
+                                              : 'select_time'.tr(context),
                                           style: TextStyle(
                                             color:
                                                 openingController.text.isEmpty
@@ -990,7 +1359,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Closing Time',
+                                  'closing_time_label'.tr(context),
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey[600],
@@ -1000,9 +1369,11 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                 InkWell(
                                   onTap: () => _selectTime(context, day, false),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 12,
+                                    padding: ResponsiveSize.getScaledPadding(
+                                      const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 12,
+                                      ),
                                     ),
                                     decoration: BoxDecoration(
                                       color:
@@ -1027,7 +1398,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                         Text(
                                           closingController.text.isNotEmpty
                                               ? closingController.text
-                                              : 'Select time',
+                                              : 'select_time'.tr(context),
                                           style: TextStyle(
                                             color:
                                                 closingController.text.isEmpty
@@ -1059,26 +1430,44 @@ class _AddShopScreenState extends State<AddShopScreen> {
     );
   }
 
-  void _submitForm() {
+  String _getDayDisplayName(String day) {
+    switch (day.toLowerCase()) {
+      case 'monday':
+        return 'monday'.tr(context);
+      case 'tuesday':
+        return 'tuesday'.tr(context);
+      case 'wednesday':
+        return 'wednesday'.tr(context);
+      case 'thursday':
+        return 'thursday'.tr(context);
+      case 'friday':
+        return 'friday'.tr(context);
+      case 'saturday':
+        return 'saturday'.tr(context);
+      case 'sunday':
+        return 'sunday'.tr(context);
+      default:
+        return day;
+    }
+  }
+
+  Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedCategories.isEmpty) {
-        // Show error for categories
         setState(() {});
         return;
       }
 
-      // Check if image is being processed
       if (_isProcessingImage) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please wait while the image is being processed'),
+          SnackBar(
+            content: Text('please_wait_image_processing'.tr(context)),
             backgroundColor: Colors.orange,
           ),
         );
         return;
       }
 
-      // Show loading
       setState(() {
         _isSubmitting = true;
       });
@@ -1100,22 +1489,61 @@ class _AddShopScreenState extends State<AddShopScreen> {
         }
       });
 
+      // Generate a unique ID for the shop
+      final shopId = const Uuid().v4();
+
+      // Upload image if selected
+      List<String> photoUrls = [];
+      if (_selectedImageBytes != null) {
+        final imageUrl = await _uploadImageToFirebase(
+          _selectedImageBytes!,
+          shopId,
+        );
+        if (imageUrl != null) {
+          photoUrls.add(imageUrl);
+        }
+      }
+
+      // Construct the full address
+      final fullAddress = [
+        _buildingNumberController.text,
+        _soiController.text,
+        _districtController.text,
+        _selectedProvince,
+      ].where((s) => s != null && s.isNotEmpty).join(', ');
+
       // Create a new shop object
       final newShop = RepairShop(
-        id: const Uuid().v4(), // Generate a unique ID
+        id: shopId,
         name: _nameController.text,
         description: _descriptionController.text,
-        address: _addressController.text,
+        address: fullAddress,
         area: _areaController.text,
         categories: _selectedCategories,
-        rating: 0.0, // Default rating for new shops
+        rating: 0.0,
         hours: hours,
         closingDays: closingDays,
         latitude: double.parse(_latitudeController.text),
         longitude: double.parse(_longitudeController.text),
         irregularHours: _hasIrregularHours,
-        approved: false, // New shops are not approved by default
-        photos: [], // We'd add the photo URL here after Firebase upload
+        approved: false,
+        photos: photoUrls,
+        subServices: _selectedSubServices,
+        timestamp: DateTime.now(),
+        buildingName: _buildingNameController.text,
+        buildingNumber: _buildingNumberController.text,
+        buildingFloor: _buildingFloorController.text,
+        soi: _soiController.text,
+        district: _districtController.text,
+        province: _selectedProvince,
+        landmark: _landmarkController.text,
+        lineId: _lineIdController.text,
+        facebookPage: _facebookPageController.text,
+        otherContacts: _otherContactsController.text,
+        paymentMethods: _selectedPaymentMethods,
+        tryOnAreaAvailable: _tryOnAreaAvailable,
+        notesOrConditions: _notesOrConditionsController.text,
+        instagramPage: _instagramPageController.text,
       );
 
       // Submit the shop
@@ -1159,15 +1587,13 @@ class _AddShopScreenState extends State<AddShopScreen> {
       builder:
           (context) => AlertDialog(
             title: Text(
-              'Shop Submitted',
+              'shop_submitted_label'.tr(context),
               style: TextStyle(
                 color: AppConstants.primaryColor,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            content: const Text(
-              'Thank you for submitting a new shop! Your submission will be reviewed by our team before it appears in the app.',
-            ),
+            content: Text('shop_submitted_message_label'.tr(context)),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -1177,7 +1603,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                   Navigator.of(context).pop(); // Close dialog
                   Navigator.of(context).pop(); // Return to previous screen
                 },
-                child: const Text('OK'),
+                child: Text('ok_label'.tr(context)),
               ),
             ],
           ),
@@ -1191,15 +1617,13 @@ class _AddShopScreenState extends State<AddShopScreen> {
       builder:
           (context) => AlertDialog(
             title: Text(
-              'Error',
+              'error'.tr(context),
               style: TextStyle(
                 color: Colors.red[700],
                 fontWeight: FontWeight.bold,
               ),
             ),
-            content: const Text(
-              'There was an error submitting your shop. Please try again later.',
-            ),
+            content: Text('shop_submit_error_message'.tr(context)),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -1208,7 +1632,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                 onPressed: () {
                   Navigator.of(context).pop(); // Close dialog
                 },
-                child: const Text('OK'),
+                child: Text('ok_label'.tr(context)),
               ),
             ],
           ),
@@ -1308,54 +1732,58 @@ class _AddShopScreenState extends State<AddShopScreen> {
   }
 
   Future<void> _pickAndCropImage() async {
-    setState(() {
-      _isProcessingImage = true;
-      _imageError = null;
-    });
-
     try {
-      // Pick image from gallery
-      final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(
+      setState(() {
+        _isProcessingImage = true;
+        _imageError = null;
+      });
+
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1920, // Initial size limit to prevent huge images
+        maxWidth: 1920,
         maxHeight: 1080,
       );
 
-      if (pickedFile == null) {
+      if (image == null) {
         setState(() {
           _isProcessingImage = false;
         });
         return;
       }
 
-      // Check file size (max 6MB before compression)
-      final fileSize = await File(pickedFile.path).length();
-      if (fileSize > 6 * 1024 * 1024) {
-        setState(() {
-          _imageError =
-              'Image is too large (max 6MB). Please select a smaller image.';
-          _isProcessingImage = false;
-        });
+      // Read image bytes
+      final Uint8List imageBytes = await image.readAsBytes();
+
+      if (kIsWeb) {
+        // For web, we'll use the bytes directly since cropping might not work well
+        await _compressAndSetImage(imageBytes);
         return;
       }
 
-      // Crop image to 6:4 ratio
+      // For mobile platforms, proceed with cropping
       final croppedFile = await ImageCropper().cropImage(
-        sourcePath: pickedFile.path,
-        aspectRatio: const CropAspectRatio(ratioX: 6, ratioY: 4),
+        sourcePath: image.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Crop Shop Image',
-            toolbarColor: AppConstants.primaryColor,
+            toolbarTitle: 'Crop Image',
+            toolbarColor: Colors.brown,
             toolbarWidgetColor: Colors.white,
-            lockAspectRatio: true,
+            initAspectRatio: CropAspectRatioPreset.original,
+            lockAspectRatio: false,
+            hideBottomControls: false,
+            showCropGrid: true,
           ),
           IOSUiSettings(
-            title: 'Crop Shop Image',
-            aspectRatioLockEnabled: true,
-            aspectRatioPickerButtonHidden: true,
+            title: 'Crop Image',
+            minimumAspectRatio: 1.0,
             resetAspectRatioEnabled: false,
+            aspectRatioLockEnabled: false,
+            rotateButtonsHidden: false,
+            rotateClockwiseButtonHidden: false,
+            doneButtonTitle: 'Done',
+            cancelButtonTitle: 'Cancel',
           ),
         ],
       );
@@ -1367,96 +1795,166 @@ class _AddShopScreenState extends State<AddShopScreen> {
         return;
       }
 
-      // Compress image to target size (<200KB)
-      final tempDir = Directory.systemTemp;
-      final targetPath =
-          '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final compressedFile = await FlutterImageCompress.compressAndGetFile(
-        croppedFile.path,
-        targetPath,
-        quality: 80, // Start with 80% quality
-        minWidth: 1200,
-        minHeight: 800,
+      // Read the cropped image bytes
+      final croppedBytes = await croppedFile.readAsBytes();
+
+      // Compress the cropped image
+      await _compressAndSetImage(croppedBytes);
+    } catch (e) {
+      setState(() {
+        _imageError = 'Error processing image: ${e.toString()}';
+        _selectedImageBytes = null;
+      });
+      appLog('Image processing error', e);
+    } finally {
+      setState(() {
+        _isProcessingImage = false;
+      });
+    }
+  }
+
+  Future<void> _compressAndSetImage(Uint8List imageBytes) async {
+    try {
+      // First compression attempt
+      Uint8List? compressedBytes = await FlutterImageCompress.compressWithList(
+        imageBytes,
+        minHeight: 1024,
+        minWidth: 1024,
+        quality: 85,
       );
 
-      if (compressedFile == null) {
+      // If still larger than 100KB, compress further
+      if (compressedBytes.length > 100 * 1024) {
+        compressedBytes = await FlutterImageCompress.compressWithList(
+          compressedBytes,
+          minHeight: 800,
+          minWidth: 800,
+          quality: 70,
+        );
+      }
+
+      // If still larger than 100KB, compress one more time
+      if (compressedBytes.length > 100 * 1024) {
+        compressedBytes = await FlutterImageCompress.compressWithList(
+          compressedBytes,
+          minHeight: 600,
+          minWidth: 600,
+          quality: 60,
+        );
+      }
+
+      // Final check - if still too large, show error
+      if (compressedBytes.length > 100 * 1024) {
         setState(() {
-          _imageError = 'Failed to compress image. Please try again.';
-          _isProcessingImage = false;
+          _imageError = 'Image is too large. Please choose a smaller image.';
+          _selectedImageBytes = null;
         });
         return;
       }
 
-      // Check if compression achieved target size (<200KB)
-      final compressedSize = await compressedFile.length();
-      if (compressedSize > 200 * 1024) {
-        // Try further compression if still too large
-        final extraCompressedPath =
-            '${tempDir.path}/${DateTime.now().millisecondsSinceEpoch}_extra.jpg';
-        final extraCompressed = await FlutterImageCompress.compressAndGetFile(
-          compressedFile.path,
-          extraCompressedPath,
-          quality: 60, // Lower quality for smaller file
-          minWidth: 900,
-          minHeight: 600,
-        );
-
-        if (extraCompressed != null) {
-          setState(() {
-            _selectedImage = File(extraCompressed.path);
-            _isProcessingImage = false;
-          });
-        } else {
-          setState(() {
-            _selectedImage = File(compressedFile.path);
-            _isProcessingImage = false;
-            _imageError = 'Image size may be larger than recommended (200KB).';
-          });
-        }
-      } else {
-        setState(() {
-          _selectedImage = File(compressedFile.path);
-          _isProcessingImage = false;
-        });
-      }
-
-      // For debug: Show file size
-      final finalSize = await _selectedImage!.length();
-      print('Final image size: ${(finalSize / 1024).toStringAsFixed(2)} KB');
-
-      // Note: In a real app, you'd upload this to Firebase Storage
-      // For now, we'll just store it locally and print a comment
-      print('TODO: Upload image to Firebase Storage');
-
-      /* 
-      To implement Firebase Storage upload:
-      1. Add firebase_storage package dependency
-      2. Initialize Firebase Storage
-      3. Upload the image with a reference like 'shops/{shopId}/main.jpg'
-      4. Get the download URL
-      5. Add the URL to the shop.photos list when creating the shop
-      
-      Example code:
-      ```
-      final storageRef = FirebaseStorage.instance.ref();
-      final shopImageRef = storageRef.child('shops/${shopId}/main.jpg');
-      
-      // Upload the file
-      await shopImageRef.putFile(_selectedImage!);
-      
-      // Get the download URL
-      final downloadUrl = await shopImageRef.getDownloadURL();
-      
-      // Add URL to shop photos
-      shop.photos.add(downloadUrl);
-      ```
-      */
+      setState(() {
+        _selectedImageBytes = compressedBytes;
+        _imageError = null;
+      });
     } catch (e) {
       setState(() {
-        _imageError = 'Error processing image: ${e.toString()}';
-        _isProcessingImage = false;
+        _imageError = 'Failed to process image. Please try again.';
+        _selectedImageBytes = null;
       });
-      print('Image processing error: $e');
+      appLog('Error compressing image: $e');
     }
+  }
+
+  Future<String?> _uploadImageToFirebase(
+    Uint8List imageBytes,
+    String shopId,
+  ) async {
+    try {
+      final storageRef = FirebaseStorage.instance.ref();
+      // Generate a unique filename using timestamp and UUID
+      final String uniqueFileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${const Uuid().v4()}.jpg';
+      final shopImageRef = storageRef.child('shops/$shopId/$uniqueFileName');
+
+      // Upload the bytes
+      await shopImageRef.putData(imageBytes);
+
+      // Get the download URL
+      final downloadUrl = await shopImageRef.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      appLog('Error uploading image to Firebase', e);
+      return null;
+    }
+  }
+
+  Widget _buildImageDisplay() {
+    if (_isProcessingImage) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: AppConstants.primaryColor),
+            const SizedBox(height: 12),
+            Text(
+              'Processing image...',
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_selectedImageBytes != null) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(_selectedImageBytes!, fit: BoxFit.cover),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedImageBytes = null;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.8),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, size: 18, color: Colors.black),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.add_photo_alternate, size: 48, color: Colors.grey[400]),
+        const SizedBox(height: 12),
+        Text(
+          'upload_shop_photo_label'.tr(context),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'shop_photo_format_hint'.tr(context),
+          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+        ),
+      ],
+    );
   }
 }

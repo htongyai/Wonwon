@@ -3,6 +3,7 @@ import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/screens/home_screen.dart';
 import 'package:wonwonw2/screens/map_screen.dart';
 import 'package:wonwonw2/screens/saved_locations_screen.dart';
+import 'package:wonwonw2/screens/profile_screen.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
 import 'package:wonwonw2/widgets/custom_navigation_bar.dart';
 
@@ -28,6 +29,7 @@ class _MainNavigationState extends State<MainNavigation> {
     const HomeScreen(),
     const MapScreen(),
     const SavedLocationsScreen(),
+    const ProfileScreen(),
   ];
 
   @override

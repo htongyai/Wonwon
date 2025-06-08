@@ -16,6 +16,12 @@ import 'dart:ui';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:wonwonw2/widgets/info_row.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:wonwonw2/screens/log_repair_screen.dart';
+import 'package:wonwonw2/screens/report_form_screen.dart';
+import 'package:wonwonw2/widgets/section_title.dart';
+import 'package:wonwonw2/widgets/info_row.dart';
 
 /// Screen that displays detailed information about a repair shop
 /// Shows shop information, hours, contact details, services, and reviews
@@ -293,204 +299,121 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            // Top header with image and back button
-            _buildHeader(),
-
-            // Main content
-            Expanded(
-              child: ListView(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16.0),
-                children: [
-                  _buildShopInfo(),
-                  const SizedBox(height: 16),
-                  _buildAddress(),
-                  const SizedBox(height: 24),
-                  _buildHours(),
-                  const SizedBox(height: 24),
-                  _buildContact(),
-                  const SizedBox(height: 24),
-                  _buildServices(),
-                  const SizedBox(height: 24),
-                  _buildReviews(),
-                  const SizedBox(height: 80), // Space for bottom buttons
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-      // Bottom navigation bar with action buttons
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-        child: Row(
-          children: [
-            // Get Directions button
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _openMapsWithDirections,
-                icon: const Icon(Icons.directions, color: Colors.white),
-                label: Text(
-                  'directions'.tr(context),
-                  style: const TextStyle(color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.brown,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Save location button
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: _toggleSaved,
-                icon:
-                    _isLoadingSavedState
-                        ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            SliverAppBar(
+              automaticallyImplyLeading: false,
+              pinned: false,
+              floating: false,
+              expandedHeight: 200,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    widget.shop.photos.isNotEmpty
+                        ? Image.network(
+                          widget.shop.photos.first,
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (_, __, ___) => AssetHelpers.getShopPlaceholder(
+                                widget.shop.name,
+                              ),
                         )
-                        : Icon(
-                          _isSaved ? Icons.bookmark : Icons.bookmark_border,
-                        ),
-                label: Text(
-                  _isSaved ? 'saved'.tr(context) : 'save'.tr(context),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      _isSaved ? Colors.orange[700] : AppConstants.primaryColor,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Build the header section with shop image and name
-  Widget _buildHeader() {
-    return Stack(
-      children: [
-        // Shop image or placeholder
-        Container(
-          height: 200,
-          width: double.infinity,
-          child:
-              widget.shop.photos.isNotEmpty
-                  ? Image.network(
-                    widget.shop.photos.first,
-                    fit: BoxFit.cover,
-                    errorBuilder:
-                        (_, __, ___) =>
-                            AssetHelpers.getShopPlaceholder(widget.shop.name),
-                  )
-                  : AssetHelpers.getShopPlaceholder(widget.shop.name),
-        ),
-
-        // Shop name overlay with gradient background
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-              ),
-            ),
-            child: Text(
-              widget.shop.name,
-              style: GoogleFonts.montserrat(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-
-        // Back button
-        Positioned(
-          top: 8,
-          left: 8,
-          child: CircleAvatar(
-            backgroundColor: Colors.black.withOpacity(0.3),
-            radius: 20,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-        ),
-
-        // Report button with counter for existing reports
-        Positioned(
-          top: 8,
-          right: 8,
-          child: CircleAvatar(
-            backgroundColor: Colors.black.withOpacity(0.3),
-            radius: 20,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.report_problem_outlined,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  onPressed: _showReportDialog,
-                ),
-                // Show count badge if there are existing reports
-                if (!_isLoadingReports && _reports.isNotEmpty)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 14,
-                        minHeight: 14,
-                      ),
-                      child: Center(
-                        child: Text(
-                          _reports.length > 9 ? '9+' : '${_reports.length}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
+                        : AssetHelpers.getShopPlaceholder(widget.shop.name),
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.white.withOpacity(0.7),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.black,
                           ),
+                          onPressed: () => Navigator.of(context).pop(),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: Colors.white.withOpacity(0.7),
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.report_problem_outlined,
+                                color: Colors.red,
+                              ),
+                              onPressed: _showReportDialog,
+                            ),
+                          ),
+                          if (!_isLoadingReports && _reports.isNotEmpty)
+                            Positioned(
+                              right: 4,
+                              top: 4,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 14,
+                                  minHeight: 14,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _reports.length > 9
+                                        ? '9+'
+                                        : '${_reports.length}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: ResponsiveSize.getScaledPadding(
+                  const EdgeInsets.all(16.0),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildShopInfo(),
+                    SizedBox(height: ResponsiveSize.getHeight(4)),
+                    _buildAddress(),
+                    SizedBox(height: ResponsiveSize.getHeight(6)),
+                    _buildHours(),
+                    SizedBox(height: ResponsiveSize.getHeight(6)),
+                    _buildContactInfo(),
+                    SizedBox(height: ResponsiveSize.getHeight(6)),
+                    _buildReviews(),
+                    SizedBox(
+                      height: ResponsiveSize.getHeight(20),
+                    ), // Space for bottom buttons
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+      bottomNavigationBar: _buildBottomBar(),
     );
   }
 
@@ -498,35 +421,268 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Rating info
+        // Rating info and shop title
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade100,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.star, color: Colors.amber, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    widget.shop.rating.toStringAsFixed(1),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
                   ),
-                ],
-              ),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade100,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.shop.rating.toStringAsFixed(1),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '(${widget.shop.reviewCount} reviews)',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
             Text(
-              '(${widget.shop.reviewCount} reviews)',
-              style: TextStyle(color: Colors.grey[600]),
+              widget.shop.name,
+              style: GoogleFonts.montserrat(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppConstants.darkColor,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 16),
+
+        // Services
+        Row(
+          children: [
+            Icon(Icons.build_outlined, color: Colors.brown),
+            const SizedBox(width: 8),
+            Text(
+              'services'.tr(context),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey[200]!),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Main categories
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    widget.shop.categories.map((category) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppConstants.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppConstants.primaryColor.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          'category_$category'.tr(context),
+                          style: GoogleFonts.montserrat(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: AppConstants.primaryColor,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+              ),
+              if (widget.shop.subServices.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 8),
+                Text(
+                  'available_subservices_label'.tr(context),
+                  style: GoogleFonts.montserrat(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Sub-services grouped by category
+                ...widget.shop.subServices.entries.map((entry) {
+                  final categoryId = entry.key;
+                  final subServiceIds = entry.value;
+                  if (subServiceIds.isEmpty) return const SizedBox.shrink();
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'category_$categoryId'.tr(context),
+                        style: GoogleFonts.montserrat(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children:
+                            subServiceIds.map((subServiceId) {
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                child: Text(
+                                  'subservice_${categoryId}_$subServiceId'.tr(
+                                    context,
+                                  ),
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 12,
+                                    color: Colors.grey[800],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  );
+                }).toList(),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Payment Methods
+        if (widget.shop.paymentMethods != null &&
+            widget.shop.paymentMethods!.isNotEmpty) ...[
+          Row(
+            children: [
+              Icon(Icons.payment_outlined, color: Colors.brown),
+              SizedBox(width: ResponsiveSize.getWidth(2)),
+              Text(
+                'payment_methods'.tr(context),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: ResponsiveSize.getHeight(2)),
+          Container(
+            width: double.infinity,
+            padding: ResponsiveSize.getScaledPadding(const EdgeInsets.all(16)),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children:
+                  widget.shop.paymentMethods!.map((method) {
+                    IconData icon;
+                    Color color;
+
+                    switch (method.toLowerCase()) {
+                      case 'cash':
+                        icon = Icons.money;
+                        color = Colors.green;
+                        break;
+                      case 'credit_card':
+                        icon = Icons.credit_card;
+                        color = Colors.blue;
+                        break;
+                      case 'debit_card':
+                        icon = Icons.credit_card;
+                        color = Colors.blue;
+                        break;
+                      case 'promptpay':
+                        icon = Icons.qr_code;
+                        color = Colors.purple;
+                        break;
+                      case 'true_money':
+                        icon = Icons.account_balance_wallet;
+                        color = Colors.orange;
+                        break;
+                      case 'line_pay':
+                        icon = Icons.chat;
+                        color = Colors.green;
+                        break;
+                      default:
+                        icon = Icons.payment;
+                        color = Colors.grey;
+                    }
+
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: color.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(icon, size: 16, color: color),
+                          const SizedBox(width: 4),
+                          Text(
+                            'payment_${_normalizePaymentMethod(method)}'.tr(
+                              context,
+                            ),
+                            style: GoogleFonts.montserrat(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
 
         // Description
         Row(
@@ -557,6 +713,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
             ),
           ),
         ),
+        _buildAdditionalInfo(),
       ],
     );
   }
@@ -570,36 +727,83 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
             Icon(Icons.location_on, color: Colors.brown),
             const SizedBox(width: 8),
             Text(
-              'address'.tr(context),
+              'address_label'.tr(context),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ],
         ),
         const SizedBox(height: 12),
         Container(
+          width: double.infinity,
           decoration: BoxDecoration(
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey[200]!),
           ),
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(widget.shop.address, style: const TextStyle(fontSize: 14)),
-              const SizedBox(height: 4),
-              Text(
-                widget.shop.area,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-            ],
+          child: Text(
+            widget.shop.address,
+            style: const TextStyle(fontSize: 15),
           ),
         ),
+        if (widget.shop.buildingName != null &&
+            widget.shop.buildingName!.isNotEmpty)
+          Text(
+            'building_name_label'.tr(context) + ': ${widget.shop.buildingName}',
+            style: const TextStyle(fontSize: 15),
+          ),
+        if (widget.shop.buildingNumber != null &&
+            widget.shop.buildingNumber!.isNotEmpty)
+          Text(
+            'building_number_label'.tr(context) +
+                ': ${widget.shop.buildingNumber}',
+            style: const TextStyle(fontSize: 15),
+          ),
+        if (widget.shop.buildingFloor != null &&
+            widget.shop.buildingFloor!.isNotEmpty)
+          Text(
+            'building_floor_label'.tr(context) +
+                ': ${widget.shop.buildingFloor}',
+            style: const TextStyle(fontSize: 15),
+          ),
+        if (widget.shop.soi != null && widget.shop.soi!.isNotEmpty)
+          Text(
+            'soi_label'.tr(context) + ': ${widget.shop.soi}',
+            style: const TextStyle(fontSize: 15),
+          ),
+        if (widget.shop.district != null && widget.shop.district!.isNotEmpty)
+          Text(
+            'district_label'.tr(context) + ': ${widget.shop.district}',
+            style: const TextStyle(fontSize: 15),
+          ),
+        if (widget.shop.province != null && widget.shop.province!.isNotEmpty)
+          Text(
+            'province_label'.tr(context) + ': ${widget.shop.province}',
+            style: const TextStyle(fontSize: 15),
+          ),
       ],
     );
   }
 
   Widget _buildHours() {
+    final days = [
+      'day_monday'.tr(context),
+      'day_tuesday'.tr(context),
+      'day_wednesday'.tr(context),
+      'day_thursday'.tr(context),
+      'day_friday'.tr(context),
+      'day_saturday'.tr(context),
+      'day_sunday'.tr(context),
+    ];
+    final dayKeys = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -608,7 +812,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
             Icon(Icons.access_time, color: Colors.brown),
             const SizedBox(width: 8),
             Text(
-              'opening_hours'.tr(context),
+              'hours'.tr(context),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ],
@@ -622,81 +826,102 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           ),
           padding: const EdgeInsets.all(16),
           child: Column(
-            children: [
-              // Show warning for irregular hours
-              if (widget.shop.irregularHours)
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.amber[800],
-                        size: 20,
+            children: List.generate(days.length, (i) {
+              final hours = widget.shop.hours[dayKeys[i]];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      days[i],
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Please call and check if the shop is open',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.amber[900],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                    ),
+                    Text(
+                      hours ?? 'day_closed'.tr(context),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color:
+                            hours != null ? Colors.grey[800] : Colors.grey[500],
+                        fontStyle:
+                            hours == null ? FontStyle.italic : FontStyle.normal,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              _buildHourRow(
-                'day_monday'.tr(context),
-                '9:00 AM - 6:00 PM',
-                _isToday('Monday'),
-              ),
-              _buildHourRow(
-                'day_tuesday'.tr(context),
-                '9:00 AM - 6:00 PM',
-                _isToday('Tuesday'),
-              ),
-              _buildHourRow(
-                'day_wednesday'.tr(context),
-                '9:00 AM - 6:00 PM',
-                _isToday('Wednesday'),
-              ),
-              _buildHourRow(
-                'day_thursday'.tr(context),
-                '9:00 AM - 6:00 PM',
-                _isToday('Thursday'),
-              ),
-              _buildHourRow(
-                'day_friday'.tr(context),
-                '9:00 AM - 6:00 PM',
-                _isToday('Friday'),
-              ),
-              _buildHourRow(
-                'day_saturday'.tr(context),
-                '10:00 AM - 4:00 PM',
-                _isToday('Saturday'),
-              ),
-              _buildHourRow(
-                'day_sunday'.tr(context),
-                'day_closed'.tr(context),
-                _isToday('Sunday'),
-              ),
-            ],
+              );
+            }),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildContact() {
+  Widget _buildContactInfo() {
+    final shop = widget.shop;
+    final List<InfoRow> info = [
+      // Phone Number
+      InfoRow(
+        icon: Icons.phone,
+        text:
+            shop.phoneNumber?.isNotEmpty == true
+                ? shop.phoneNumber!
+                : 'no_information'.tr(context),
+        onTap:
+            shop.phoneNumber?.isNotEmpty == true
+                ? () => _launchUrl('tel:${shop.phoneNumber}')
+                : null,
+      ),
+      // Line ID
+      InfoRow(
+        icon: FontAwesomeIcons.line,
+        text:
+            shop.lineId?.isNotEmpty == true
+                ? shop.lineId!
+                : 'no_information'.tr(context),
+        onTap:
+            shop.lineId?.isNotEmpty == true
+                ? () => _launchUrl('https://line.me/ti/p/~${shop.lineId}')
+                : null,
+      ),
+      // Facebook
+      InfoRow(
+        icon: FontAwesomeIcons.facebook,
+        text:
+            shop.facebookPage?.isNotEmpty == true
+                ? shop.facebookPage!
+                : 'no_information'.tr(context),
+        onTap:
+            shop.facebookPage?.isNotEmpty == true
+                ? () => _launchUrl(shop.facebookPage!)
+                : null,
+      ),
+      // Instagram
+      InfoRow(
+        icon: FontAwesomeIcons.instagram,
+        text:
+            shop.instagramPage?.isNotEmpty == true
+                ? shop.instagramPage!
+                : 'no_information'.tr(context),
+        onTap:
+            shop.instagramPage?.isNotEmpty == true
+                ? () => _launchUrl(shop.instagramPage!)
+                : null,
+      ),
+      // Other Contacts
+      InfoRow(
+        icon: Icons.contact_mail,
+        text:
+            shop.otherContacts?.isNotEmpty == true
+                ? shop.otherContacts!
+                : 'no_information'.tr(context),
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -719,85 +944,31 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           ),
           padding: const EdgeInsets.all(16),
           child: Column(
-            children: [
-              _buildContactItem(Icons.phone, '+66 80 123 4567', () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Calling shop...')),
-                );
-              }),
-              const Divider(height: 16),
-              _buildContactItem(FontAwesomeIcons.line, '@wonwonrepair', () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Opening Line...')),
-                );
-              }),
-              const Divider(height: 16),
-              _buildContactItem(Icons.language, 'www.wonwonrepair.com', () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Opening website...')),
-                );
-              }),
-            ],
+            children:
+                info
+                    .map(
+                      (row) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: row,
+                      ),
+                    )
+                    .toList(),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildServices() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.build_outlined, color: Colors.brown),
-            const SizedBox(width: 8),
-            Text(
-              'services'.tr(context),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children:
-              widget.shop.categories.map((category) {
-                final bool isSelected =
-                    widget.selectedCategory != null &&
-                    widget.selectedCategory!.toLowerCase() ==
-                        category.toLowerCase();
-
-                return InkWell(
-                  onTap: () {
-                    if (category.toLowerCase() == "all") {
-                      Navigator.pop(context);
-                    } else {
-                      Navigator.pop(context, {'filterCategory': category});
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Chip(
-                    backgroundColor:
-                        isSelected
-                            ? AppConstants.primaryColor
-                            : AppConstants.primaryColor.withOpacity(0.1),
-                    label: Text(
-                      category,
-                      style: TextStyle(
-                        color:
-                            isSelected
-                                ? Colors.white
-                                : AppConstants.primaryColor,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-        ),
-      ],
-    );
+  Future<void> _launchUrl(String url) async {
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url));
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not launch $url')));
+      }
+    }
   }
 
   Widget _buildReviews() {
@@ -836,44 +1007,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     );
   }
 
-  Widget _buildHourRow(String day, String hours, bool isToday) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            day,
-            style: TextStyle(
-              fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-              color: isToday ? AppConstants.primaryColor : Colors.black87,
-            ),
-          ),
-          Text(
-            hours,
-            style: TextStyle(
-              fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-              color: isToday ? AppConstants.primaryColor : Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContactItem(IconData icon, String text, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: Colors.brown),
-          const SizedBox(width: 12),
-          Text(text),
-        ],
-      ),
-    );
-  }
-
   Widget _buildNoReviews() {
     return Center(
       child: Padding(
@@ -882,13 +1015,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           children: [
             Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey[300]),
             const SizedBox(height: 16),
-            const Text(
-              'No reviews yet',
+            Text(
+              'no_reviews'.tr(context),
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              'Be the first to review this shop',
+              'be_first_review'.tr(context),
               style: TextStyle(color: Colors.grey[600]),
             ),
           ],
@@ -972,30 +1105,28 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     );
   }
 
-  void _showAddReviewDialog() {
+  void _showAddReviewDialog() async {
     // If not logged in, prompt to login first
     if (!_isLoggedIn) {
       showDialog(
         context: context,
         builder:
             (context) => AlertDialog(
-              title: const Text('Login Required'),
-              content: const Text(
-                'You need to be logged in to write a review.',
-              ),
+              title: Text('login_required'.tr(context)),
+              content: Text('login_to_review'.tr(context)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
               actions: [
                 TextButton(
-                  child: const Text('Cancel'),
+                  child: Text('cancel'.tr(context)),
                   onPressed: () => Navigator.pop(context),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppConstants.primaryColor,
                   ),
-                  child: const Text('Login'),
+                  child: Text('login'.tr(context)),
                   onPressed: () async {
                     Navigator.pop(context); // Close dialog
                     final result = await Navigator.push(
@@ -1020,6 +1151,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
       return;
     }
 
+    // Get the actual user's full name
+    String userName = await _authService.getUserName() ?? 'User';
+
     // User is logged in, show review dialog
     showDialog(
       context: context,
@@ -1028,8 +1162,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
             onSubmit: (rating, comment, isAnonymous) {
               if (comment.trim().isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please write a review comment'),
+                  SnackBar(
+                    content: Text('please_write_review_comment'.tr(context)),
                     backgroundColor: Colors.red,
                   ),
                 );
@@ -1040,7 +1174,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                 id: DateTime.now().millisecondsSinceEpoch.toString(),
                 shopId: widget.shop.id,
                 userId: 'current-user',
-                userName: 'Current User',
+                userName: userName,
                 comment: comment,
                 rating: rating,
                 createdAt: DateTime.now(),
@@ -1050,8 +1184,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
               _reviewService.addReview(newReview).then((_) {
                 _loadReviews();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Thank you for your review!'),
+                  SnackBar(
+                    content: Text('thank_you_review'.tr(context)),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -1062,54 +1196,23 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   }
 
   void _showReportDialog() {
-    // Remove login check and directly show report dialog
-    final reasonOptions = [
-      'report_reason_address'.tr(context),
-      'report_reason_hours'.tr(context),
-      'report_reason_closed'.tr(context),
-      'report_reason_contact'.tr(context),
-      'report_reason_services'.tr(context),
-      'report_reason_nonexistent'.tr(context),
-      'report_reason_other'.tr(context),
-    ];
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => _ReportDialog(
-            onSubmit: (reason, details) {
-              if (reason.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('report_reason_required'.tr(context)),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              final report = ShopReport(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                shopId: widget.shop.id,
-                reason: reason,
-                details: details,
-                createdAt: DateTime.now(),
-                userId: 'anonymous-user',
-              );
-
-              _reportService.addReport(report).then((_) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => ReportFormScreen(
+              shopId: widget.shop.id,
+              onReportSubmitted: () {
                 _loadReports();
-                Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('thank_you_report'.tr(context)),
                     backgroundColor: Colors.green,
                   ),
                 );
-              });
-            },
-            reasonOptions: reasonOptions,
-          ),
+              },
+            ),
+      ),
     );
   }
 
@@ -1122,27 +1225,232 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   String _getDayName(int weekday) {
     switch (weekday) {
       case 1:
-        return 'Monday';
+        return 'day_monday'.tr(context);
       case 2:
-        return 'Tuesday';
+        return 'day_tuesday'.tr(context);
       case 3:
-        return 'Wednesday';
+        return 'day_wednesday'.tr(context);
       case 4:
-        return 'Thursday';
+        return 'day_thursday'.tr(context);
       case 5:
-        return 'Friday';
+        return 'day_friday'.tr(context);
       case 6:
-        return 'Saturday';
+        return 'day_saturday'.tr(context);
       case 7:
-        return 'Sunday';
+        return 'day_sunday'.tr(context);
       default:
         return '';
     }
   }
+
+  Widget _buildAdditionalInfo() {
+    final shop = widget.shop;
+    List<Widget> info = [];
+    if (shop.timestamp != null) {
+      info.add(
+        InfoRow(
+          icon: Icons.access_time,
+          text:
+              'added_label'.tr(context) +
+              ': ' +
+              shop.timestamp!.toLocal().toString(),
+        ),
+      );
+    }
+    if ((shop.buildingNumber != null && shop.buildingNumber!.isNotEmpty) ||
+        (shop.buildingName != null && shop.buildingName!.isNotEmpty)) {
+      info.add(
+        InfoRow(
+          icon: Icons.location_city,
+          text:
+              'building_label'.tr(context) +
+              ': ' +
+              [
+                shop.buildingNumber,
+                shop.buildingName,
+              ].where((e) => e != null && e.isNotEmpty).join(' '),
+        ),
+      );
+    }
+    if (shop.buildingFloor != null && shop.buildingFloor!.isNotEmpty)
+      info.add(
+        InfoRow(
+          icon: Icons.location_city,
+          text: 'building_floor_label'.tr(context) + ': ' + shop.buildingFloor!,
+        ),
+      );
+    if (shop.soi != null && shop.soi!.isNotEmpty)
+      info.add(
+        InfoRow(
+          icon: Icons.alt_route,
+          text: 'soi_label'.tr(context) + ': ' + shop.soi!,
+        ),
+      );
+    if (shop.district != null && shop.district!.isNotEmpty)
+      info.add(
+        InfoRow(
+          icon: Icons.map,
+          text: 'district_label'.tr(context) + ': ' + shop.district!,
+        ),
+      );
+    if (shop.province != null && shop.province!.isNotEmpty)
+      info.add(
+        InfoRow(
+          icon: Icons.location_city,
+          text: 'province_label'.tr(context) + ': ' + shop.province!,
+        ),
+      );
+    if (shop.landmark != null && shop.landmark!.isNotEmpty) {
+      info.add(
+        InfoRow(
+          icon: Icons.place,
+          text: 'landmark_label'.tr(context) + ': ' + shop.landmark!,
+        ),
+      );
+    }
+    if (shop.notesOrConditions != null && shop.notesOrConditions!.isNotEmpty) {
+      info.add(
+        InfoRow(
+          icon: Icons.info_outline,
+          text: 'notes_label'.tr(context) + ': ' + shop.notesOrConditions!,
+        ),
+      );
+    }
+    if (shop.tryOnAreaAvailable == true)
+      info.add(
+        InfoRow(
+          icon: Icons.check_circle_outline,
+          text:
+              'try_on_area_available'.tr(context) +
+              ': ' +
+              'yes_label'.tr(context),
+        ),
+      );
+    if (shop.paymentMethods != null && shop.paymentMethods!.isNotEmpty) {
+      info.add(
+        InfoRow(
+          icon: Icons.payment,
+          text:
+              'payment_methods_label'.tr(context) +
+              ': ' +
+              shop.paymentMethods!.join(', '),
+        ),
+      );
+    }
+    if (shop.instagramPage != null && shop.instagramPage!.isNotEmpty)
+      info.add(
+        InfoRow(icon: FontAwesomeIcons.instagram, text: shop.instagramPage!),
+      );
+    return info.isNotEmpty
+        ? Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            Text(
+              'additional_info_label'.tr(context),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...info,
+          ],
+        )
+        : SizedBox.shrink();
+  }
+
+  Widget _buildBottomBar() {
+    return Padding(
+      padding: ResponsiveSize.getScaledPadding(
+        const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+      ),
+      child: Row(
+        children: [
+          // Get Directions button
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _openMapsWithDirections,
+              icon: const Icon(Icons.directions, color: Colors.white),
+              label: Text(
+                'directions'.tr(context),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.brown,
+                padding: ResponsiveSize.getScaledPadding(
+                  const EdgeInsets.symmetric(vertical: 20),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveSize.getWidth(3)),
+          // Save location button
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _toggleSaved,
+              icon:
+                  _isLoadingSavedState
+                      ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                      : Icon(
+                        _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                        color: Colors.white,
+                      ),
+              label: Text(
+                _isSaved ? 'saved'.tr(context) : 'save'.tr(context),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    _isSaved ? Colors.orange[700] : AppConstants.primaryColor,
+                padding: ResponsiveSize.getScaledPadding(
+                  const EdgeInsets.symmetric(vertical: 20),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Add this function to normalize payment method keys
+  String _normalizePaymentMethod(String method) {
+    final m = method.toLowerCase().replaceAll(' ', '').replaceAll('_', '');
+    if (m.contains('cash')) return 'cash';
+    if (m.contains('creditcard') ||
+        m.contains('debitcard') ||
+        m.contains('card'))
+      return 'card';
+    if (m.contains('qr') || m.contains('promptpay')) return 'qr';
+    if (m.contains('banktransfer')) return 'bank_transfer';
+    if (m.contains('truemoney')) return 'true_money';
+    if (m.contains('linepay')) return 'line_pay';
+    return m;
+  }
 }
 
 class _ReportDialog extends StatefulWidget {
-  final Function(String reason, String details) onSubmit;
+  final Function(String reason, String correctInfo, String additionalDetails)
+  onSubmit;
   final List<String> reasonOptions;
 
   const _ReportDialog({required this.onSubmit, required this.reasonOptions});
@@ -1153,8 +1461,8 @@ class _ReportDialog extends StatefulWidget {
 
 class _ReportDialogState extends State<_ReportDialog> {
   String _selectedReason = '';
-  String _details = '';
   String _correctInfo = '';
+  String _details = '';
 
   @override
   Widget build(BuildContext context) {
@@ -1162,9 +1470,8 @@ class _ReportDialogState extends State<_ReportDialog> {
 
     return AlertDialog(
       title: Text('report_incorrect'.tr(context)),
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: screenWidth * 0.08,
-        vertical: 24.0,
+      insetPadding: ResponsiveSize.getScaledPadding(
+        EdgeInsets.symmetric(horizontal: screenWidth * 0.08, vertical: 24.0),
       ),
       content: Container(
         width: screenWidth * 0.85,
@@ -1177,7 +1484,7 @@ class _ReportDialogState extends State<_ReportDialog> {
                 'whats_incorrect'.tr(context),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: ResponsiveSize.getHeight(2)),
               DropdownButtonFormField<String>(
                 isExpanded: true,
                 decoration: InputDecoration(
@@ -1264,9 +1571,7 @@ class _ReportDialogState extends State<_ReportDialog> {
           ),
           child: Text('submit'.tr(context)),
           onPressed: () {
-            final combinedDetails =
-                'Correct Information:\n${_correctInfo}\n\nAdditional Details:\n${_details}';
-            widget.onSubmit(_selectedReason, combinedDetails);
+            widget.onSubmit(_selectedReason, _correctInfo, _details);
           },
         ),
       ],
@@ -1294,9 +1599,8 @@ class _ReviewDialogState extends State<_ReviewDialog> {
 
     return AlertDialog(
       title: Text('write_review'.tr(context)),
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: screenWidth * 0.08,
-        vertical: 24.0,
+      insetPadding: ResponsiveSize.getScaledPadding(
+        EdgeInsets.symmetric(horizontal: screenWidth * 0.08, vertical: 24.0),
       ),
       content: Container(
         width: screenWidth * 0.85,
@@ -1337,7 +1641,7 @@ class _ReviewDialogState extends State<_ReviewDialog> {
               TextField(
                 maxLines: 4,
                 decoration: InputDecoration(
-                  hintText: 'Share your experience...',
+                  hintText: 'review_comment_hint'.tr(context),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),

@@ -1,65 +1,73 @@
 import 'package:wonwonw2/models/review.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 class ReviewService {
-  // Mock data for reviews
-  List<Review> _mockReviews = [
-    Review(
-      id: '1',
-      shopId: 'shop1',
-      userId: 'user1',
-      userName: 'John Smith',
-      comment: 'Great service! They fixed my phone in just 30 minutes.',
-      rating: 5.0,
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      isAnonymous: false,
-    ),
-    Review(
-      id: '2',
-      shopId: 'shop1',
-      userId: 'user2',
-      userName: 'Mary Johnson',
-      comment: 'Reasonable prices and good quality repair.',
-      rating: 4.5,
-      createdAt: DateTime.now().subtract(const Duration(days: 5)),
-      isAnonymous: true,
-    ),
-    Review(
-      id: '3',
-      shopId: 'shop1',
-      userId: 'user3',
-      userName: 'Robert Wilson',
-      comment: 'They did a decent job, but took longer than expected.',
-      rating: 3.5,
-      createdAt: DateTime.now().subtract(const Duration(days: 10)),
-      isAnonymous: false,
-    ),
-    Review(
-      id: '4',
-      shopId: 'shop2',
-      userId: 'user4',
-      userName: 'Sarah Lee',
-      comment: 'Excellent work on my laptop screen replacement!',
-      rating: 5.0,
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      isAnonymous: false,
-    ),
-  ];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final String _collection = 'reviews';
 
   // Get reviews for a specific shop
   Future<List<Review>> getReviewsForShop(String shopId) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final snapshot =
+          await _firestore
+              .collection('shops')
+              .doc(shopId)
+              .collection('review')
+              .orderBy('createdAt', descending: true)
+              .get();
 
-    // Return filtered reviews
-    return _mockReviews.where((review) => review.shopId == shopId).toList();
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return Review(
+          id: doc.id,
+          shopId: data['shopId'] as String,
+          userId: data['userId'] as String,
+          userName: data['userName'] as String,
+          comment: data['comment'] as String,
+          rating: (data['rating'] as num).toDouble(),
+          createdAt: (data['createdAt'] as Timestamp).toDate(),
+          isAnonymous: data['isAnonymous'] as bool? ?? false,
+        );
+      }).toList();
+    } catch (e) {
+      appLog('Error getting reviews: $e');
+      return [];
+    }
   }
 
   // Add a new review
   Future<void> addReview(Review review) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final shopRef = _firestore.collection('shops').doc(review.shopId);
+      final reviewRef = shopRef.collection('review').doc(review.id);
+      await reviewRef.set({
+        'shopId': review.shopId,
+        'userId': review.userId,
+        'userName': review.isAnonymous ? 'Anonymous User' : review.userName,
+        'comment': review.comment,
+        'rating': review.rating,
+        'createdAt': Timestamp.fromDate(review.createdAt),
+        'isAnonymous': review.isAnonymous,
+      });
 
-    // Add to mock list
-    _mockReviews.add(review);
+      // Update average rating and review count
+      final reviewsSnapshot = await shopRef.collection('review').get();
+      final reviews = reviewsSnapshot.docs;
+      if (reviews.isNotEmpty) {
+        double total = 0;
+        for (var doc in reviews) {
+          final data = doc.data();
+          if (data['rating'] != null) {
+            total += (data['rating'] as num).toDouble();
+          }
+        }
+        final avg = total / reviews.length;
+        await shopRef.update({'rating': avg, 'reviewCount': reviews.length});
+      }
+    } catch (e) {
+      appLog('Error adding review: $e');
+      rethrow;
+    }
   }
 }

@@ -5,6 +5,9 @@ import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui' as ui;
 import 'dart:async';
+import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/utils/responsive_size.dart';
 
 class MapPickerScreen extends StatefulWidget {
   final double? initialLatitude;
@@ -362,7 +365,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
           }
         })
         .catchError((error) {
-          debugPrint("Error setting map style: $error");
+          appLog("Error setting map style: $error");
           // Set the controller even if there's an error
           _mapController = controller;
 
@@ -493,7 +496,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      'Loading map...',
+                      'loading_map'.tr(context),
                       style: GoogleFonts.montserrat(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
@@ -534,7 +537,9 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               left: 0,
               right: 0,
               child: Container(
-                padding: const EdgeInsets.all(20.0),
+                padding: ResponsiveSize.getScaledPadding(
+                  const EdgeInsets.all(20.0),
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   boxShadow: [

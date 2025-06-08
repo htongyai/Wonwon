@@ -1,50 +1,108 @@
-import '../models/repair_shop.dart';
+import 'package:wonwonw2/models/repair_shop.dart';
+import 'package:wonwonw2/services/firebase_shop_service.dart';
 import 'dart:math' as math;
-import 'mock_shop_data.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 class ShopService {
-  // Get all shops
+  final FirebaseShopService _firebaseService = FirebaseShopService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final CollectionReference _shopsRef = FirebaseFirestore.instance.collection(
+    'shops',
+  );
+
+  // Get all approved shops
   Future<List<RepairShop>> getAllShops() async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      appLog('Querying Firestore for all approved shops...');
 
-    // Get saved user-submitted shops
-    final userShops = await _getUserSubmittedShops();
+      // Get the shops collection reference
+      final CollectionReference shopsCollection = FirebaseFirestore.instance
+          .collection('shops');
 
-    // Get approved user-submitted shops
-    final approvedUserShops = userShops.where((shop) => shop.approved).toList();
+      // Query for approved shops
+      final QuerySnapshot snapshot =
+          await shopsCollection.where('approved', isEqualTo: true).get();
 
-    // Combine mock shops with approved user-submitted shops
-    final allShops = [...MockShopData.getAllShops(), ...approvedUserShops];
+      appLog('Firestore returned ${snapshot.docs.length} documents');
 
-    return allShops;
+      // Convert documents to RepairShop objects
+      final List<RepairShop> shops =
+          snapshot.docs.map((doc) {
+            appLog('Processing document ${doc.id}');
+            final data = doc.data() as Map<String, dynamic>;
+            // Add the document ID to the data
+            data['id'] = doc.id;
+            appLog('Document data: $data');
+            return RepairShop.fromMap(data);
+          }).toList();
+
+      appLog(
+        'Successfully converted ${shops.length} documents to RepairShop objects',
+      );
+      return shops;
+    } catch (e) {
+      appLog('Error getting all shops: $e');
+      rethrow;
+    }
+  }
+
+  // Get unapproved shops
+  Future<List<RepairShop>> getUnapprovedShops() async {
+    try {
+      appLog('Querying Firestore for unapproved shops...');
+
+      // Get the shops collection reference
+      final CollectionReference shopsCollection = FirebaseFirestore.instance
+          .collection('shops');
+
+      // Query for unapproved shops
+      final QuerySnapshot snapshot =
+          await shopsCollection.where('approved', isEqualTo: false).get();
+
+      appLog('Firestore returned ${snapshot.docs.length} documents');
+
+      // Convert documents to RepairShop objects
+      final List<RepairShop> shops =
+          snapshot.docs.map((doc) {
+            appLog('Processing document ${doc.id}');
+            final data = doc.data() as Map<String, dynamic>;
+            // Add the document ID to the data
+            data['id'] = doc.id;
+            appLog('Document data: $data');
+            return RepairShop.fromMap(data);
+          }).toList();
+
+      appLog(
+        'Successfully converted ${shops.length} documents to RepairShop objects',
+      );
+      return shops;
+    } catch (e) {
+      appLog('Error getting unapproved shops: $e');
+      rethrow;
+    }
   }
 
   // Add a new shop
   Future<bool> addShop(RepairShop shop) async {
-    try {
-      // Simulate network delay
-      await Future.delayed(const Duration(seconds: 1));
+    return await _firebaseService.addShop(shop);
+  }
 
-      // In a real app, this would send the shop to a backend API
-      // For this demo, we'll save it to SharedPreferences
+  // Update a shop
+  Future<bool> updateShop(RepairShop shop) async {
+    return await _firebaseService.updateShop(shop);
+  }
 
-      // Get existing submitted shops
-      final userShops = await _getUserSubmittedShops();
+  // Approve a shop
+  Future<bool> approveShop(String shopId) async {
+    return await _firebaseService.approveShop(shopId);
+  }
 
-      // Add the new shop
-      userShops.add(shop);
-
-      // Save back to SharedPreferences
-      await _saveUserSubmittedShops(userShops);
-
-      return true;
-    } catch (e) {
-      print('Error adding shop: $e');
-      return false;
-    }
+  // Delete a shop
+  Future<bool> deleteShop(String shopId) async {
+    return await _firebaseService.deleteShop(shopId);
   }
 
   // Get user-submitted shops (both approved and pending)
@@ -110,10 +168,11 @@ class ShopService {
           features: features,
           approved: shopMap['approved'] as bool? ?? false,
           irregularHours: shopMap['irregularHours'] as bool? ?? false,
+          instagramPage: shopMap['instagramPage'],
         );
       }).toList();
     } catch (e) {
-      print('Error getting user-submitted shops: $e');
+      appLog('Error getting user-submitted shops: $e');
       return [];
     }
   }
@@ -125,24 +184,13 @@ class ShopService {
       final shopsJson = shops.map((shop) => jsonEncode(shop.toMap())).toList();
       await prefs.setStringList('user_submitted_shops', shopsJson);
     } catch (e) {
-      print('Error saving user-submitted shops: $e');
+      appLog('Error saving user-submitted shops: $e');
     }
   }
 
   // Get shop by ID
   Future<RepairShop?> getShopById(String shopId) async {
-    // Check user-submitted shops first
-    final userShops = await _getUserSubmittedShops();
-    final userShop = userShops.where((shop) => shop.id == shopId).toList();
-    if (userShop.isNotEmpty) {
-      return userShop.first;
-    }
-
-    // Then check mock shops
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    final shops = MockShopData.getAllShops();
+    final shops = await getAllShops();
     return shops.firstWhere(
       (shop) => shop.id == shopId,
       orElse:
@@ -163,32 +211,15 @@ class ShopService {
 
   // Get shops by category
   Future<List<RepairShop>> getShopsByCategory(String categoryId) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    // Get mock shops by category
-    final mockShops = MockShopData.getShopsByCategory(categoryId);
-
-    // Get approved user-submitted shops
-    final userShops = await _getUserSubmittedShops();
-    final approvedUserShops =
-        userShops
-            .where(
-              (shop) =>
-                  shop.approved &&
-                  (categoryId == 'all' || shop.categories.contains(categoryId)),
-            )
-            .toList();
-
-    // Combine lists
-    return [...mockShops, ...approvedUserShops];
+    final shops = await getAllShops();
+    if (categoryId == 'all') {
+      return shops;
+    }
+    return shops.where((shop) => shop.categories.contains(categoryId)).toList();
   }
 
   // Search shops by name or description
   Future<List<RepairShop>> searchShops(String query) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 300));
-
     final shops = await getAllShops();
     final lowerCaseQuery = query.toLowerCase();
     return shops
@@ -206,9 +237,6 @@ class ShopService {
 
   // Get shops by area
   Future<List<RepairShop>> getShopsByArea(String area) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 300));
-
     final shops = await getAllShops();
     final lowerCaseArea = area.toLowerCase();
     return shops
@@ -218,9 +246,6 @@ class ShopService {
 
   // Get shops by rating (minimum rating)
   Future<List<RepairShop>> getShopsByMinimumRating(double minRating) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 300));
-
     final shops = await getAllShops();
     return shops.where((shop) => shop.rating >= minRating).toList();
   }
@@ -231,9 +256,6 @@ class ShopService {
     double longitude,
     double radiusKm,
   ) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 500));
-
     final shops = await getAllShops();
     return shops
         .where(
@@ -249,7 +271,7 @@ class ShopService {
         .toList();
   }
 
-  // Calculate distance between two coordinates using Haversine formula
+  // Calculate distance between two points using Haversine formula
   double _calculateDistance(
     double lat1,
     double lon1,
@@ -271,5 +293,28 @@ class ShopService {
 
   double _toRadians(double degree) {
     return degree * math.pi / 180;
+  }
+
+  Future<bool> updateShopApprovalStatus(String shopId, bool approved) async {
+    try {
+      appLog('Updating shop approval status for shop $shopId to $approved');
+
+      // Get the shops collection reference
+      final DocumentReference shopRef = FirebaseFirestore.instance
+          .collection('shops')
+          .doc(shopId);
+
+      // Update the document
+      await shopRef.update({
+        'approved': approved,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      appLog('Successfully updated shop approval status');
+      return true;
+    } catch (e) {
+      appLog('Error updating shop approval status: $e');
+      return false;
+    }
   }
 }

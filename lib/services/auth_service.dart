@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 class AuthService {
   static const String _isLoggedInKey = 'is_logged_in';
@@ -52,7 +53,7 @@ class AuthService {
           return doc.data()!['name'] as String;
         }
       } catch (e) {
-        print('Error getting user name from Firestore: $e');
+        appLog('Error getting user name from Firestore: $e');
       }
     }
 
@@ -85,17 +86,17 @@ class AuthService {
             await prefs.setString(_userNameKey, doc.data()!['name'] as String);
           }
         } catch (e) {
-          print('Error getting user name from Firestore: $e');
+          appLog('Error getting user name from Firestore: $e');
         }
 
         return true;
       }
       return false;
     } on FirebaseAuthException catch (e) {
-      print('Login error (Firebase Auth): ${e.code} - ${e.message}');
+      appLog('Login error (Firebase Auth): ${e.code} - ${e.message}');
       return false;
     } catch (e) {
-      print('Login error (General): $e');
+      appLog('Login error (General): $e');
       return false;
     }
   }
@@ -126,6 +127,7 @@ class AuthService {
           'createdAt': FieldValue.serverTimestamp(),
           'acceptedTerms': true,
           'acceptedPrivacy': true,
+          'admin': false,
         });
 
         // Store user info in SharedPreferences (as a backup)
@@ -139,13 +141,13 @@ class AuthService {
       }
       return false;
     } on FirebaseAuthException catch (e) {
-      print('Registration error (Firebase Auth): ${e.code} - ${e.message}');
+      appLog('Registration error (Firebase Auth): ${e.code} - ${e.message}');
       return false;
     } on FirebaseException catch (e) {
-      print('Registration error (Firestore): ${e.code} - ${e.message}');
+      appLog('Registration error (Firestore): ${e.code} - ${e.message}');
       return false;
     } catch (e) {
-      print('Registration error (General): $e');
+      appLog('Registration error (General): $e');
       return false;
     }
   }
@@ -157,10 +159,10 @@ class AuthService {
       await _auth.sendPasswordResetEmail(email: email);
       return true;
     } on FirebaseAuthException catch (e) {
-      print('Password reset error (Firebase Auth): ${e.code} - ${e.message}');
+      appLog('Password reset error (Firebase Auth): ${e.code} - ${e.message}');
       return false;
     } catch (e) {
-      print('Password reset error (General): $e');
+      appLog('Password reset error (General): $e');
       return false;
     }
   }
@@ -178,9 +180,9 @@ class AuthService {
       await prefs.remove(_userEmailKey);
       await prefs.remove(_userNameKey);
     } on FirebaseAuthException catch (e) {
-      print('Logout error (Firebase Auth): ${e.code} - ${e.message}');
+      appLog('Logout error (Firebase Auth): ${e.code} - ${e.message}');
     } catch (e) {
-      print('Logout error (General): $e');
+      appLog('Logout error (General): $e');
     }
   }
 }

@@ -6,9 +6,45 @@
 
 ## Overview
 
-WonWon Repair Finder is a comprehensive mobile application designed to connect users with local repair services. The app provides a seamless experience for finding, evaluating, and contacting repair shops across various categories. With an intuitive interface and powerful features, users can easily locate the services they need when something breaks.
+WonWon Repair Finder is a comprehensive mobile and web application designed to connect users with local repair services. The app provides a seamless experience for finding, evaluating, and contacting repair shops across various categories. With an intuitive interface and powerful features, users can easily locate the services they need when something breaks.
 
 > ⚠️ **Important Note**: The current version does not include Firebase integration. All data is mock data, and backend functionality like authentication, real-time updates, and cloud storage will be implemented in future versions.
+
+## 🌟 Flutter Web Support
+
+### How to Run for Web
+
+1. **Enable web support (if not already):**
+   ```bash
+   flutter config --enable-web
+   ```
+2. **Run in Chrome:**
+   ```bash
+   flutter run -d chrome
+   ```
+3. **Build for web:**
+   ```bash
+   flutter build web
+   ```
+   The output will be in the `build/web` directory.
+
+### Web-Specific Notes
+- All major features are supported on web, including localization, category filtering, shop details, and reviews.
+- Responsive design ensures the app looks great on desktop and mobile browsers.
+- Some plugins (e.g., Firebase, camera) may require additional setup for web compatibility.
+- For Google Maps, ensure your API key is set in `web/index.html` as well as mobile manifests.
+
+## 🏗️ Modern Architecture & Recent Improvements
+
+- **SliverAppBar for Details Page:** The shop details page uses a `SliverAppBar` for the cover image, which scrolls up with the content for a modern, native feel.
+- **Language Switch Loading Overlay:** When switching languages, a loading overlay is shown for 1 second for a smooth transition.
+- **Responsive Design:** Uses `ResponsiveSize` utilities for consistent sizing across devices and browsers.
+- **Dynamic Localization:** Instantly switch between English and Thai, with all UI elements updating live.
+- **Category & Subservice System:** Categories and subservices are fully localized and filterable.
+- **Lazy Loading Images:** Images are loaded only when visible for performance.
+- **Settings Page:** Compact, modern, and responsive with language and account controls.
+- **Shop List & Filtering:** Fast, interactive, and supports both list and map views.
+- **Report System:** Users can report incorrect shop info, with a visible counter on the details page.
 
 ## 🌟 Key Features
 

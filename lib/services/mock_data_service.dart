@@ -30,6 +30,7 @@ class MockDataService {
         ],
         priceRange: '₿₿',
         features: {'pickup': true, 'delivery': false},
+        approved: true,
       ),
       RepairShop(
         id: '2',
@@ -52,6 +53,7 @@ class MockDataService {
         ],
         priceRange: '₿₿',
         features: {'pickup': false, 'delivery': true},
+        approved: true,
       ),
       RepairShop(
         id: '3',
@@ -74,6 +76,7 @@ class MockDataService {
         ],
         priceRange: '₿₿₿',
         features: {'pickup': true, 'delivery': true},
+        approved: true,
       ),
       RepairShop(
         id: '4',
@@ -96,6 +99,7 @@ class MockDataService {
         ],
         priceRange: '₿₿',
         features: {'pickup': false, 'delivery': false},
+        approved: true,
       ),
       RepairShop(
         id: '5',
@@ -118,6 +122,7 @@ class MockDataService {
         ],
         priceRange: '₿',
         features: {'pickup': false, 'delivery': false},
+        approved: true,
       ),
     ];
   }
