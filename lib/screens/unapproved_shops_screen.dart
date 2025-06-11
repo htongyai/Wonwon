@@ -131,97 +131,257 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
                   itemCount: _unapprovedShops.length,
                   itemBuilder: (context, index) {
                     final shop = _unapprovedShops[index];
-                    return GestureDetector(
-                      onTap: () async {
-                        final approved = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (context) =>
-                                    UnapprovedShopDetailScreen(shop: shop),
-                          ),
-                        );
-                        if (approved == true) {
-                          _approveShop(shop);
-                        }
-                      },
-                      child: Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      shop.name,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: InkWell(
+                        onTap: () async {
+                          final approved = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) =>
+                                      UnapprovedShopDetailScreen(shop: shop),
+                            ),
+                          );
+                          if (approved == true) {
+                            _approveShop(shop);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Shop image
+                            Hero(
+                              tag: 'shop-image-${shop.id}',
+                              child: Container(
+                                height: 150,
+                                decoration: BoxDecoration(
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(16),
                                   ),
-                                  ElevatedButton(
-                                    onPressed: () => _approveShop(shop),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          AppConstants.primaryColor,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(16),
+                                  ),
+                                  child:
+                                      shop.photos.isNotEmpty
+                                          ? Image.network(
+                                            shop.photos.first,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) =>
+                                                    Container(
+                                                      color: Colors.grey[200],
+                                                    ),
+                                          )
+                                          : Container(color: Colors.grey[200]),
+                                ),
+                              ),
+                            ),
+                            // Shop details
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Name and rating row
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          shop.name,
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppConstants.darkColor,
+                                            letterSpacing: 0.1,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.star,
+                                            color: Colors.amber,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            shop.rating.toStringAsFixed(1),
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                              color: AppConstants.darkColor,
+                                            ),
+                                          ),
+                                          if (shop.reviewCount > 0) ...[
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '(${shop.reviewCount})',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  // Categories under name
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children:
+                                        shop.categories.map((category) {
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppConstants.primaryColor
+                                                  .withOpacity(0.13),
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                            ),
+                                            child: Text(
+                                              category,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                                color:
+                                                    AppConstants.primaryColor,
+                                                letterSpacing: 0.1,
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  // Subservices available
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.build,
+                                        color: Colors.grey,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          shop.subServices.values
+                                                  .expand((subs) => subs)
+                                                  .isNotEmpty
+                                              ? shop.subServices.values
+                                                      .expand((subs) => subs)
+                                                      .take(3)
+                                                      .join(', ') +
+                                                  (shop.subServices.values
+                                                              .expand(
+                                                                (subs) => subs,
+                                                              )
+                                                              .length >
+                                                          3
+                                                      ? '...'
+                                                      : '')
+                                              : 'No subservices',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey[800],
+                                            fontWeight: FontWeight.w500,
+                                            letterSpacing: 0.1,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  // Address
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.location_on,
+                                        color: Colors.grey,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          shop.address,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey[700],
+                                            letterSpacing: 0.1,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // View Details button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        final approved = await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) =>
+                                                    UnapprovedShopDetailScreen(
+                                                      shop: shop,
+                                                    ),
+                                          ),
+                                        );
+                                        if (approved == true) {
+                                          _approveShop(shop);
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            AppConstants.primaryColor,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: Text(
+                                        'View Details',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                        ),
                                       ),
                                     ),
-                                    child: const Text('Approve'),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                shop.description,
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                shop.address,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children:
-                                    shop.categories.map((category) {
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppConstants.primaryColor
-                                              .withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          category,
-                                          style: TextStyle(
-                                            color: AppConstants.primaryColor,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     );

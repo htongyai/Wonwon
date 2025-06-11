@@ -530,6 +530,13 @@ class _AddShopScreenState extends State<AddShopScreen> {
                     label: 'building_number_and_name_label'.tr(context),
                     hint: 'enter_building_number_and_name_hint'.tr(context),
                   ),
+                  //    SizedBox(height: ResponsiveSize.getHeight(4)), Building Floor
+                  _buildTextFormField(
+                    controller: _buildingFloorController,
+                    label: 'building_floor_label'.tr(context),
+                    hint: 'enter_building_floor_hint'.tr(context),
+                  ),
+
                   SizedBox(height: ResponsiveSize.getHeight(4)),
                   _buildTextFormField(
                     controller: _soiController,
@@ -587,6 +594,16 @@ class _AddShopScreenState extends State<AddShopScreen> {
                     hint: 'enter_landmark_hint'.tr(context),
                   ),
                   SizedBox(height: ResponsiveSize.getHeight(4)),
+                  // Notes or Service Conditions
+                  _buildTextFormField(
+                    controller: _notesOrConditionsController,
+                    label: 'notes_or_conditions_label'.tr(context),
+                    hint: 'enter_notes_or_conditions_hint'.tr(context),
+                    maxLines: 2,
+                  ),
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
+
+                  SizedBox(height: ResponsiveSize.getHeight(4)),
                   // Contact Channels
                   SectionTitle(text: 'contact_information'.tr(context)),
                   SizedBox(height: ResponsiveSize.getHeight(4)),
@@ -594,7 +611,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                   // Line ID (Optional)
                   _buildTextFormField(
                     controller: _lineIdController,
-                    label: 'line_id_label'.tr(context),
+                    label: '${'line_id_label'.tr(context)} (Optional)',
                     hint: 'enter_line_id_hint'.tr(context),
                     prefixIcon: Icon(
                       FontAwesomeIcons.line,
@@ -619,7 +636,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                   // Instagram Page (Optional)
                   _buildTextFormField(
                     controller: _instagramPageController,
-                    label: 'instagram_label'.tr(context),
+                    label: '${'instagram_label'.tr(context)} (Optional)',
                     hint: 'enter_instagram_url'.tr(context),
                     prefixIcon: Icon(
                       FontAwesomeIcons.instagram,
@@ -632,7 +649,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                   // Other Contacts
                   _buildTextFormField(
                     controller: _otherContactsController,
-                    label: 'other_contacts_label'.tr(context),
+                    label: '${'other_contacts_label'.tr(context)} (Optional)',
                     hint: 'enter_other_contacts_hint'.tr(context),
                     maxLines: 2,
                   ),
@@ -690,25 +707,8 @@ class _AddShopScreenState extends State<AddShopScreen> {
                       Text('trial_area_available'.tr(context)),
                     ],
                   ),
-                  SizedBox(height: ResponsiveSize.getHeight(4)),
-                  // Notes or Service Conditions
-                  _buildTextFormField(
-                    controller: _notesOrConditionsController,
-                    label: 'notes_or_conditions_label'.tr(context),
-                    hint: 'enter_notes_or_conditions_hint'.tr(context),
-                    maxLines: 2,
-                  ),
-                  SizedBox(height: ResponsiveSize.getHeight(4)),
-                  // Building Floor
-                  _buildTextFormField(
-                    controller: _buildingFloorController,
-                    label: 'building_floor_label'.tr(context),
-                    hint: 'enter_building_floor_hint'.tr(context),
-                  ),
-                  SizedBox(height: ResponsiveSize.getHeight(4)),
 
                   // Contact Section
-                  SectionTitle(text: 'contact_information'.tr(context)),
                   SizedBox(height: ResponsiveSize.getHeight(4)),
 
                   // Hours Section

@@ -24,6 +24,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/widgets/section_title.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:excel/excel.dart' as excel;
+import 'package:wonwonw2/services/shop_service.dart';
+import 'package:wonwonw2/models/repair_shop.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -180,19 +184,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               return SizedBox.shrink();
                             }
                             if (snapshot.data == true) {
-                              return _buildFeatureTile(
-                                Icons.report_problem,
-                                'view_reports'.tr(context),
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) =>
-                                              const ViewReportsScreen(),
-                                    ),
-                                  );
-                                },
+                              return Column(
+                                children: [
+                                  _buildFeatureTile(
+                                    Icons.report_problem,
+                                    'view_reports'.tr(context),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) =>
+                                                  const ViewReportsScreen(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _buildFeatureTile(
+                                    Icons.upload_file,
+                                    'Import from Excel',
+                                    onTap: _importShopsFromExcel,
+                                  ),
+                                ],
                               );
                             }
                             return SizedBox.shrink();
@@ -644,11 +657,165 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<bool> _isAdminUser() async {
-    final authService = AuthService();
-    final userId = await authService.getUserId();
-    if (userId == null) return false;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
     final userDoc =
-        await FirebaseFirestore.instance.collection('users').doc(userId).get();
-    return userDoc.data()?['admin'] == true;
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+    return userDoc.data()?['admin'] ?? false;
+  }
+
+  Future<void> _importShopsFromExcel() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'xls'],
+      );
+      if (result == null || result.files.isEmpty) return;
+      final fileBytes = result.files.first.bytes;
+      if (fileBytes == null) throw Exception('File could not be read');
+      final excelFile = excel.Excel.decodeBytes(fileBytes);
+      int importedCount = 0;
+
+      for (final table in excelFile.tables.keys) {
+        final sheet = excelFile.tables[table]!;
+        if (sheet.maxRows < 2) continue; // skip if no data
+        final headers =
+            sheet.rows[0].map((cell) => cell?.value?.toString() ?? '').toList();
+        for (int i = 1; i < sheet.rows.length; i++) {
+          final row = sheet.rows[i];
+          // Skip row if all columns are empty or whitespace
+          if (row.every(
+            (cell) =>
+                cell == null ||
+                cell.value == null ||
+                cell.value.toString().trim().isEmpty,
+          )) {
+            continue;
+          }
+          final Map<String, dynamic> data = {};
+          for (int j = 0; j < headers.length && j < row.length; j++) {
+            final value = row[j]?.value;
+            if (value != null && value.toString().trim().isNotEmpty) {
+              data[headers[j]] = value;
+            }
+          }
+          try {
+            List<String> paymentMethods = [];
+            if (data['cash']?.toString().toLowerCase() == 'true')
+              paymentMethods.add('cash');
+            if (data['QR']?.toString().toLowerCase() == 'true')
+              paymentMethods.add('qr');
+            if (data['credit']?.toString().toLowerCase() == 'true')
+              paymentMethods.add('card');
+            Map<String, String> hours = {};
+            final days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+            for (final day in days) {
+              final timeStr = data[day]?.toString() ?? '';
+              if (timeStr.isNotEmpty) {
+                hours[day] = timeStr;
+              }
+            }
+            // Generate id using Firestore convention
+            final String shopId =
+                FirebaseFirestore.instance.collection('shops').doc().id;
+            final shop = RepairShop(
+              id: shopId,
+              name: data['name']?.toString() ?? '',
+              description: data['description']?.toString() ?? '',
+              address: data['address']?.toString() ?? '',
+              area: data['area']?.toString() ?? '',
+              categories:
+                  (data['categories'] is String)
+                      ? (data['categories'] as String)
+                          .split(',')
+                          .map((e) => e.trim())
+                          .toList()
+                      : [],
+              rating: double.tryParse(data['rating']?.toString() ?? '0') ?? 0.0,
+              amenities:
+                  (data['amenities'] is String)
+                      ? (data['amenities'] as String)
+                          .split(',')
+                          .map((e) => e.trim())
+                          .toList()
+                      : [],
+              hours: hours,
+              closingDays: [],
+              latitude:
+                  double.tryParse(data['latitude']?.toString() ?? '0') ?? 0.0,
+              longitude:
+                  double.tryParse(data['longitude']?.toString() ?? '0') ?? 0.0,
+              durationMinutes:
+                  int.tryParse(data['durationMinutes']?.toString() ?? '0') ?? 0,
+              requiresPurchase:
+                  (data['requiresPurchase']?.toString().toLowerCase() ==
+                      'true'),
+              photos: [],
+              priceRange: data['priceRange']?.toString() ?? '₿',
+              features: {},
+              approved:
+                  (data['isapproved']?.toString().toLowerCase() == 'true'),
+              irregularHours: false,
+              subServices: {},
+              buildingNumber: data['buildingNumber']?.toString(),
+              buildingName: data['buildingName']?.toString(),
+              soi: data['soi']?.toString(),
+              district: data['district']?.toString(),
+              province: data['province']?.toString(),
+              landmark: data['landmark']?.toString(),
+              lineId: data['lineId']?.toString(),
+              facebookPage: data['facebookPage']?.toString(),
+              otherContacts: data['otherContacts']?.toString(),
+              paymentMethods: paymentMethods.isNotEmpty ? paymentMethods : null,
+              tryOnAreaAvailable:
+                  (data['tryOnAreaAvailable']?.toString().toLowerCase() ==
+                      'true'),
+              notesOrConditions: data['notesOrConditions']?.toString(),
+              usualOpeningTime: data['usualOpeningTime']?.toString(),
+              usualClosingTime: data['usualClosingTime']?.toString(),
+              instagramPage: data['instagramPage']?.toString(),
+              phoneNumber: data['phoneNumber']?.toString(),
+              buildingFloor: data['buildingFloor']?.toString(),
+            );
+            await ShopService().addShop(shop);
+            importedCount++;
+          } catch (e) {
+            print('Error processing row $i: $e');
+          }
+        }
+      }
+      showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: const Text('Import Complete'),
+              content: Text('Successfully imported $importedCount shops.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+      );
+    } catch (e) {
+      showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: const Text('Import Failed'),
+              content: Text('Error: ' + e.toString()),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+      );
+    }
   }
 }

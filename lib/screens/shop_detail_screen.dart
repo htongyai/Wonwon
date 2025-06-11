@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/models/review.dart';
+import 'package:wonwonw2/screens/edit_shop_screen.dart';
 import 'package:wonwonw2/screens/login_screen.dart';
+import 'package:wonwonw2/screens/report_form_screen.dart';
 import 'package:wonwonw2/services/auth_service.dart';
 import 'package:wonwonw2/services/review_service.dart';
 import 'package:wonwonw2/services/report_service.dart';
@@ -19,9 +21,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:wonwonw2/widgets/info_row.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wonwonw2/screens/log_repair_screen.dart';
-import 'package:wonwonw2/screens/report_form_screen.dart';
 import 'package:wonwonw2/widgets/section_title.dart';
-import 'package:wonwonw2/widgets/info_row.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 /// Screen that displays detailed information about a repair shop
 /// Shows shop information, hours, contact details, services, and reviews
@@ -57,6 +60,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   bool _isSaved = false;
   bool _isLoadingSavedState = true;
   bool _isLoggedIn = false;
+  bool _isAdmin = false;
+  Map<String, bool> _showReplyInput = {};
+  Map<String, TextEditingController> _replyControllers = {};
+  Map<String, bool> _expandedReplies = {};
+  Map<String, bool> _userExistsCache = {};
 
   @override
   void initState() {
@@ -76,9 +84,10 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         _isLoggedIn = isLoggedIn;
       });
 
-      // If logged in, check if this shop is saved
+      // If logged in, check if this shop is saved and check admin status
       if (isLoggedIn) {
         _checkIfSaved();
+        _checkAdminStatus();
       } else {
         setState(() {
           _isLoadingSavedState = false;
@@ -103,6 +112,27 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           _isLoadingSavedState = false;
         });
       }
+    }
+  }
+
+  /// Check if the current user is an admin
+  Future<void> _checkAdminStatus() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
+        if (mounted) {
+          setState(() {
+            _isAdmin = userDoc.data()?['admin'] ?? false;
+          });
+        }
+      }
+    } catch (e) {
+      appLog('Error checking admin status', e);
     }
   }
 
@@ -198,6 +228,38 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   Future<void> _loadReviews() async {
     try {
       final reviews = await _reviewService.getReviewsForShop(widget.shop.id);
+      // Collect all unique userIds from reviews and replies
+      Set<String> userIds = {};
+      for (var review in reviews) {
+        userIds.add(review.userId);
+        for (var reply in review.replies) {
+          userIds.add(reply.userId);
+        }
+      }
+      // Check which users exist (batch in groups of 10)
+      Map<String, bool> existsMap = {};
+      final usersCollection = FirebaseFirestore.instance.collection('users');
+      final userIdList = userIds.toList();
+      for (int i = 0; i < userIdList.length; i += 10) {
+        final batch = userIdList.skip(i).take(10).toList();
+        if (batch.isEmpty) continue;
+        final query =
+            await usersCollection
+                .where(FieldPath.documentId, whereIn: batch)
+                .get();
+        // Mark found users as existing
+        for (var doc in query.docs) {
+          existsMap[doc.id] = true;
+        }
+        // Mark not found users as not existing
+        for (var id in batch) {
+          if (!existsMap.containsKey(id)) {
+            existsMap[id] = false;
+          }
+        }
+      }
+      // Cache for session
+      _userExistsCache = existsMap;
       if (mounted) {
         setState(() {
           _reviews = reviews;
@@ -292,6 +354,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   void dispose() {
     // Clean up resources
     _scrollController.dispose();
+    _replyControllers.forEach((_, c) => c.dispose());
     super.dispose();
   }
 
@@ -338,47 +401,74 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                     Positioned(
                       top: 8,
                       right: 8,
-                      child: Stack(
-                        alignment: Alignment.center,
+                      child: Row(
                         children: [
-                          CircleAvatar(
-                            backgroundColor: Colors.white.withOpacity(0.7),
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.report_problem_outlined,
-                                color: Colors.red,
+                          // Edit button - only show for admin users
+                          if (_isAdmin)
+                            CircleAvatar(
+                              backgroundColor: Colors.white.withOpacity(0.7),
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.edit_outlined,
+                                  color: AppConstants.primaryColor,
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) =>
+                                              EditShopScreen(shop: widget.shop),
+                                    ),
+                                  );
+                                },
                               ),
-                              onPressed: _showReportDialog,
                             ),
-                          ),
-                          if (!_isLoadingReports && _reports.isNotEmpty)
-                            Positioned(
-                              right: 4,
-                              top: 4,
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
+                          if (_isAdmin) const SizedBox(width: 8),
+                          // Report button
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: Colors.white.withOpacity(0.7),
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.report_problem_outlined,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: _showReportDialog,
                                 ),
-                                constraints: const BoxConstraints(
-                                  minWidth: 14,
-                                  minHeight: 14,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    _reports.length > 9
-                                        ? '9+'
-                                        : '${_reports.length}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 8,
-                                      fontWeight: FontWeight.bold,
+                              ),
+                              if (!_isLoadingReports && _reports.isNotEmpty)
+                                Positioned(
+                                  right: 4,
+                                  top: 4,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 14,
+                                      minHeight: 14,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        _reports.length > 9
+                                            ? '9+'
+                                            : '${_reports.length}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -1033,7 +1123,14 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   Widget _buildReviewItem(Review review) {
     final formattedDate =
         '${review.createdAt.day}/${review.createdAt.month}/${review.createdAt.year}';
-
+    _replyControllers.putIfAbsent(review.id, () => TextEditingController());
+    _showReplyInput.putIfAbsent(review.id, () => false);
+    _expandedReplies.putIfAbsent(review.id, () => false);
+    // Use cache to determine display name
+    String displayName =
+        (_userExistsCache[review.userId] == false || review.isAnonymous)
+            ? 'Anonymous'
+            : review.userName;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -1046,15 +1143,18 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
                 backgroundColor:
-                    review.isAnonymous
+                    review.isAnonymous ||
+                            (_userExistsCache[review.userId] == false)
                         ? Colors.grey[400]
                         : AppConstants.primaryColor.withOpacity(0.2),
                 radius: 16,
                 child: Text(
-                  review.isAnonymous
+                  (review.isAnonymous ||
+                          (_userExistsCache[review.userId] == false))
                       ? 'A'
                       : review.userName
                           .split(' ')
@@ -1063,7 +1163,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                           .toUpperCase(),
                   style: TextStyle(
                     color:
-                        review.isAnonymous
+                        review.isAnonymous ||
+                                (_userExistsCache[review.userId] == false)
                             ? Colors.white
                             : AppConstants.primaryColor,
                     fontSize: 12,
@@ -1076,7 +1177,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      review.getDisplayName(),
+                      displayName,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     Text(
@@ -1087,22 +1188,224 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                 ),
               ),
               Row(
-                children: List.generate(
-                  5,
-                  (index) => Icon(
-                    index < review.rating ? Icons.star : Icons.star_border,
-                    color: Colors.amber,
-                    size: 16,
+                children: [
+                  ...List.generate(
+                    5,
+                    (index) => Icon(
+                      index < review.rating ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 16,
+                    ),
                   ),
-                ),
+                  // Add spacing between stars and show replies button
+                  if (review.replies.isNotEmpty) ...[
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _expandedReplies[review.id] =
+                              !_expandedReplies[review.id]!;
+                        });
+                      },
+                      child: Text(
+                        _expandedReplies[review.id] == true
+                            ? 'Hide replies'
+                            : 'Show replies',
+                        style: TextStyle(
+                          color: AppConstants.primaryColor,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(review.comment),
+          const SizedBox(height: 8),
+          // Replies (expandable)
+          if (review.replies.isNotEmpty && _expandedReplies[review.id] == true)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children:
+                  review.replies.map((reply) {
+                    final replyDate =
+                        '${reply.createdAt.day}/${reply.createdAt.month}/${reply.createdAt.year}';
+                    // Use cache to determine reply display name
+                    String replyDisplayName =
+                        (_userExistsCache[reply.userId] == false)
+                            ? 'Anonymous'
+                            : reply.userName;
+                    return Container(
+                      margin: const EdgeInsets.only(top: 8, left: 24),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            backgroundColor:
+                                (_userExistsCache[reply.userId] == false)
+                                    ? Colors.grey[400]
+                                    : AppConstants.primaryColor.withOpacity(
+                                      0.15,
+                                    ),
+                            radius: 12,
+                            child: Text(
+                              (_userExistsCache[reply.userId] == false)
+                                  ? 'A'
+                                  : (reply.userName.isNotEmpty
+                                      ? reply.userName[0].toUpperCase()
+                                      : '?'),
+                              style: TextStyle(
+                                color:
+                                    (_userExistsCache[reply.userId] == false)
+                                        ? Colors.white
+                                        : AppConstants.primaryColor,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  replyDisplayName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  replyDate,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  reply.comment,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+            ),
+          // Reply button and input
+          const SizedBox(height: 8),
+          if (_showReplyInput[review.id] == true)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _replyControllers[review.id],
+                  decoration: InputDecoration(
+                    hintText: 'Write a reply...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  minLines: 1,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    ElevatedButton(
+                      onPressed: () => _submitReply(review),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConstants.primaryColor,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                      ),
+                      child: const Text('Reply'),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _showReplyInput[review.id] = false;
+                        });
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                ),
+              ],
+            )
+          else
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _showReplyInput[review.id] = true;
+                });
+              },
+              child: const Text('Reply'),
+            ),
         ],
       ),
     );
+  }
+
+  void _submitReply(Review review) async {
+    final replyText = _replyControllers[review.id]?.text.trim() ?? '';
+    if (replyText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a reply.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    // Get user info
+    String userId = await _authService.getUserId() ?? 'unknown';
+    String userName = await _authService.getUserName() ?? 'User';
+    final reply = ReviewReply(
+      userId: userId,
+      userName: userName,
+      comment: replyText,
+      createdAt: DateTime.now(),
+    );
+    try {
+      await _reviewService.addReplyToReview(
+        shopId: widget.shop.id,
+        reviewId: review.id,
+        reply: reply,
+      );
+      _replyControllers[review.id]?.clear();
+      setState(() {
+        _showReplyInput[review.id] = false;
+      });
+      _loadReviews();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Reply posted!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   void _showAddReviewDialog() async {
@@ -1424,6 +1727,36 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
+              ),
+            ),
+          ),
+          SizedBox(width: ResponsiveSize.getWidth(3)),
+          // Log Repair button
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => LogRepairScreen(shop: widget.shop),
+                ),
+              );
+            },
+            icon: const Icon(Icons.add, color: Colors.white),
+            label: Text(
+              'log'.tr(context),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey[900],
+              padding: ResponsiveSize.getScaledPadding(
+                const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
           ),

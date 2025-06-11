@@ -19,6 +19,8 @@ import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/models/repair_sub_service.dart';
+import 'package:wonwonw2/services/auth_state_service.dart';
+import 'package:wonwonw2/services/service_providers.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -242,17 +244,22 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
           ),
-          floatingActionButton: FloatingActionButton(
-            heroTag: 'add_shop_home',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddShopScreen()),
-              );
-            },
-            backgroundColor: Colors.grey[800],
-            child: const Icon(Icons.add, color: Colors.white),
-          ),
+          floatingActionButton:
+              ServiceProvider.authStateOf(context).isLoggedIn
+                  ? FloatingActionButton(
+                    heroTag: 'add_shop_home',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddShopScreen(),
+                        ),
+                      );
+                    },
+                    backgroundColor: Colors.grey[800],
+                    child: const Icon(Icons.add, color: Colors.white),
+                  )
+                  : null,
         ),
         if (_showLoadingOverlay)
           Positioned.fill(

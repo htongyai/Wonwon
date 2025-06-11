@@ -9,6 +9,9 @@ class RepairRecord {
   final DateTime date;
   final Duration? duration;
   final String? notes;
+  final int? satisfactionRating; // 1-5 rating
+  final String category;
+  final String subService;
 
   RepairRecord({
     required this.id,
@@ -19,6 +22,9 @@ class RepairRecord {
     required this.date,
     this.duration,
     this.notes,
+    this.satisfactionRating,
+    required this.category,
+    required this.subService,
   });
 
   Map<String, dynamic> toMap() {
@@ -31,6 +37,9 @@ class RepairRecord {
       'date': Timestamp.fromDate(date),
       'duration': duration?.inDays,
       'notes': notes,
+      'satisfactionRating': satisfactionRating,
+      'category': category,
+      'subService': subService,
     };
   }
 
@@ -45,6 +54,9 @@ class RepairRecord {
       duration:
           map['duration'] != null ? Duration(days: map['duration']) : null,
       notes: map['notes'] as String?,
+      satisfactionRating: map['satisfactionRating'] as int?,
+      category: map['category'] as String,
+      subService: map['subService'] as String,
     );
   }
 }

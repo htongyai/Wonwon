@@ -19,6 +19,12 @@ class ReviewService {
 
       return snapshot.docs.map((doc) {
         final data = doc.data();
+        // Parse replies if present
+        final repliesData = data['replies'] as List<dynamic>? ?? [];
+        final replies =
+            repliesData
+                .map((r) => ReviewReply.fromMap(Map<String, dynamic>.from(r)))
+                .toList();
         return Review(
           id: doc.id,
           shopId: data['shopId'] as String,
@@ -28,6 +34,7 @@ class ReviewService {
           rating: (data['rating'] as num).toDouble(),
           createdAt: (data['createdAt'] as Timestamp).toDate(),
           isAnonymous: data['isAnonymous'] as bool? ?? false,
+          replies: replies,
         );
       }).toList();
     } catch (e) {
@@ -67,6 +74,26 @@ class ReviewService {
       }
     } catch (e) {
       appLog('Error adding review: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> addReplyToReview({
+    required String shopId,
+    required String reviewId,
+    required ReviewReply reply,
+  }) async {
+    try {
+      final reviewRef = _firestore
+          .collection('shops')
+          .doc(shopId)
+          .collection('review')
+          .doc(reviewId);
+      await reviewRef.update({
+        'replies': FieldValue.arrayUnion([reply.toMap()]),
+      });
+    } catch (e) {
+      appLog('Error adding reply to review: $e');
       rethrow;
     }
   }

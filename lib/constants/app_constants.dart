@@ -26,4 +26,8 @@ class AppConstants {
   // Border Radius
   static const double borderRadius = 8.0;
   static const double cardBorderRadius = 12.0;
+
+  // Default location (Bangkok)
+  static const double defaultLatitude = 13.7563;
+  static const double defaultLongitude = 100.5018;
 }

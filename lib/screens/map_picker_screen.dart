@@ -520,10 +520,75 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                 foregroundColor: AppConstants.primaryColor,
                 elevation: 4,
                 onPressed: () async {
-                  if (_mapController != null && _selectedLocation != null) {
-                    await _mapController!.animateCamera(
-                      CameraUpdate.newLatLngZoom(_selectedLocation!, 15.0),
+                  try {
+                    // Check for location permission
+                    LocationPermission permission =
+                        await Geolocator.checkPermission();
+                    if (permission == LocationPermission.denied) {
+                      permission = await Geolocator.requestPermission();
+                      if (permission == LocationPermission.denied) {
+                        // Show error message if permission is denied
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Location permission denied'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                    }
+
+                    if (permission == LocationPermission.deniedForever) {
+                      // Show error message if permission is permanently denied
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Location permission permanently denied. Please enable in settings.',
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    // Get current position
+                    final Position position =
+                        await Geolocator.getCurrentPosition(
+                          desiredAccuracy: LocationAccuracy.high,
+                        );
+
+                    final newLocation = LatLng(
+                      position.latitude,
+                      position.longitude,
                     );
+
+                    // Update the selected location
+                    setState(() {
+                      _selectedLocation = newLocation;
+                    });
+
+                    // Animate camera to new location
+                    if (_mapController != null) {
+                      await _mapController!.animateCamera(
+                        CameraUpdate.newLatLngZoom(newLocation, 15.0),
+                      );
+                    }
+                  } catch (e) {
+                    // Show error message if location retrieval fails
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Error getting location: ${e.toString()}',
+                          ),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 },
                 child: const Icon(Icons.my_location),
