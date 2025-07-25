@@ -6,6 +6,7 @@ import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/screens/shop_detail_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class ShopApprovalScreen extends StatefulWidget {
   const ShopApprovalScreen({Key? key}) : super(key: key);
@@ -139,12 +140,7 @@ class _ShopApprovalScreenState extends State<ShopApprovalScreen> {
             ),
             child: InkWell(
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ShopDetailScreen(shop: shop),
-                  ),
-                );
+                context.go('/shops/${shop.id}');
               },
               borderRadius: BorderRadius.circular(16),
               child: Column(
@@ -328,13 +324,7 @@ class _ShopApprovalScreenState extends State<ShopApprovalScreen> {
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) => ShopDetailScreen(shop: shop),
-                                ),
-                              );
+                              context.go('/shops/${shop.id}');
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppConstants.primaryColor,

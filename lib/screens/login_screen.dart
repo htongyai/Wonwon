@@ -14,6 +14,7 @@ import 'package:wonwonw2/widgets/custom_form_field.dart';
 import 'package:wonwonw2/widgets/error_boundary.dart';
 import 'package:wonwonw2/utils/error_logger.dart';
 import 'package:wonwonw2/services/error_handling_service.dart';
+import 'package:go_router/go_router.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -230,200 +231,208 @@ class _LoginScreenState extends State<LoginScreen>
         child: Scaffold(
           backgroundColor: Colors.white,
           body: SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: ResponsiveSize.getScaledPadding(
-                  const EdgeInsets.symmetric(horizontal: 24.0),
-                ),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Back button and header
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(
-                                Icons.arrow_back,
-                                color: AppTheme.primaryColor,
-                              ),
-                              onPressed: () {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => const MainNavigation(),
-                                  ),
-                                );
-                              },
-                            ),
-                            const Spacer(),
-                          ],
-                        ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 16, left: 8),
+                  child: TextButton.icon(
+                    onPressed: () {
+                      context.go('/');
+                    },
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: AppTheme.primaryColor,
+                    ),
+                    label: Text(
+                      'Back',
+                      style: TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
                       ),
-
-                      // Logo
-                      RepaintBoundary(
-                        child: Center(
-                          child: Container(
-                            margin: const EdgeInsets.only(top: 20, bottom: 32),
-                            width: 90,
-                            height: 90,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              image: DecorationImage(
-                                image: AssetImage('assets/images/wwg.png'),
-                                fit: BoxFit.contain,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Welcome text
-                      Text(
-                        'login'.tr(context),
-                        style: AppTheme.getTitleStyle(),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'sign_in_description'.tr(context),
-                        style: AppTheme.getSubtitleStyle(),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 40),
-
-                      // Email field
-                      CustomFormField(
-                        controller: _emailController,
-                        focusNode: _emailFocusNode,
-                        labelText: 'email'.tr(context),
-                        prefixIcon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        autofillHints: const [AutofillHints.email],
-                        onFieldSubmitted: (_) => _handleKeyboardSubmit(),
-                        isValid: _isEmailValid,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'email_required'.tr(context);
-                          }
-                          if (!RegExp(
-                            r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                          ).hasMatch(value)) {
-                            return 'valid_email_required'.tr(context);
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Password field
-                      CustomFormField(
-                        controller: _passwordController,
-                        focusNode: _passwordFocusNode,
-                        labelText: 'password'.tr(context),
-                        prefixIcon: Icons.lock_outline,
-                        obscureText: _obscurePassword,
-                        textInputAction: TextInputAction.done,
-                        autofillHints: const [AutofillHints.password],
-                        onFieldSubmitted: (_) => _handleKeyboardSubmit(),
-                        isValid: _isPasswordValid,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: Colors.grey,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'password_required'.tr(context);
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Forgot password
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => const ForgotPasswordScreen(),
-                              ),
-                            );
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppTheme.primaryColor,
-                          ),
-                          child: Text('forgot_password'.tr(context)),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Login button
-                      ElevatedButton(
-                        onPressed: _isLoading ? null : _handleLogin,
-                        style: AppTheme.getPrimaryButtonStyle(),
-                        child:
-                            _isLoading
-                                ? const CircularProgressIndicator(
-                                  color: Colors.white,
-                                )
-                                : Text(
-                                  'login'.tr(context),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Sign up link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'no_account'.tr(context),
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const SignupScreen(),
-                                ),
-                              );
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppTheme.primaryColor,
-                            ),
-                            child: Text('signup'.tr(context)),
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.primaryColor,
+                    ),
                   ),
                 ),
-              ),
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 400),
+                        child: Padding(
+                          padding: ResponsiveSize.getScaledPadding(
+                            const EdgeInsets.symmetric(horizontal: 24.0),
+                          ),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // Logo
+                                RepaintBoundary(
+                                  child: Center(
+                                    child: Container(
+                                      margin: const EdgeInsets.only(
+                                        top: 20,
+                                        bottom: 32,
+                                      ),
+                                      width: 90,
+                                      height: 90,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        image: DecorationImage(
+                                          image: AssetImage(
+                                            'assets/images/wwg.png',
+                                          ),
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                // Welcome text
+                                Text(
+                                  'login'.tr(context),
+                                  style: AppTheme.getTitleStyle(),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'sign_in_description'.tr(context),
+                                  style: AppTheme.getSubtitleStyle(),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 40),
+
+                                // Email field
+                                CustomFormField(
+                                  controller: _emailController,
+                                  focusNode: _emailFocusNode,
+                                  labelText: 'email'.tr(context),
+                                  prefixIcon: Icons.email_outlined,
+                                  keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next,
+                                  autofillHints: const [AutofillHints.email],
+                                  onFieldSubmitted:
+                                      (_) => _handleKeyboardSubmit(),
+                                  isValid: _isEmailValid,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'email_required'.tr(context);
+                                    }
+                                    if (!RegExp(
+                                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                    ).hasMatch(value)) {
+                                      return 'valid_email_required'.tr(context);
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+
+                                // Password field
+                                CustomFormField(
+                                  controller: _passwordController,
+                                  focusNode: _passwordFocusNode,
+                                  labelText: 'password'.tr(context),
+                                  prefixIcon: Icons.lock_outline,
+                                  obscureText: _obscurePassword,
+                                  textInputAction: TextInputAction.done,
+                                  autofillHints: const [AutofillHints.password],
+                                  onFieldSubmitted:
+                                      (_) => _handleKeyboardSubmit(),
+                                  isValid: _isPasswordValid,
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscurePassword
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      color: Colors.grey,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _obscurePassword = !_obscurePassword;
+                                      });
+                                    },
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'password_required'.tr(context);
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+
+                                // Forgot password
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: () {
+                                      context.push('/forgot-password');
+                                    },
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: AppTheme.primaryColor,
+                                    ),
+                                    child: Text('forgot_password'.tr(context)),
+                                  ),
+                                ),
+                                const SizedBox(height: 32),
+
+                                // Login button
+                                ElevatedButton(
+                                  onPressed: _isLoading ? null : _handleLogin,
+                                  style: AppTheme.getPrimaryButtonStyle(),
+                                  child:
+                                      _isLoading
+                                          ? const CircularProgressIndicator(
+                                            color: Colors.white,
+                                          )
+                                          : Text(
+                                            'login'.tr(context),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Sign up link
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'no_account'.tr(context),
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        context.push('/signup');
+                                      },
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: AppTheme.primaryColor,
+                                      ),
+                                      child: Text('signup'.tr(context)),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

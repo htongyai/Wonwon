@@ -107,7 +107,7 @@ class _ViewReportsScreenState extends State<ViewReportsScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  report['reason'] ?? 'No Reason',
+                                  report['reason'] ?? 'no_reason'.tr(context),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
@@ -250,7 +250,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          report['reason'] ?? 'No Reason',
+                          report['reason'] ?? 'no_reason'.tr(context),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 20,

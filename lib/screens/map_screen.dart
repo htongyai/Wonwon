@@ -16,6 +16,7 @@ import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/screens/add_shop_screen.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:go_router/go_router.dart';
 
 /// Map Screen that displays repair shops on Google Maps
 /// Provides interactive markers, location tracking, and navigation to shop details
@@ -490,17 +491,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               _isFollowingUser = false;
             });
 
-            Navigator.of(context)
-                .push(
-                  MaterialPageRoute(
-                    builder: (context) => ShopDetailScreen(shop: shop),
-                  ),
-                )
-                .then((_) {
-                  setState(() {
-                    _selectedShop = null;
-                  });
-                });
+            context.push('/shops/${shop.id}');
           },
         ),
       );
@@ -710,36 +701,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 ),
               ),
             ),
-
-          // Title bar overlay
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
-            left: 16,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Text(
-                'repair_shops_map'.tr(context),
-                style: GoogleFonts.montserrat(
-                  fontWeight: FontWeight.bold,
-                  color: AppConstants.darkColor,
-                  fontSize: 18,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
         ],
       ),
       // Floating action buttons for map navigation - only show when map is loaded

@@ -26,7 +26,33 @@ class ShopService {
       final QuerySnapshot snapshot =
           await shopsCollection.where('approved', isEqualTo: true).get();
 
+      appLog(
+        'Firestore query: shopsCollection.where("approved", isEqualTo: true)',
+      );
+      appLog('Query returned ${snapshot.docs.length} documents');
+
       appLog('Firestore returned ${snapshot.docs.length} documents');
+
+      // Check for duplicate document IDs
+      final docIds = snapshot.docs.map((doc) => doc.id).toList();
+      final uniqueDocIds = docIds.toSet();
+      appLog('All document IDs from Firestore: $docIds');
+      appLog('Unique document IDs: ${uniqueDocIds.toList()}');
+
+      if (docIds.length != uniqueDocIds.length) {
+        appLog('WARNING: Duplicate document IDs found in Firestore response!');
+        final duplicates = <String, int>{};
+        for (final id in docIds) {
+          duplicates[id] = (duplicates[id] ?? 0) + 1;
+        }
+        duplicates.forEach((id, count) {
+          if (count > 1) {
+            appLog(
+              'Document ID $id appears $count times in Firestore response',
+            );
+          }
+        });
+      }
 
       // Convert documents to RepairShop objects
       final List<RepairShop> shops =
@@ -35,14 +61,26 @@ class ShopService {
             final data = doc.data() as Map<String, dynamic>;
             // Add the document ID to the data
             data['id'] = doc.id;
-            appLog('Document data: $data');
             return RepairShop.fromMap(data);
           }).toList();
 
       appLog(
         'Successfully converted ${shops.length} documents to RepairShop objects',
       );
-      return shops;
+
+      // Remove duplicates by ID (keep the first occurrence)
+      final Map<String, RepairShop> uniqueShops = {};
+      for (final shop in shops) {
+        if (!uniqueShops.containsKey(shop.id)) {
+          uniqueShops[shop.id] = shop;
+        }
+      }
+
+      final uniqueShopsList = uniqueShops.values.toList();
+      appLog(
+        'After removing duplicates: ${uniqueShopsList.length} unique shops',
+      );
+      return uniqueShopsList;
     } catch (e) {
       appLog('Error getting all shops: $e');
       rethrow;

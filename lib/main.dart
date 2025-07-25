@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/screens/main_navigation.dart';
+import 'package:wonwonw2/screens/signup_screen.dart';
 import 'package:wonwonw2/screens/splash_screen.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,6 +18,21 @@ import 'package:geolocator/geolocator.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:wonwonw2/services/auth_state_service.dart';
+import 'package:go_router/go_router.dart';
+import 'screens/shop_detail_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/map_screen.dart';
+import 'screens/saved_locations_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/admin_manage_shops_screen.dart';
+import 'screens/admin_manage_users_screen.dart';
+import 'screens/admin_unapprove_pages_screen.dart';
+import 'screens/admin_reports_screen.dart';
+import 'screens/admin_dashboard_screen.dart';
+import 'screens/login_screen.dart';
+import 'screens/forgot_password_screen.dart';
+import 'screens/terms_of_use_screen.dart';
+import 'screens/privacy_policy_screen.dart';
 
 /// Entry point for the WonWon Repair Finder application
 /// Initializes app services and configurations before launching the UI
@@ -51,11 +67,13 @@ void main() async {
   // Initialize AuthStateService
   await authStateService.initialize();
 
-  // Lock the app to portrait orientation only
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // Lock the app to portrait orientation only for mobile devices
+  if (!kIsWeb) {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
 
   // Retrieve the user's preferred language setting from local storage
   final locale = await AppLocalizationsService.getLocale();
@@ -80,6 +98,101 @@ class _MyAppState extends State<MyApp> {
   // Default to English locale if none is provided
   Locale _locale = const Locale('en');
 
+  late final GoRouter _router = GoRouter(
+    routes: [
+      // Standalone routes (outside of ShellRoute)
+      GoRoute(
+        path: '/signup',
+        builder: (context, state) => const SignupScreen(),
+      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/terms-of-use',
+        builder: (context, state) => const TermsOfUseScreen(),
+      ),
+      GoRoute(
+        path: '/privacy-policy',
+        builder: (context, state) => const PrivacyPolicyScreen(),
+      ),
+      GoRoute(
+        path: '/shops/:shopId',
+        builder: (context, state) {
+          final shopId = state.pathParameters['shopId']!;
+          return ShopDetailScreen(shopId: shopId);
+        },
+      ),
+      // ShellRoute for main navigation
+      ShellRoute(
+        builder: (context, state, child) {
+          // Get the current path to determine the active tab
+          final path = state.uri.path;
+          int initialIndex = 0;
+
+          if (path.startsWith('/map')) {
+            initialIndex = 1;
+          } else if (path.startsWith('/saved')) {
+            initialIndex = 2;
+          } else if (path.startsWith('/profile')) {
+            initialIndex = 3;
+          } else if (path.startsWith('/admin/dashboard')) {
+            initialIndex = 4;
+          } else if (path.startsWith('/admin/manage-shops')) {
+            initialIndex = 5;
+          } else if (path.startsWith('/admin/manage-users')) {
+            initialIndex = 6;
+          } else if (path.startsWith('/admin/unapprove-pages')) {
+            initialIndex = 7;
+          } else if (path.startsWith('/admin/reports')) {
+            initialIndex = 8;
+          }
+
+          return MainNavigation(initialIndex: initialIndex, child: child);
+        },
+        routes: [
+          GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+          GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
+          GoRoute(
+            path: '/saved',
+            builder: (context, state) => const SavedLocationsScreen(),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfileScreen(),
+          ),
+          GoRoute(
+            path: '/admin/dashboard',
+            builder: (context, state) => const AdminDashboardScreen(),
+          ),
+          GoRoute(
+            path: '/admin/manage-shops',
+            builder: (context, state) => const AdminManageShopsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/manage-users',
+            builder: (context, state) => const AdminManageUsersScreen(),
+          ),
+          GoRoute(
+            path: '/admin/unapprove-pages',
+            builder: (context, state) => const AdminUnapprovePagesScreen(),
+          ),
+          GoRoute(
+            path: '/admin/reports',
+            builder: (context, state) => const AdminReportsScreen(),
+          ),
+          GoRoute(
+            path: '/admin/reports',
+            builder: (context, state) => const AdminReportsScreen(),
+          ),
+        ],
+      ),
+    ],
+    errorBuilder: (context, state) => const NotFoundScreen(),
+  );
+
   @override
   void initState() {
     super.initState();
@@ -100,7 +213,7 @@ class _MyAppState extends State<MyApp> {
       // Provide services to the entire app
       locationService: locationService,
       authStateService: authStateService,
-      child: MaterialApp(
+      child: MaterialApp.router(
         title: AppConstants.appName,
         locale: _locale,
         // Define supported languages (English and Thai)
@@ -196,16 +309,22 @@ class _MyAppState extends State<MyApp> {
                         // Get the current screen width
                         final screenWidth = MediaQuery.of(context).size.width;
 
-                        // Calculate the maximum width for the app container based on screen size
-                        // This ensures proper display across different device types
+                        // For desktop, use full width; for mobile/tablet, use constrained width
                         final double maxWidth =
-                            screenWidth < 600
+                            ResponsiveSize.shouldShowDesktopLayout()
+                                ? screenWidth // Full width for desktop
+                                : screenWidth < 600
                                 ? screenWidth // Full width on phones
                                 : screenWidth < 900
                                 ? 540 // Slightly wider for tablets
-                                : 560; // Slightly wider for desktop
+                                : 560; // Slightly wider for smaller desktop
 
-                        // Create a container with appropriate styling and constraints
+                        // For desktop, use full width without container constraints
+                        if (ResponsiveSize.shouldShowDesktopLayout()) {
+                          return child!;
+                        }
+
+                        // For mobile/tablet, use constrained container
                         return Container(
                           constraints: BoxConstraints(maxWidth: maxWidth),
                           decoration: BoxDecoration(
@@ -243,10 +362,20 @@ class _MyAppState extends State<MyApp> {
             ),
           );
         },
-        // Set the initial screen to the splash screen
-        home: const SplashScreen(),
-        // Remove the debug banner
+        routerConfig: _router,
         debugShowCheckedModeBanner: false,
+      ),
+    );
+  }
+}
+
+class NotFoundScreen extends StatelessWidget {
+  const NotFoundScreen({Key? key}) : super(key: key);
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Text('Page not found', style: TextStyle(fontSize: 24)),
       ),
     );
   }

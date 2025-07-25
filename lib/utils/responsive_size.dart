@@ -13,6 +13,11 @@ class ResponsiveSize {
   static late double textScaleFactor;
   static late double fontSize;
 
+  // Breakpoints for responsive design
+  static const double mobileBreakpoint = 600;
+  static const double tabletBreakpoint = 1024;
+  static const double desktopBreakpoint = 1440;
+
   static void init(BuildContext context) {
     _mediaQueryData = MediaQuery.of(context);
     screenWidth = _mediaQueryData.size.width;
@@ -48,12 +53,63 @@ class ResponsiveSize {
 
   // Check if device is a tablet
   static bool isTablet() {
-    return screenWidth > 600;
+    return screenWidth > mobileBreakpoint && screenWidth <= tabletBreakpoint;
+  }
+
+  // Check if device is desktop
+  static bool isDesktop() {
+    return screenWidth > tabletBreakpoint && screenWidth <= desktopBreakpoint;
+  }
+
+  // Check if device is large desktop
+  static bool isLargeDesktop() {
+    return screenWidth > desktopBreakpoint;
+  }
+
+  // Check if device is mobile
+  static bool isMobile() {
+    return screenWidth <= mobileBreakpoint;
   }
 
   // Check if device is in landscape mode
   static bool isLandscape() {
     return _mediaQueryData.orientation == Orientation.landscape;
+  }
+
+  // Get device type as string
+  static String getDeviceType() {
+    if (isMobile()) return 'mobile';
+    if (isTablet()) return 'tablet';
+    if (isDesktop()) return 'desktop';
+    if (isLargeDesktop()) return 'large_desktop';
+    return 'unknown';
+  }
+
+  // Get appropriate max width for content container
+  static double getMaxContentWidth() {
+    if (isMobile()) return screenWidth;
+    if (isTablet()) return 768;
+    if (isDesktop()) return 1200;
+    if (isLargeDesktop()) return 1400;
+    return screenWidth;
+  }
+
+  // Get appropriate padding for different screen sizes
+  static EdgeInsets getResponsivePadding() {
+    if (isMobile()) {
+      return const EdgeInsets.all(16.0);
+    } else if (isTablet()) {
+      return const EdgeInsets.all(24.0);
+    } else {
+      return const EdgeInsets.all(32.0);
+    }
+  }
+
+  // Get appropriate spacing for different screen sizes
+  static double getResponsiveSpacing() {
+    if (isMobile()) return 8.0;
+    if (isTablet()) return 12.0;
+    return 16.0;
   }
 
   // Get padding that scales with screen size
@@ -64,5 +120,18 @@ class ResponsiveSize {
       top: getHeight(padding.top / blockSizeVertical),
       bottom: getHeight(padding.bottom / blockSizeVertical),
     );
+  }
+
+  // Get desktop-specific layout constraints
+  static BoxConstraints getDesktopConstraints() {
+    return BoxConstraints(
+      maxWidth: getMaxContentWidth(),
+      minHeight: screenHeight * 0.8,
+    );
+  }
+
+  // Check if we should show desktop layout
+  static bool shouldShowDesktopLayout() {
+    return isDesktop() || isLargeDesktop();
   }
 }

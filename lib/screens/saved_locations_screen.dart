@@ -6,6 +6,7 @@ import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/screens/login_screen.dart';
 import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:wonwonw2/screens/main_navigation.dart';
+import 'package:wonwonw2/screens/home_screen.dart';
 import 'package:wonwonw2/services/auth_service.dart';
 import 'package:wonwonw2/services/auth_state_service.dart';
 import 'package:wonwonw2/services/saved_shop_service.dart';
@@ -18,6 +19,7 @@ import 'package:wonwonw2/widgets/auth_wrapper.dart';
 import 'package:wonwonw2/models/repair_category.dart';
 import 'package:wonwonw2/widgets/search_bar_widget.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:go_router/go_router.dart';
 
 class SavedLocationsScreen extends StatefulWidget {
   const SavedLocationsScreen({Key? key}) : super(key: key);
@@ -420,13 +422,13 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () {
-              // Navigate to home page (index 0)
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MainNavigation(initialIndex: 0),
-                ),
-              );
+              // Update the navigation index to 0 (home)
+              if (context.mounted) {
+                final mainNav = MainNavigationState.of(context);
+                if (mainNav != null) {
+                  mainNav.onTap(0);
+                }
+              }
             },
             icon: const Icon(Icons.search),
             label: Text('find_repair_shops'.tr(context)),
@@ -466,13 +468,13 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () {
-              // Navigate to home page (index 0)
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MainNavigation(initialIndex: 0),
-                ),
-              );
+              // Update the navigation index to 0 (home)
+              if (context.mounted) {
+                final mainNav = MainNavigationState.of(context);
+                if (mainNav != null) {
+                  mainNav.onTap(0);
+                }
+              }
             },
             icon: const Icon(Icons.search),
             label: Text('find_repair_shops'.tr(context)),
@@ -503,12 +505,7 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
             ),
             child: InkWell(
               onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ShopDetailScreen(shop: shop),
-                  ),
-                );
+                await context.push('/shops/${shop.id}');
 
                 // Refresh the list when returning from details
                 _loadSavedShops();

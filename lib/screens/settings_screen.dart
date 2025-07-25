@@ -7,7 +7,9 @@ import 'package:wonwonw2/screens/saved_locations_screen.dart';
 import 'package:wonwonw2/screens/add_shop_screen.dart';
 import 'package:wonwonw2/screens/unapproved_shops_screen.dart';
 import 'package:wonwonw2/screens/view_reports_screen.dart';
+import 'package:wonwonw2/screens/users_list_screen.dart';
 import 'package:wonwonw2/services/auth_service.dart';
+import 'package:wonwonw2/services/user_service.dart';
 import 'package:wonwonw2/services/app_localizations_service.dart' as service;
 import 'package:wonwonw2/services/theme_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -28,6 +30,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' as excel;
 import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
+import 'package:uuid/uuid.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -45,6 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
   bool _isAdmin = false;
+  String _appVersion = '';
 
   @override
   void initState() {
@@ -52,6 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _checkLoginStatus();
     _loadSelectedLanguage();
     _checkAdminStatus();
+    _loadAppVersion();
   }
 
   Future<void> _checkLoginStatus() async {
@@ -117,6 +123,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (e) {
       appLog('Error checking admin status', e);
     }
+  }
+
+  Future<void> _loadAppVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    setState(() {
+      _appVersion = packageInfo.version;
+    });
   }
 
   @override
@@ -201,6 +214,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     },
                                   ),
                                   _buildFeatureTile(
+                                    Icons.people,
+                                    'Users List',
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) =>
+                                                  const UsersListScreen(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  _buildFeatureTile(
                                     Icons.upload_file,
                                     'Import from Excel',
                                     onTap: _importShopsFromExcel,
@@ -225,32 +252,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 SizedBox(height: ResponsiveSize.getHeight(2)),
 
                 // Language Section
-                SectionTitle(text: 'language'.tr(context)),
-                SizedBox(height: ResponsiveSize.getHeight(2)),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildLanguageOption(
-                        context,
-                        'thai'.tr(context),
-                        'th',
-                        'th',
-                      ),
-                      SizedBox(height: ResponsiveSize.getHeight(0.25)),
-                      _buildLanguageOption(
-                        context,
-                        'english'.tr(context),
-                        'en',
-                        'en',
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: ResponsiveSize.getHeight(2)),
+                _buildLanguageSection(),
+
+                // Profile Section - Only show if logged in
+                if (_isLoggedIn) ...[_buildProfileSection()],
 
                 // Legal Section
                 SectionTitle(text: 'legal'.tr(context)),
@@ -334,7 +339,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       SizedBox(height: ResponsiveSize.getHeight(2)),
                       Text(
-                        'version'.tr(context) + ' 1.0.3',
+                        '${'version'.tr(context)} $_appVersion',
                         style: TextStyle(color: Colors.grey[600], fontSize: 14),
                       ),
                     ],
@@ -439,53 +444,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildLanguageOption(
-    BuildContext context,
-    String languageName,
-    String languageCode,
-    String selectedLanguage,
-  ) {
-    return ListTile(
-      contentPadding: ResponsiveSize.getScaledPadding(
-        const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      ),
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: AppConstants.primaryColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(
-          child: FaIcon(
-            Icons.language,
-            color: AppConstants.primaryColor,
-            size: 16,
+  Widget _buildLanguageSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionTitle(text: 'language'.tr(context)),
+        SizedBox(height: ResponsiveSize.getHeight(2)),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedLanguage,
+              isExpanded: true,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              items: [
+                DropdownMenuItem(
+                  value: 'en',
+                  child: Text('english'.tr(context)),
+                ),
+                DropdownMenuItem(value: 'th', child: Text('thai'.tr(context))),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedLanguage = value;
+                  });
+                  service.AppLocalizationsService.setLocale(value);
+                  // Refresh the app
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsScreen(),
+                    ),
+                  );
+                }
+              },
+            ),
           ),
         ),
-      ),
-      title: Text(
-        languageName,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight:
-              _selectedLanguage == languageCode
-                  ? FontWeight.bold
-                  : FontWeight.normal,
-        ),
-      ),
-      trailing: Radio(
-        value: languageCode,
-        groupValue: _selectedLanguage,
-        onChanged: (value) {
-          if (value != null) {
-            setState(() {
-              _selectedLanguage = value as String;
-            });
-            service.AppLocalizationsService.setLocale(value);
-          }
-        },
-      ),
+      ],
     );
   }
 
@@ -657,14 +657,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<bool> _isAdminUser() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return false;
-    final userDoc =
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-    return userDoc.data()?['admin'] ?? false;
+    final userService = UserService();
+    return await userService.isCurrentUserAdmin();
   }
 
   Future<void> _importShopsFromExcel() async {
@@ -678,12 +672,78 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (fileBytes == null) throw Exception('File could not be read');
       final excelFile = excel.Excel.decodeBytes(fileBytes);
       int importedCount = 0;
+      int failedCount = 0;
+      List<String> failedRows = [];
 
       for (final table in excelFile.tables.keys) {
         final sheet = excelFile.tables[table]!;
         if (sheet.maxRows < 2) continue; // skip if no data
+
+        // Get headers and validate required columns
         final headers =
-            sheet.rows[0].map((cell) => cell?.value?.toString() ?? '').toList();
+            sheet.rows[0]
+                .map(
+                  (cell) => cell?.value?.toString().trim().toLowerCase() ?? '',
+                )
+                .toList();
+        final requiredColumns = [
+          'name',
+          'description',
+          'address',
+          'area',
+          'categories',
+          'latitude',
+          'longitude',
+          'rating',
+          'amenities',
+          'durationminutes',
+          'requirespurchase',
+          'pricerange',
+          'buildingnumber',
+          'buildingname',
+          'soi',
+          'district',
+          'province',
+          'landmark',
+          'lineid',
+          'facebookpage',
+          'othercontacts',
+          'cash',
+          'qr',
+          'credit',
+          'mon',
+          'tue',
+          'wed',
+          'thu',
+          'fri',
+          'sat',
+          'sun',
+          'instagrampage',
+          'phonenumber',
+          'buildingfloor',
+          'isapproved',
+          'verification_status',
+          'image_url',
+          'paymentmethods',
+          'tryonareaavailable',
+          'notesorconditions',
+          'usualopeningtime',
+          'gmap link',
+          'note',
+        ];
+
+        // Validate headers
+        final missingColumns =
+            requiredColumns
+                .where((col) => !headers.contains(col.toLowerCase()))
+                .toList();
+        if (missingColumns.isNotEmpty) {
+          final foundHeaders = headers.where((h) => h.isNotEmpty).join(', ');
+          throw Exception(
+            'Missing required columns: ${missingColumns.join(", ")}\n\nFound headers in file: $foundHeaders',
+          );
+        }
+
         for (int i = 1; i < sheet.rows.length; i++) {
           final row = sheet.rows[i];
           // Skip row if all columns are empty or whitespace
@@ -695,32 +755,86 @@ class _SettingsScreenState extends State<SettingsScreen> {
           )) {
             continue;
           }
-          final Map<String, dynamic> data = {};
-          for (int j = 0; j < headers.length && j < row.length; j++) {
-            final value = row[j]?.value;
-            if (value != null && value.toString().trim().isNotEmpty) {
-              data[headers[j]] = value;
-            }
-          }
+
           try {
-            List<String> paymentMethods = [];
-            if (data['cash']?.toString().toLowerCase() == 'true')
-              paymentMethods.add('cash');
-            if (data['QR']?.toString().toLowerCase() == 'true')
-              paymentMethods.add('qr');
-            if (data['credit']?.toString().toLowerCase() == 'true')
-              paymentMethods.add('card');
+            final Map<String, dynamic> data = {};
+            for (int j = 0; j < headers.length && j < row.length; j++) {
+              final value = row[j]?.value;
+              if (value != null && value.toString().trim().isNotEmpty) {
+                data[headers[j]] = value;
+              }
+            }
+
+            // Process opening hours
             Map<String, String> hours = {};
             final days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
             for (final day in days) {
-              final timeStr = data[day]?.toString() ?? '';
-              if (timeStr.isNotEmpty) {
-                hours[day] = timeStr;
+              final timeStr = data[day]?.toString().trim() ?? '';
+              if (timeStr.isEmpty || timeStr.toLowerCase() == 'closed') {
+                hours[day] = 'Closed';
+              } else {
+                // Convert periods to colons
+                final normalized = timeStr.replaceAll('.', ':');
+                final parts = normalized.split('-');
+                if (parts.length == 2) {
+                  final openingTime = parts[0].trim();
+                  final closingTime = parts[1].trim();
+                  hours[day] = '$openingTime - $closingTime';
+                } else {
+                  hours[day] = 'Closed';
+                }
               }
             }
-            // Generate id using Firestore convention
-            final String shopId =
-                FirebaseFirestore.instance.collection('shops').doc().id;
+
+            // Process payment methods - check both individual columns and combined column
+            List<String> paymentMethods = [];
+
+            // Check individual payment method columns
+            if (data['cash']?.toString().toLowerCase() == 'true') {
+              paymentMethods.add('cash');
+            }
+            if (data['qr']?.toString().toLowerCase() == 'true') {
+              paymentMethods.add('qr');
+            }
+            if (data['credit']?.toString().toLowerCase() == 'true') {
+              paymentMethods.add('card');
+            }
+
+            // If no individual methods found, try the combined column
+            if (paymentMethods.isEmpty && data['paymentmethods'] != null) {
+              paymentMethods =
+                  data['paymentmethods']
+                      .toString()
+                      .split(',')
+                      .map((e) => e.trim())
+                      .where((e) => e.isNotEmpty)
+                      .toList();
+            }
+
+            // Generate a unique ID for the shop
+            final shopId = const Uuid().v4();
+
+            // Get verification status from Excel or verify coordinates
+            String verificationStatus =
+                data['verification_status']?.toString() ?? '';
+            if (verificationStatus.isEmpty) {
+              final lat =
+                  double.tryParse(data['latitude']?.toString() ?? '0') ?? 0.0;
+              final lng =
+                  double.tryParse(data['longitude']?.toString() ?? '0') ?? 0.0;
+              verificationStatus = _verifyGeocoding(
+                lat,
+                lng,
+                data['address']?.toString() ?? '',
+              );
+            }
+
+            // Process image URL
+            String? imageUrl = data['image_url']?.toString();
+            if (imageUrl == null || imageUrl.trim().isEmpty) {
+              imageUrl = null;
+            }
+
             final shop = RepairShop(
               id: shopId,
               name: data['name']?.toString() ?? '',
@@ -749,50 +863,80 @@ class _SettingsScreenState extends State<SettingsScreen> {
               longitude:
                   double.tryParse(data['longitude']?.toString() ?? '0') ?? 0.0,
               durationMinutes:
-                  int.tryParse(data['durationMinutes']?.toString() ?? '0') ?? 0,
+                  int.tryParse(data['durationminutes']?.toString() ?? '0') ?? 0,
               requiresPurchase:
-                  (data['requiresPurchase']?.toString().toLowerCase() ==
+                  (data['requirespurchase']?.toString().toLowerCase() ==
                       'true'),
-              photos: [],
-              priceRange: data['priceRange']?.toString() ?? '₿',
+              photos: imageUrl != null ? [imageUrl] : [],
+              priceRange: data['pricerange']?.toString() ?? '₿',
               features: {},
               approved:
                   (data['isapproved']?.toString().toLowerCase() == 'true'),
               irregularHours: false,
               subServices: {},
-              buildingNumber: data['buildingNumber']?.toString(),
-              buildingName: data['buildingName']?.toString(),
+              buildingNumber: data['buildingnumber']?.toString(),
+              buildingName: data['buildingname']?.toString(),
               soi: data['soi']?.toString(),
               district: data['district']?.toString(),
               province: data['province']?.toString(),
               landmark: data['landmark']?.toString(),
-              lineId: data['lineId']?.toString(),
-              facebookPage: data['facebookPage']?.toString(),
-              otherContacts: data['otherContacts']?.toString(),
+              lineId: data['lineid']?.toString(),
+              facebookPage: data['facebookpage']?.toString(),
+              otherContacts: data['othercontacts']?.toString(),
               paymentMethods: paymentMethods.isNotEmpty ? paymentMethods : null,
               tryOnAreaAvailable:
-                  (data['tryOnAreaAvailable']?.toString().toLowerCase() ==
+                  (data['tryonareaavailable']?.toString().toLowerCase() ==
                       'true'),
-              notesOrConditions: data['notesOrConditions']?.toString(),
-              usualOpeningTime: data['usualOpeningTime']?.toString(),
-              usualClosingTime: data['usualClosingTime']?.toString(),
-              instagramPage: data['instagramPage']?.toString(),
-              phoneNumber: data['phoneNumber']?.toString(),
-              buildingFloor: data['buildingFloor']?.toString(),
+              notesOrConditions: data['notesorconditions']?.toString(),
+              usualOpeningTime: data['usualopeningtime']?.toString(),
+              instagramPage: data['instagrampage']?.toString(),
+              phoneNumber: data['phonenumber']?.toString(),
+              buildingFloor: data['buildingfloor']?.toString(),
             );
-            await ShopService().addShop(shop);
+
+            // Add to Firestore with verification status and additional data
+            await FirebaseFirestore.instance
+                .collection('shops')
+                .doc(shopId)
+                .set({
+                  ...shop.toMap(),
+                  'verification_status': verificationStatus,
+                  'gMap_link': data['gmap link']?.toString(),
+                  'note': data['note']?.toString(),
+                });
+
             importedCount++;
           } catch (e) {
-            print('Error processing row $i: $e');
+            failedCount++;
+            failedRows.add('Row ${i + 1}: ${e.toString()}');
           }
         }
       }
+
+      // Show import results
       showDialog(
         context: context,
         builder:
             (context) => AlertDialog(
               title: const Text('Import Complete'),
-              content: Text('Successfully imported $importedCount shops.'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Successfully imported $importedCount shops.'),
+                  if (failedCount > 0) ...[
+                    const SizedBox(height: 8),
+                    Text('Failed to import $failedCount shops:'),
+                    const SizedBox(height: 4),
+                    ...failedRows.map(
+                      (error) => Text(
+                        error,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
@@ -807,7 +951,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder:
             (context) => AlertDialog(
               title: const Text('Import Failed'),
-              content: Text('Error: ' + e.toString()),
+              content: Text('Error: ${e.toString()}'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
@@ -817,5 +961,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
       );
     }
+  }
+
+  String _verifyGeocoding(double lat, double lng, String address) {
+    // Basic validation of coordinates
+    if (lat == 0.0 && lng == 0.0) {
+      return 'Invalid coordinates';
+    }
+
+    // Check if coordinates are within reasonable bounds (Thailand)
+    if (lat < 5.0 || lat > 20.0 || lng < 97.0 || lng > 106.0) {
+      return 'Coordinates outside Thailand';
+    }
+
+    // If we have both coordinates and address, mark as verified
+    if (address.isNotEmpty) {
+      return 'Verified (Simulated)';
+    }
+
+    return 'Unverified';
+  }
+
+  Widget _buildProfileSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionTitle(text: 'profile'.tr(context)),
+        SizedBox(height: ResponsiveSize.getHeight(2)),
+        _buildSettingsCard(
+          child: Column(
+            children: [
+              _buildProfileTile(),
+              const Divider(height: 1, thickness: 0.5),
+              _buildActionTile(
+                'change_password',
+                FontAwesomeIcons.key,
+                Colors.blue,
+                onTap: () {
+                  // Navigate to change password screen
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/screens/login_screen.dart';
 import 'package:wonwonw2/screens/main_navigation.dart';
+import 'package:wonwonw2/screens/home_screen.dart';
 import 'package:wonwonw2/services/auth_state_service.dart';
 import 'package:wonwonw2/services/service_providers.dart';
+import 'package:go_router/go_router.dart';
 
 /// A wrapper widget that handles authentication state and determines which screen to show
 class AuthWrapper extends StatefulWidget {
@@ -47,7 +49,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
     // Always show the main app first regardless of login status
     // Users can access login-required features later if needed
-    return const MainNavigation();
+    return const MainNavigation(child: HomeScreen());
   }
 }
 
@@ -92,17 +94,8 @@ class FeatureAuthGate extends StatelessWidget {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
-                  );
-
-                  // Force a rebuild of this widget when returning from login screen
+                  final result = await context.push('/login');
                   if (result == true) {
-                    // If using a StatefulWidget parent, you could call setState there
-                    // For this stateless widget, we use a rebuild trigger
                     (context as Element).markNeedsBuild();
                   }
                 },

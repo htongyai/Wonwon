@@ -296,7 +296,7 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
                                                           3
                                                       ? '...'
                                                       : '')
-                                              : 'No subservices',
+                                              : 'no_subservices'.tr(context),
                                           style: TextStyle(
                                             fontSize: 13,
                                             color: Colors.grey[800],

@@ -21,6 +21,12 @@ import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/models/repair_sub_service.dart';
 import 'package:wonwonw2/services/auth_state_service.dart';
 import 'package:wonwonw2/services/service_providers.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+// Conditional import for web
+// ignore: uri_does_not_exist
+import 'dart:html' as html;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -51,9 +57,14 @@ class _HomeScreenState extends State<HomeScreen>
 
   bool _showLoadingOverlay = false;
 
+  Position? _userPosition;
+  String? _userDistrict;
+  bool _locationPermissionDenied = false;
+
   @override
   void initState() {
     super.initState();
+    _getUserLocation(); // Automatically get location on load
     _loadShops();
     _loadCurrentLanguage();
 
@@ -131,28 +142,24 @@ class _HomeScreenState extends State<HomeScreen>
 
     try {
       final shops = await _shopService.getAllShops();
-
-      // Add a small delay to show the refresh indicator
       await Future.delayed(const Duration(milliseconds: 800));
-
       setState(() {
         _shops = shops;
         if (_searchQuery.isEmpty && !_isFiltered()) {
           _filteredShops = shops;
         } else if (_searchQuery.isNotEmpty) {
-          // Re-apply search filter
           _handleSearch(_searchQuery);
         } else if (_isFiltered() && _filteredShops.isNotEmpty) {
-          // Re-apply category filter
           final selectedCategory = _getSelectedCategory();
           if (selectedCategory != null) {
             _filterShopsByCategory(selectedCategory);
           }
         }
         _isLoading = false;
+        if (_userPosition != null) {
+          _sortShopsByDistance();
+        }
       });
-
-      // Show a success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Shop list refreshed'),
@@ -166,8 +173,6 @@ class _HomeScreenState extends State<HomeScreen>
       setState(() {
         _isLoading = false;
       });
-
-      // Show an error message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Failed to refresh. Please try again.'),
@@ -581,7 +586,9 @@ class _HomeScreenState extends State<HomeScreen>
                           _isFiltered()
                               ? 'filtered_results'.tr(context)
                               : (_searchQuery.isEmpty
-                                  ? 'recommended_shops'.tr(context)
+                                  ? (_userPosition != null
+                                      ? 'Shops near you'
+                                      : 'recommended_shops'.tr(context))
                                   : 'search_results'.tr(context)),
                           style: GoogleFonts.montserrat(
                             fontSize: 20,
@@ -607,6 +614,9 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                       ],
                     ),
+                    SizedBox(
+                      height: ResponsiveSize.getHeight(2),
+                    ), // Add spacing under heading
                   ],
                 ),
               ),
@@ -669,7 +679,9 @@ class _HomeScreenState extends State<HomeScreen>
                         );
                       },
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        padding: ResponsiveSize.getScaledPadding(
+                          const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        ),
                         child: _buildShopCard(shop),
                       ),
                     );
@@ -679,6 +691,42 @@ class _HomeScreenState extends State<HomeScreen>
             // Add extra bottom padding for the navigation bar (increased to match new height)
             SliverToBoxAdapter(
               child: SizedBox(height: ResponsiveSize.getHeight(9)),
+            ),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _getUserLocation,
+                      icon: Icon(Icons.my_location),
+                      label: Text('Find Nearby Shops'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConstants.primaryColor,
+                      ),
+                    ),
+                    if (_userDistrict != null) ...[
+                      SizedBox(width: 12),
+                      Text(
+                        'District: ${_userDistrict!}',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                    if (_locationPermissionDenied)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12),
+                        child: Text(
+                          'Location permission denied',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -807,16 +855,7 @@ class _HomeScreenState extends State<HomeScreen>
           // Get the currently selected category
           final selectedCategory = _getSelectedCategory();
 
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder:
-                  (context) => ShopDetailScreen(
-                    shop: shop,
-                    selectedCategory: selectedCategory,
-                  ),
-            ),
-          );
+          final result = await context.push('/shops/${shop.id}');
 
           // Handle returning with category filter
           if (result is Map<String, dynamic> &&
@@ -1059,16 +1098,7 @@ class _HomeScreenState extends State<HomeScreen>
                     child: ElevatedButton(
                       onPressed: () async {
                         final selectedCategory = _getSelectedCategory();
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (context) => ShopDetailScreen(
-                                  shop: shop,
-                                  selectedCategory: selectedCategory,
-                                ),
-                          ),
-                        );
+                        final result = await context.push('/shops/${shop.id}');
                         if (result is Map<String, dynamic> &&
                             result.containsKey('filterCategory')) {
                           final category = result['filterCategory'] as String;
@@ -1210,6 +1240,11 @@ class _HomeScreenState extends State<HomeScreen>
           backgroundColor: AppConstants.primaryColor,
         ),
       );
+    }
+
+    // Refresh the page if running on web
+    if (kIsWeb) {
+      html.window.location.reload();
     }
   }
 
@@ -1380,5 +1415,73 @@ class _HomeScreenState extends State<HomeScreen>
         _showLoadingOverlay = false;
       });
     }
+  }
+
+  Future<void> _getUserLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          _locationPermissionDenied = true;
+        });
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _locationPermissionDenied = true;
+          });
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _locationPermissionDenied = true;
+        });
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _userPosition = position;
+      });
+      // Reverse geocode for district
+      final placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      if (placemarks.isNotEmpty) {
+        setState(() {
+          _userDistrict = placemarks.first.subAdministrativeArea;
+        });
+      }
+      _sortShopsByDistance();
+    } catch (e) {
+      setState(() {
+        _locationPermissionDenied = true;
+      });
+    }
+  }
+
+  void _sortShopsByDistance() {
+    if (_userPosition == null) return;
+    setState(() {
+      _filteredShops.sort((a, b) {
+        double da = Geolocator.distanceBetween(
+          _userPosition!.latitude,
+          _userPosition!.longitude,
+          a.latitude,
+          a.longitude,
+        );
+        double db = Geolocator.distanceBetween(
+          _userPosition!.latitude,
+          _userPosition!.longitude,
+          b.latitude,
+          b.longitude,
+        );
+        return da.compareTo(db);
+      });
+    });
   }
 }

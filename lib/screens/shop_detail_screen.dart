@@ -29,30 +29,28 @@ import 'package:wonwonw2/utils/app_logger.dart';
 /// Screen that displays detailed information about a repair shop
 /// Shows shop information, hours, contact details, services, and reviews
 class ShopDetailScreen extends StatefulWidget {
-  // The repair shop to display details for
-  final RepairShop shop;
-
-  // Optional parameter for pre-selected service category
+  final String shopId;
   final String? selectedCategory;
-
-  const ShopDetailScreen({Key? key, required this.shop, this.selectedCategory})
-    : super(key: key);
+  const ShopDetailScreen({
+    Key? key,
+    required this.shopId,
+    this.selectedCategory,
+  }) : super(key: key);
 
   @override
   State<ShopDetailScreen> createState() => _ShopDetailScreenState();
 }
 
 class _ShopDetailScreenState extends State<ShopDetailScreen> {
-  // Controller for the scrollable content
   final ScrollController _scrollController = ScrollController();
-
-  // Services for data operations
   final ReviewService _reviewService = ReviewService();
   final ReportService _reportService = ReportService();
   final SavedShopService _savedShopService = SavedShopService();
   final AuthService _authService = AuthService();
 
-  // State variables for shop data
+  RepairShop? _shop;
+  bool _isLoadingShop = true;
+  String? _error;
   List<Review> _reviews = [];
   List<ShopReport> _reports = [];
   bool _isLoadingReviews = true;
@@ -69,10 +67,40 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // Load all necessary data when screen initializes
+    _fetchShop();
     _checkLoginStatus();
     _loadReviews();
     _loadReports();
+  }
+
+  Future<void> _fetchShop() async {
+    setState(() {
+      _isLoadingShop = true;
+      _error = null;
+    });
+    try {
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('shops')
+              .doc(widget.shopId)
+              .get();
+      if (!doc.exists) {
+        setState(() {
+          _error = 'Shop not found';
+          _isLoadingShop = false;
+        });
+        return;
+      }
+      setState(() {
+        _shop = RepairShop.fromMap(doc.data()!..['id'] = doc.id);
+        _isLoadingShop = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Error loading shop';
+        _isLoadingShop = false;
+      });
+    }
   }
 
   /// Check if user is logged in and update UI accordingly
@@ -99,7 +127,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   /// Check if this shop is saved by the logged-in user
   Future<void> _checkIfSaved() async {
     try {
-      final isSaved = await _savedShopService.isShopSaved(widget.shop.id);
+      final isSaved = await _savedShopService.isShopSaved(widget.shopId);
       if (mounted) {
         setState(() {
           _isSaved = isSaved;
@@ -170,7 +198,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
       bool success;
       if (_isSaved) {
         // Remove shop from saved locations
-        success = await _savedShopService.removeShop(widget.shop.id);
+        success = await _savedShopService.removeShop(widget.shopId);
         if (success && mounted) {
           setState(() {
             _isSaved = false;
@@ -180,7 +208,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
               content: Text(
                 'removed_from_saved'
                     .tr(context)
-                    .replaceAll('{shop_name}', widget.shop.name),
+                    .replaceAll('{shop_name}', _shop!.name),
               ),
               backgroundColor: Colors.red[400],
             ),
@@ -188,7 +216,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         }
       } else {
         // Add shop to saved locations
-        success = await _savedShopService.saveShop(widget.shop.id);
+        success = await _savedShopService.saveShop(widget.shopId);
         if (success && mounted) {
           setState(() {
             _isSaved = true;
@@ -198,7 +226,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
               content: Text(
                 'saved_to_locations'
                     .tr(context)
-                    .replaceAll('{shop_name}', widget.shop.name),
+                    .replaceAll('{shop_name}', _shop!.name),
               ),
               backgroundColor: AppConstants.primaryColor,
             ),
@@ -227,7 +255,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   /// Load reviews for this shop
   Future<void> _loadReviews() async {
     try {
-      final reviews = await _reviewService.getReviewsForShop(widget.shop.id);
+      final reviews = await _reviewService.getReviewsForShop(widget.shopId);
       // Collect all unique userIds from reviews and replies
       Set<String> userIds = {};
       for (var review in reviews) {
@@ -278,7 +306,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   /// Load existing reports for this shop
   Future<void> _loadReports() async {
     try {
-      final reports = await _reportService.getReportsByShopId(widget.shop.id);
+      final reports = await _reportService.getReportsByShopId(widget.shopId);
       if (mounted) {
         setState(() {
           _reports = reports;
@@ -305,8 +333,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     );
 
     // Get the shop's coordinates
-    final double latitude = widget.shop.latitude;
-    final double longitude = widget.shop.longitude;
+    final double latitude = _shop!.latitude;
+    final double longitude = _shop!.longitude;
 
     // Create Google Maps URL with directions
     final Uri googleMapsUrl = Uri.parse(
@@ -360,6 +388,17 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingShop) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_error != null) {
+      return Scaffold(body: Center(child: Text(_error!)));
+    }
+    if (_shop == null) {
+      return Scaffold(
+        body: Center(child: Text('Shop not found')), // fallback
+      );
+    }
     return Scaffold(
       body: SafeArea(
         child: CustomScrollView(
@@ -374,16 +413,15 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                 background: Stack(
                   fit: StackFit.expand,
                   children: [
-                    widget.shop.photos.isNotEmpty
+                    _shop!.photos.isNotEmpty
                         ? Image.network(
-                          widget.shop.photos.first,
+                          _shop!.photos.first,
                           fit: BoxFit.cover,
                           errorBuilder:
-                              (_, __, ___) => AssetHelpers.getShopPlaceholder(
-                                widget.shop.name,
-                              ),
+                              (_, __, ___) =>
+                                  AssetHelpers.getShopPlaceholder(_shop!.name),
                         )
-                        : AssetHelpers.getShopPlaceholder(widget.shop.name),
+                        : AssetHelpers.getShopPlaceholder(_shop!.name),
                     Positioned(
                       top: 8,
                       left: 8,
@@ -418,7 +456,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                                     MaterialPageRoute(
                                       builder:
                                           (context) =>
-                                              EditShopScreen(shop: widget.shop),
+                                              EditShopScreen(shop: _shop!),
                                     ),
                                   );
                                 },
@@ -511,47 +549,42 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Rating info and shop title
+        // Shop Title
+        Text(
+          _shop!.name,
+          style: GoogleFonts.montserrat(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: AppConstants.darkColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Rating info
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade100,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.shop.rating.toStringAsFixed(1),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '(${widget.shop.reviewCount} reviews)',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-              ],
-            ),
-            Text(
-              widget.shop.name,
-              style: GoogleFonts.montserrat(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppConstants.darkColor,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade100,
+                borderRadius: BorderRadius.circular(4),
               ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.star, color: Colors.amber, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    _shop!.rating.toStringAsFixed(1),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '(${_shop!.reviewCount} reviews)',
+              style: TextStyle(color: Colors.grey[600]),
             ),
           ],
         ),
@@ -585,7 +618,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children:
-                    widget.shop.categories.map((category) {
+                    _shop!.categories.map((category) {
                       return Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -609,7 +642,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                       );
                     }).toList(),
               ),
-              if (widget.shop.subServices.isNotEmpty) ...[
+              if (_shop!.subServices.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 const Divider(),
                 const SizedBox(height: 8),
@@ -623,7 +656,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                 ),
                 const SizedBox(height: 8),
                 // Sub-services grouped by category
-                ...widget.shop.subServices.entries.map((entry) {
+                ..._shop!.subServices.entries.map((entry) {
                   final categoryId = entry.key;
                   final subServiceIds = entry.value;
                   if (subServiceIds.isEmpty) return const SizedBox.shrink();
@@ -678,8 +711,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         const SizedBox(height: 16),
 
         // Payment Methods
-        if (widget.shop.paymentMethods != null &&
-            widget.shop.paymentMethods!.isNotEmpty) ...[
+        if (_shop!.paymentMethods != null &&
+            _shop!.paymentMethods!.isNotEmpty) ...[
           Row(
             children: [
               Icon(Icons.payment_outlined, color: Colors.brown),
@@ -706,7 +739,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
               spacing: 8,
               runSpacing: 8,
               children:
-                  widget.shop.paymentMethods!.map((method) {
+                  _shop!.paymentMethods!.map((method) {
                     IconData icon;
                     Color color;
 
@@ -795,7 +828,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
             border: Border.all(color: Colors.grey[200]!),
           ),
           child: Text(
-            widget.shop.description,
+            _shop!.description,
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[800],
@@ -825,53 +858,76 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
         const SizedBox(height: 12),
         Container(
           width: double.infinity,
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.grey[50],
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey[200]!),
           ),
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            widget.shop.address,
-            style: const TextStyle(fontSize: 15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _shop!.address,
+                style: const TextStyle(fontSize: 15, height: 1.5),
+              ),
+              if (_shop!.buildingName != null &&
+                      _shop!.buildingName!.isNotEmpty ||
+                  _shop!.buildingNumber != null &&
+                      _shop!.buildingNumber!.isNotEmpty ||
+                  _shop!.buildingFloor != null &&
+                      _shop!.buildingFloor!.isNotEmpty ||
+                  _shop!.soi != null && _shop!.soi!.isNotEmpty ||
+                  _shop!.district != null && _shop!.district!.isNotEmpty ||
+                  _shop!.province != null && _shop!.province!.isNotEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Divider(),
+                ),
+              if (_shop!.buildingName != null &&
+                  _shop!.buildingName!.isNotEmpty)
+                _buildDetailRow(
+                  'building_name_label'.tr(context),
+                  _shop!.buildingName!,
+                ),
+              if (_shop!.buildingNumber != null &&
+                  _shop!.buildingNumber!.isNotEmpty)
+                _buildDetailRow(
+                  'building_number_label'.tr(context),
+                  _shop!.buildingNumber!,
+                ),
+              if (_shop!.buildingFloor != null &&
+                  _shop!.buildingFloor!.isNotEmpty)
+                _buildDetailRow(
+                  'building_floor_label'.tr(context),
+                  _shop!.buildingFloor!,
+                ),
+              if (_shop!.soi != null && _shop!.soi!.isNotEmpty)
+                _buildDetailRow('soi_label'.tr(context), _shop!.soi!),
+              if (_shop!.district != null && _shop!.district!.isNotEmpty)
+                _buildDetailRow('district_label'.tr(context), _shop!.district!),
+              if (_shop!.province != null && _shop!.province!.isNotEmpty)
+                _buildDetailRow('province_label'.tr(context), _shop!.province!),
+            ],
           ),
         ),
-        if (widget.shop.buildingName != null &&
-            widget.shop.buildingName!.isNotEmpty)
-          Text(
-            'building_name_label'.tr(context) + ': ${widget.shop.buildingName}',
-            style: const TextStyle(fontSize: 15),
-          ),
-        if (widget.shop.buildingNumber != null &&
-            widget.shop.buildingNumber!.isNotEmpty)
-          Text(
-            'building_number_label'.tr(context) +
-                ': ${widget.shop.buildingNumber}',
-            style: const TextStyle(fontSize: 15),
-          ),
-        if (widget.shop.buildingFloor != null &&
-            widget.shop.buildingFloor!.isNotEmpty)
-          Text(
-            'building_floor_label'.tr(context) +
-                ': ${widget.shop.buildingFloor}',
-            style: const TextStyle(fontSize: 15),
-          ),
-        if (widget.shop.soi != null && widget.shop.soi!.isNotEmpty)
-          Text(
-            'soi_label'.tr(context) + ': ${widget.shop.soi}',
-            style: const TextStyle(fontSize: 15),
-          ),
-        if (widget.shop.district != null && widget.shop.district!.isNotEmpty)
-          Text(
-            'district_label'.tr(context) + ': ${widget.shop.district}',
-            style: const TextStyle(fontSize: 15),
-          ),
-        if (widget.shop.province != null && widget.shop.province!.isNotEmpty)
-          Text(
-            'province_label'.tr(context) + ': ${widget.shop.province}',
-            style: const TextStyle(fontSize: 15),
-          ),
       ],
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 15, color: Colors.grey[600])),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
     );
   }
 
@@ -885,15 +941,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
       'day_saturday'.tr(context),
       'day_sunday'.tr(context),
     ];
-    final dayKeys = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
+    final shortKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -917,7 +965,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: List.generate(days.length, (i) {
-              final hours = widget.shop.hours[dayKeys[i]];
+              final hours = _shop!.hours[shortKeys[i]];
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
                 child: Row(
@@ -952,7 +1000,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   }
 
   Widget _buildContactInfo() {
-    final shop = widget.shop;
+    final shop = _shop!;
     final List<InfoRow> info = [
       // Phone Number
       InfoRow(
@@ -1386,7 +1434,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     );
     try {
       await _reviewService.addReplyToReview(
-        shopId: widget.shop.id,
+        shopId: widget.shopId,
         reviewId: review.id,
         reply: reply,
       );
@@ -1475,7 +1523,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
 
               final newReview = Review(
                 id: DateTime.now().millisecondsSinceEpoch.toString(),
-                shopId: widget.shop.id,
+                shopId: widget.shopId,
                 userId: 'current-user',
                 userName: userName,
                 comment: comment,
@@ -1504,7 +1552,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
       MaterialPageRoute(
         builder:
             (context) => ReportFormScreen(
-              shopId: widget.shop.id,
+              shopId: widget.shopId,
               onReportSubmitted: () {
                 _loadReports();
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1547,7 +1595,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   }
 
   Widget _buildAdditionalInfo() {
-    final shop = widget.shop;
+    final shop = _shop!;
     List<Widget> info = [];
     if (shop.timestamp != null) {
       info.add(
@@ -1737,7 +1785,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => LogRepairScreen(shop: widget.shop),
+                  builder: (context) => LogRepairScreen(shop: _shop!),
                 ),
               );
             },

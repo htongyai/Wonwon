@@ -437,5 +437,13 @@
   "terms_placeholder": "Here are the terms and conditions. (Replace with your actual terms.)",
   "privacy_policy_placeholder": "Here is the privacy policy. (Replace with your actual policy.)",
   "no_account": "Continue without an account",
-  "signup": "Sign Up"
+  "signup": "Sign Up",
+  "no_reason": "No reason",
+  "details": "Details",
+  "satisfaction": "Satisfaction",
+  "manage_shops": "Manage Shops",
+  "manage_users": "Manage Users", 
+  "unapprove_pages": "Unapprove Pages",
+  "reports": "Reports",
+  "dashboard": "Dashboard"
 } 
