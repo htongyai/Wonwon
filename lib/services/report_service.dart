@@ -78,9 +78,15 @@ class ReportService {
         await _firestore
             .collection(_collection)
             .where('shopId', isEqualTo: shopId)
-            .orderBy('createdAt', descending: true)
             .get();
-    return snapshot.docs.map((doc) => ShopReport.fromJson(doc.data())).toList();
+
+    // Sort in memory to avoid composite index requirement
+    final reports =
+        snapshot.docs.map((doc) => ShopReport.fromJson(doc.data())).toList();
+    reports.sort(
+      (a, b) => b.createdAt.compareTo(a.createdAt),
+    ); // Sort by createdAt descending
+    return reports;
   }
 
   // Mark a report as resolved in Firestore

@@ -121,6 +121,19 @@ class CustomNavigationBar extends StatelessWidget {
                         topIndicatorHeight,
                       ),
                     ),
+                    Expanded(
+                      child: _buildNavItem(
+                        context,
+                        4,
+                        FontAwesomeIcons.comments,
+                        'forum',
+                        availableHeight,
+                        iconSize,
+                        textSize,
+                        dotSize,
+                        topIndicatorHeight,
+                      ),
+                    ),
                   ],
                 );
               },

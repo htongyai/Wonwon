@@ -22,6 +22,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async';
 import 'package:wonwonw2/services/location_service.dart';
+import 'package:wonwonw2/widgets/performance_loading_widget.dart';
 
 class DesktopHomeScreen extends StatefulWidget {
   final bool? isMainSidebarCollapsed;
@@ -764,17 +765,8 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
 
             const SizedBox(height: 32),
 
-            // Main loading spinner
-            const SizedBox(
-              width: 40,
-              height: 40,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  AppConstants.primaryColor,
-                ),
-              ),
-            ),
+            // Performance loading widget
+            const PerformanceLoadingWidget(size: 40, showProgress: true),
           ],
         ),
       ),

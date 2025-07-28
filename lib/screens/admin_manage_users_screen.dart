@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:wonwonw2/widgets/performance_loading_widget.dart';
 
 class AdminManageUsersScreen extends StatefulWidget {
   const AdminManageUsersScreen({Key? key}) : super(key: key);
@@ -132,7 +133,10 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
               stream: _firestore.collection('users').snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const PerformanceLoadingWidget(
+                    message: 'Loading users...',
+                    size: 50,
+                  );
                 }
 
                 if (snapshot.hasError) {

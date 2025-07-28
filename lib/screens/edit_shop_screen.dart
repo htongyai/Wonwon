@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/constants/app_colors.dart';
+import 'package:wonwonw2/constants/app_text_styles.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/models/repair_sub_service.dart';
 import 'package:wonwonw2/services/shop_service.dart';
@@ -18,7 +20,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/widgets/section_title.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
-import 'package:wonwonw2/utils/asset_helpers.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class EditShopScreen extends StatefulWidget {
   final RepairShop shop;
@@ -31,752 +33,358 @@ class EditShopScreen extends StatefulWidget {
 
 class _EditShopScreenState extends State<EditShopScreen> {
   final _formKey = GlobalKey<FormState>();
-  bool _isSubmitting = false;
-  bool _isProcessingImage = false;
-  String? _imageError;
-  File? _imageFile;
-  final ShopService _shopService = ShopService();
-
-  // Form controllers
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _areaController = TextEditingController();
+  final _latitudeController = TextEditingController();
+  final _longitudeController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _buildingNumberController = TextEditingController();
+  final _buildingNameController = TextEditingController();
   final _soiController = TextEditingController();
   final _districtController = TextEditingController();
   final _landmarkController = TextEditingController();
   final _lineIdController = TextEditingController();
   final _facebookPageController = TextEditingController();
-  final _instagramPageController = TextEditingController();
   final _otherContactsController = TextEditingController();
   final _notesOrConditionsController = TextEditingController();
+  final _usualOpeningTimeController = TextEditingController();
+  final _usualClosingTimeController = TextEditingController();
+  final _instagramPageController = TextEditingController();
   final _buildingFloorController = TextEditingController();
-  final _latitudeController = TextEditingController();
-  final _longitudeController = TextEditingController();
 
-  // Categories and services
-  final List<String> _categories = [
-    'Motorcycle Repair',
-    'Car Repair',
-    'Bicycle Repair',
-    'Electronics Repair',
-    'Appliance Repair',
-    'Other',
-  ];
-  final Set<String> _selectedCategories = {};
-  late Map<String, List<String>> _selectedSubServices;
+  // Image variables
+  Uint8List? _selectedImageBytes;
+  String? _imageError;
+  bool _isProcessingImage = false;
+  List<String> _existingPhotos = [];
 
-  // Opening hours
-  final List<String> _days = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
+  List<String> _selectedCategories = [];
+  final List<String> _availableCategories = [
+    'clothing',
+    'footwear',
+    'watch',
+    'bag',
+    'electronics',
+    'appliance',
   ];
-  final Map<String, TimeOfDay?> _openingTimes = {};
-  final Map<String, TimeOfDay?> _closingTimes = {};
-  final Map<String, bool> _closedDays = {};
-  final Map<String, TextEditingController> _openingTimeControllers = {};
-  final Map<String, TextEditingController> _closingTimeControllers = {};
-  bool _sameTimeEveryDay = false;
-  bool _hasIrregularHours = false;
+
+  // Map to store selected sub-services for each category
+  final Map<String, List<String>> _selectedSubServices = {};
+
+  final Map<String, TextEditingController> _hoursControllers = {
+    'Monday': TextEditingController(),
+    'Tuesday': TextEditingController(),
+    'Wednesday': TextEditingController(),
+    'Thursday': TextEditingController(),
+    'Friday': TextEditingController(),
+    'Saturday': TextEditingController(),
+    'Sunday': TextEditingController(),
+  };
+
+  // New controllers for separate opening and closing times
+  final Map<String, TextEditingController> _openingTimeControllers = {
+    'Monday': TextEditingController(),
+    'Tuesday': TextEditingController(),
+    'Wednesday': TextEditingController(),
+    'Thursday': TextEditingController(),
+    'Friday': TextEditingController(),
+    'Saturday': TextEditingController(),
+    'Sunday': TextEditingController(),
+  };
+
+  final Map<String, TextEditingController> _closingTimeControllers = {
+    'Monday': TextEditingController(),
+    'Tuesday': TextEditingController(),
+    'Wednesday': TextEditingController(),
+    'Thursday': TextEditingController(),
+    'Friday': TextEditingController(),
+    'Saturday': TextEditingController(),
+    'Sunday': TextEditingController(),
+  };
 
   // Payment methods
-  final Set<String> _selectedPaymentMethods = {};
-  bool _tryOnAreaAvailable = false;
+  bool _acceptsCash = false;
+  bool _acceptsQR = false;
+  bool _acceptsCredit = false;
 
-  // Province selection
-  String _selectedProvince = 'Bangkok';
-  final List<String> _provinces = [
-    'Bangkok',
-    'Chiang Mai',
-    'Phuket',
-    'Pattaya',
-    // Add more provinces as needed
-  ];
+  // Other options
+  bool _requiresPurchase = false;
+  bool _tryOnAreaAvailable = false;
+  String _priceRange = '₿';
+
+  bool _isLoading = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeFormData();
+    _initializeForm();
   }
 
-  void _initializeFormData() {
-    // Initialize controllers with existing shop data
-    _nameController.text = widget.shop.name;
-    _descriptionController.text = widget.shop.description;
-    _buildingNumberController.text = widget.shop.buildingNumber ?? '';
-    _soiController.text = widget.shop.soi ?? '';
-    _districtController.text = widget.shop.district ?? '';
-    _landmarkController.text = widget.shop.landmark ?? '';
-    _lineIdController.text = widget.shop.lineId ?? '';
-    _facebookPageController.text = widget.shop.facebookPage ?? '';
-    _instagramPageController.text = widget.shop.instagramPage ?? '';
-    _otherContactsController.text = widget.shop.otherContacts ?? '';
-    _notesOrConditionsController.text = widget.shop.notesOrConditions ?? '';
-    _buildingFloorController.text = widget.shop.buildingFloor ?? '';
-    _latitudeController.text = widget.shop.latitude.toString();
-    _longitudeController.text = widget.shop.longitude.toString();
+  void _initializeForm() {
+    final shop = widget.shop;
 
-    // Initialize categories and sub-services
-    _selectedCategories.addAll(widget.shop.categories);
-    _selectedSubServices = Map.fromEntries(
-      widget.shop.subServices.entries.map(
-        (e) => MapEntry(e.key, List<String>.from(e.value)),
-      ),
-    );
+    // Basic information
+    _nameController.text = shop.name;
+    _descriptionController.text = shop.description;
+    _addressController.text = shop.address;
+    _areaController.text = shop.area;
+    _latitudeController.text = shop.latitude.toString();
+    _longitudeController.text = shop.longitude.toString();
 
-    // Initialize opening hours
-    for (final day in _days) {
-      _openingTimeControllers[day] = TextEditingController();
-      _closingTimeControllers[day] = TextEditingController();
+    // Contact information
+    _phoneController.text = shop.phoneNumber ?? '';
+    _buildingNumberController.text = shop.buildingNumber ?? '';
+    _buildingNameController.text = shop.buildingName ?? '';
+    _soiController.text = shop.soi ?? '';
+    _districtController.text = shop.district ?? '';
+    _landmarkController.text = shop.landmark ?? '';
+    _lineIdController.text = shop.lineId ?? '';
+    _facebookPageController.text = shop.facebookPage ?? '';
+    _otherContactsController.text = shop.otherContacts ?? '';
+    _notesOrConditionsController.text = shop.notesOrConditions ?? '';
+    _usualOpeningTimeController.text = shop.usualOpeningTime ?? '';
+    _instagramPageController.text = shop.instagramPage ?? '';
+    _buildingFloorController.text = shop.buildingFloor ?? '';
 
-      final hours = widget.shop.hours[day.toLowerCase()];
-      if (hours != null) {
+    // Categories
+    _selectedCategories = List.from(shop.categories);
+
+    // Payment methods
+    if (shop.paymentMethods != null) {
+      _acceptsCash = shop.paymentMethods!.contains('cash');
+      _acceptsQR = shop.paymentMethods!.contains('qr');
+      _acceptsCredit = shop.paymentMethods!.contains('card');
+    }
+
+    // Other options
+    _requiresPurchase = shop.requiresPurchase ?? false;
+    _tryOnAreaAvailable = shop.tryOnAreaAvailable ?? false;
+    _priceRange = shop.priceRange;
+
+    // Hours
+    _initializeHours();
+
+    // Photos
+    _existingPhotos = List.from(shop.photos);
+  }
+
+  void _initializeHours() {
+    final shop = widget.shop;
+    final days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+
+    for (final day in days) {
+      final hours = shop.hours[day.toLowerCase()] ?? 'Closed';
+      if (hours != 'Closed') {
         final parts = hours.split(' - ');
         if (parts.length == 2) {
-          final openingTime = _parseTimeString(parts[0]);
-          final closingTime = _parseTimeString(parts[1]);
-          if (openingTime != null && closingTime != null) {
-            _openingTimes[day] = openingTime;
-            _closingTimes[day] = closingTime;
-            _openingTimeControllers[day]?.text = parts[0];
-            _closingTimeControllers[day]?.text = parts[1];
-          }
+          _openingTimeControllers[day]!.text = parts[0].trim();
+          _closingTimeControllers[day]!.text = parts[1].trim();
         }
       }
-      _closedDays[day] = widget.shop.closingDays.contains(day.toLowerCase());
     }
-
-    // Initialize other fields
-    _selectedPaymentMethods.addAll(widget.shop.paymentMethods ?? []);
-    _tryOnAreaAvailable = widget.shop.tryOnAreaAvailable ?? false;
-    _selectedProvince = widget.shop.province ?? 'Bangkok';
-    _hasIrregularHours = widget.shop.irregularHours;
-  }
-
-  TimeOfDay? _parseTimeString(String timeStr) {
-    try {
-      final parts = timeStr.split(':');
-      if (parts.length == 2) {
-        final hour = int.parse(parts[0]);
-        final minute = int.parse(parts[1]);
-        return TimeOfDay(hour: hour, minute: minute);
-      }
-    } catch (e) {
-      // Invalid time format
-    }
-    return null;
-  }
-
-  String _formatTimeOfDay(TimeOfDay time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
+    _addressController.dispose();
+    _areaController.dispose();
+    _latitudeController.dispose();
+    _longitudeController.dispose();
+    _phoneController.dispose();
     _buildingNumberController.dispose();
+    _buildingNameController.dispose();
     _soiController.dispose();
     _districtController.dispose();
     _landmarkController.dispose();
     _lineIdController.dispose();
     _facebookPageController.dispose();
-    _instagramPageController.dispose();
     _otherContactsController.dispose();
     _notesOrConditionsController.dispose();
+    _usualOpeningTimeController.dispose();
+    _usualClosingTimeController.dispose();
+    _instagramPageController.dispose();
     _buildingFloorController.dispose();
-    _latitudeController.dispose();
-    _longitudeController.dispose();
+
+    for (final controller in _hoursControllers.values) {
+      controller.dispose();
+    }
     for (final controller in _openingTimeControllers.values) {
       controller.dispose();
     }
     for (final controller in _closingTimeControllers.values) {
       controller.dispose();
     }
+
     super.dispose();
-  }
-
-  Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    try {
-      // Create updated shop data
-      final updatedShop = RepairShop(
-        id: widget.shop.id,
-        name: _nameController.text,
-        description: _descriptionController.text,
-        address: widget.shop.address, // Keep existing address
-        area: widget.shop.area, // Keep existing area
-        categories: _selectedCategories.toList(),
-        rating: widget.shop.rating, // Keep existing rating
-        reviewCount: widget.shop.reviewCount, // Keep existing review count
-        amenities: widget.shop.amenities, // Keep existing amenities
-        hours: Map.fromEntries(
-          _days.map(
-            (day) => MapEntry(
-              day.toLowerCase(),
-              _closedDays[day] ?? false
-                  ? 'Closed'
-                  : '${_openingTimeControllers[day]?.text} - ${_closingTimeControllers[day]?.text}',
-            ),
-          ),
-        ),
-        closingDays:
-            _days
-                .where((day) => _closedDays[day] ?? false)
-                .map((day) => day.toLowerCase())
-                .toList(),
-        latitude: double.parse(_latitudeController.text),
-        longitude: double.parse(_longitudeController.text),
-        durationMinutes: widget.shop.durationMinutes, // Keep existing duration
-        requiresPurchase: widget.shop.requiresPurchase, // Keep existing value
-        photos: widget.shop.photos, // Keep existing photos
-        priceRange: widget.shop.priceRange, // Keep existing price range
-        features: widget.shop.features, // Keep existing features
-        approved: widget.shop.approved, // Keep existing approval status
-        irregularHours: _hasIrregularHours,
-        subServices: _selectedSubServices,
-        timestamp: widget.shop.timestamp, // Keep existing timestamp
-        buildingNumber: _buildingNumberController.text,
-        buildingName: widget.shop.buildingName, // Keep existing building name
-        soi: _soiController.text,
-        district: _districtController.text,
-        province: _selectedProvince,
-        landmark: _landmarkController.text,
-        lineId: _lineIdController.text,
-        facebookPage: _facebookPageController.text,
-        otherContacts: _otherContactsController.text,
-        paymentMethods: _selectedPaymentMethods.toList(),
-        tryOnAreaAvailable: _tryOnAreaAvailable,
-        notesOrConditions: _notesOrConditionsController.text,
-        usualOpeningTime:
-            widget.shop.usualOpeningTime, // Keep existing usual times
-        usualClosingTime: widget.shop.usualClosingTime,
-        instagramPage: _instagramPageController.text,
-        phoneNumber: widget.shop.phoneNumber, // Keep existing phone number
-        buildingFloor: _buildingFloorController.text,
-      );
-
-      // Update shop in the database
-      await _shopService.updateShop(updatedShop);
-
-      if (mounted) {
-        Navigator.pop(context, updatedShop);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update shop: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _pickAndCropImage() async {
-    try {
-      setState(() {
-        _isProcessingImage = true;
-        _imageError = null;
-      });
-
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-
-      if (image != null) {
-        final CroppedFile? croppedFile = await ImageCropper().cropImage(
-          sourcePath: image.path,
-          aspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
-          compressQuality: 80,
-          maxWidth: 1200,
-          maxHeight: 675,
-          uiSettings: [
-            AndroidUiSettings(
-              toolbarTitle: 'Crop Image',
-              toolbarColor: AppConstants.primaryColor,
-              toolbarWidgetColor: Colors.white,
-              initAspectRatio: CropAspectRatioPreset.original,
-              lockAspectRatio: true,
-            ),
-            IOSUiSettings(title: 'Crop Image', aspectRatioLockEnabled: true),
-          ],
-        );
-
-        if (croppedFile != null) {
-          setState(() {
-            _imageFile = File(croppedFile.path);
-          });
-        }
-      }
-    } catch (e) {
-      setState(() {
-        _imageError = 'Failed to process image. Please try again.';
-      });
-    } finally {
-      setState(() {
-        _isProcessingImage = false;
-      });
-    }
-  }
-
-  Future<void> _openMapPicker(BuildContext context) async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => MapPickerScreen(
-              initialLatitude:
-                  double.tryParse(_latitudeController.text) ??
-                  AppConstants.defaultLatitude,
-              initialLongitude:
-                  double.tryParse(_longitudeController.text) ??
-                  AppConstants.defaultLongitude,
-            ),
-      ),
-    );
-
-    if (result != null && result is Map<String, double>) {
-      setState(() {
-        _latitudeController.text = result['latitude']!.toString();
-        _longitudeController.text = result['longitude']!.toString();
-      });
-    }
-  }
-
-  Widget _buildImageDisplay() {
-    if (_isProcessingImage) {
-      return Container(
-        width: double.infinity,
-        height: 200,
-        color: Colors.grey[200],
-        child: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_imageFile != null) {
-      return Image.file(
-        _imageFile!,
-        width: double.infinity,
-        height: 200,
-        fit: BoxFit.cover,
-      );
-    }
-
-    if (widget.shop.photos.isNotEmpty) {
-      return Image.network(
-        widget.shop.photos.first,
-        width: double.infinity,
-        height: 200,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return _buildPlaceholderImage();
-        },
-      );
-    }
-
-    return _buildPlaceholderImage();
-  }
-
-  Widget _buildPlaceholderImage() {
-    return Container(
-      width: double.infinity,
-      height: 200,
-      color: Colors.grey[200],
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.add_photo_alternate, size: 48, color: Colors.grey[400]),
-          const SizedBox(height: 8),
-          Text(
-            'Add Shop Photo',
-            style: TextStyle(color: Colors.grey[600], fontSize: 16),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoriesSelector() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children:
-          _categories.map((category) {
-            final isSelected = _selectedCategories.contains(category);
-            return FilterChip(
-              label: Text(category),
-              selected: isSelected,
-              onSelected: (selected) {
-                setState(() {
-                  if (selected) {
-                    _selectedCategories.add(category);
-                  } else {
-                    _selectedCategories.remove(category);
-                  }
-                });
-              },
-              backgroundColor: Colors.grey[200],
-              selectedColor: AppConstants.primaryColor.withOpacity(0.2),
-              checkmarkColor: AppConstants.primaryColor,
-              labelStyle: TextStyle(
-                color: isSelected ? AppConstants.primaryColor : Colors.black87,
-              ),
-            );
-          }).toList(),
-    );
-  }
-
-  Widget _buildOpeningHoursFields() {
-    return Column(
-      children:
-          _days.map((day) {
-            final isClosed = _closedDays[day] ?? false;
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            day,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        Checkbox(
-                          value: isClosed,
-                          onChanged: (value) {
-                            setState(() {
-                              _closedDays[day] = value ?? false;
-                              if (value ?? false) {
-                                _openingTimes[day] = null;
-                                _closingTimes[day] = null;
-                                _openingTimeControllers[day]?.clear();
-                                _closingTimeControllers[day]?.clear();
-                              }
-                            });
-                          },
-                        ),
-                        const Text('Closed'),
-                      ],
-                    ),
-                    if (!isClosed) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _openingTimeControllers[day],
-                              decoration: const InputDecoration(
-                                labelText: 'Opening Time',
-                                suffixIcon: Icon(Icons.access_time),
-                              ),
-                              readOnly: true,
-                              onTap: () => _selectTime(context, day, true),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _closingTimeControllers[day],
-                              decoration: const InputDecoration(
-                                labelText: 'Closing Time',
-                                suffixIcon: Icon(Icons.access_time),
-                              ),
-                              readOnly: true,
-                              onTap: () => _selectTime(context, day, false),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-    );
-  }
-
-  Future<void> _selectTime(
-    BuildContext context,
-    String day,
-    bool isOpening,
-  ) async {
-    final TimeOfDay? selectedTime = await showTimePicker(
-      context: context,
-      initialTime:
-          isOpening
-              ? _openingTimes[day] ?? const TimeOfDay(hour: 9, minute: 0)
-              : _closingTimes[day] ?? const TimeOfDay(hour: 17, minute: 0),
-    );
-
-    if (selectedTime != null) {
-      setState(() {
-        if (isOpening) {
-          _openingTimes[day] = selectedTime;
-          _openingTimeControllers[day]?.text = _formatTimeOfDay(selectedTime);
-        } else {
-          _closingTimes[day] = selectedTime;
-          _closingTimeControllers[day]?.text = _formatTimeOfDay(selectedTime);
-        }
-      });
-    }
-  }
-
-  void _onDeleteShopPressed() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Delete Shop'),
-            content: const Text(
-              'Are you sure you want to delete this shop? This action cannot be undone.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ],
-          ),
-    );
-    if (confirmed == true) {
-      setState(() => _isSubmitting = true);
-      try {
-        final success = await _shopService.deleteShop(widget.shop.id);
-        if (success && mounted) {
-          Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Shop deleted successfully'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        } else {
-          throw Exception('Failed to delete shop');
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${e.toString()}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } finally {
-        if (mounted) setState(() => _isSubmitting = false);
-      }
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Edit Shop'),
+        title: Text(
+          'Edit Shop',
+          style: AppTextStyles.heading.copyWith(color: AppColors.text),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _isSubmitting ? null : _submitForm,
+          if (_isSaving)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            TextButton(
+              onPressed: _saveShop,
+              child: Text(
+                'Save',
+                style: TextStyle(
+                  color: AppConstants.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+        ],
+      ),
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SafeArea(
+                child: Padding(
+                  padding: ResponsiveSize.getScaledPadding(
+                    const EdgeInsets.all(16.0),
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildBasicInformationSection(),
+                          SizedBox(height: ResponsiveSize.getHeight(2)),
+                          _buildLocationSection(),
+                          SizedBox(height: ResponsiveSize.getHeight(2)),
+                          _buildContactSection(),
+                          SizedBox(height: ResponsiveSize.getHeight(2)),
+                          _buildCategoriesSection(),
+                          SizedBox(height: ResponsiveSize.getHeight(2)),
+                          _buildHoursSection(),
+                          SizedBox(height: ResponsiveSize.getHeight(2)),
+                          _buildPaymentSection(),
+                          SizedBox(height: ResponsiveSize.getHeight(2)),
+                          _buildPhotosSection(),
+                          SizedBox(height: ResponsiveSize.getHeight(2)),
+                          _buildOptionsSection(),
+                          SizedBox(height: ResponsiveSize.getHeight(4)),
+                          _buildSaveButton(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+    );
+  }
+
+  Widget _buildBasicInformationSection() {
+    return _buildSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(text: 'Basic Information'),
+          SizedBox(height: ResponsiveSize.getHeight(2)),
+          _buildTextField(
+            controller: _nameController,
+            label: 'Shop Name',
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter shop name';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: ResponsiveSize.getHeight(1)),
+          _buildTextField(
+            controller: _descriptionController,
+            label: 'Description',
+            maxLines: 3,
+          ),
+          SizedBox(height: ResponsiveSize.getHeight(1)),
+          _buildTextField(
+            controller: _addressController,
+            label: 'Address',
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter address';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: ResponsiveSize.getHeight(1)),
+          _buildTextField(
+            controller: _areaController,
+            label: 'Area/Neighborhood',
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Basic Information Section
-            const SectionTitle(text: 'Basic Information'),
-            const SizedBox(height: 16),
-            _buildImageDisplay(),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: _pickAndCropImage,
-              icon: const Icon(Icons.add_photo_alternate),
-              label: const Text('Upload New Photo'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.primaryColor,
-                foregroundColor: Colors.white,
+    );
+  }
+
+  Widget _buildLocationSection() {
+    return _buildSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(text: 'Location'),
+          SizedBox(height: ResponsiveSize.getHeight(2)),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  controller: _latitudeController,
+                  label: 'Latitude',
+                  keyboardType: TextInputType.number,
+                ),
               ),
-            ),
-            if (_imageError != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _imageError!,
-                style: const TextStyle(color: Colors.red, fontSize: 12),
+              SizedBox(width: ResponsiveSize.getWidth(2)),
+              Expanded(
+                child: _buildTextField(
+                  controller: _longitudeController,
+                  label: 'Longitude',
+                  keyboardType: TextInputType.number,
+                ),
               ),
             ],
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Shop Name',
-                hintText: 'Enter shop name',
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a shop name';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                hintText: 'Enter shop description',
-              ),
-              maxLines: 3,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a description';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Categories Section
-            const SectionTitle(text: 'Categories'),
-            const SizedBox(height: 16),
-            _buildCategoriesSelector(),
-            const SizedBox(height: 24),
-
-            // Location Section
-            const SectionTitle(text: 'Location'),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _buildingNumberController,
-              decoration: const InputDecoration(
-                labelText: 'Building Number',
-                hintText: 'Enter building number',
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _soiController,
-              decoration: const InputDecoration(
-                labelText: 'Soi',
-                hintText: 'Enter soi',
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _districtController,
-              decoration: const InputDecoration(
-                labelText: 'District',
-                hintText: 'Enter district',
-              ),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: _selectedProvince,
-              decoration: const InputDecoration(labelText: 'Province'),
-              items:
-                  _provinces.map((province) {
-                    return DropdownMenuItem(
-                      value: province,
-                      child: Text(province),
-                    );
-                  }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _selectedProvince = value;
-                  });
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _landmarkController,
-              decoration: const InputDecoration(
-                labelText: 'Landmark',
-                hintText: 'Enter nearby landmark',
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _latitudeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Latitude',
-                      hintText: 'Enter latitude',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter latitude';
-                      }
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid number';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: _longitudeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Longitude',
-                      hintText: 'Enter longitude',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter longitude';
-                      }
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid number';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => _openMapPicker(context),
+          ),
+          SizedBox(height: ResponsiveSize.getHeight(1)),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _pickLocation,
               icon: const Icon(Icons.map),
               label: const Text('Pick Location on Map'),
               style: ElevatedButton.styleFrom(
@@ -784,151 +392,539 @@ class _EditShopScreenState extends State<EditShopScreen> {
                 foregroundColor: Colors.white,
               ),
             ),
-            const SizedBox(height: 24),
+          ),
+        ],
+      ),
+    );
+  }
 
-            // Contact Information Section
-            const SectionTitle(text: 'Contact Information'),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _lineIdController,
-              decoration: const InputDecoration(
-                labelText: 'Line ID',
-                hintText: 'Enter Line ID',
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _facebookPageController,
-              decoration: const InputDecoration(
-                labelText: 'Facebook Page',
-                hintText: 'Enter Facebook page URL',
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _instagramPageController,
-              decoration: const InputDecoration(
-                labelText: 'Instagram Page',
-                hintText: 'Enter Instagram page URL',
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _otherContactsController,
-              decoration: const InputDecoration(
-                labelText: 'Other Contacts',
-                hintText: 'Enter other contact information',
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 24),
+  Widget _buildContactSection() {
+    return _buildSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(text: 'Contact Information'),
+          SizedBox(height: ResponsiveSize.getHeight(2)),
+          _buildTextField(
+            controller: _phoneController,
+            label: 'Phone Number',
+            keyboardType: TextInputType.phone,
+          ),
+          SizedBox(height: ResponsiveSize.getHeight(1)),
+          _buildTextField(controller: _lineIdController, label: 'Line ID'),
+          SizedBox(height: ResponsiveSize.getHeight(1)),
+          _buildTextField(
+            controller: _facebookPageController,
+            label: 'Facebook Page',
+          ),
+          SizedBox(height: ResponsiveSize.getHeight(1)),
+          _buildTextField(
+            controller: _instagramPageController,
+            label: 'Instagram Page',
+          ),
+        ],
+      ),
+    );
+  }
 
-            // Payment Methods Section
-            const SectionTitle(text: 'Payment Methods'),
-            const SizedBox(height: 16),
+  Widget _buildCategoriesSection() {
+    return _buildSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(text: 'Service Categories'),
+          SizedBox(height: ResponsiveSize.getHeight(2)),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children:
+                _availableCategories.map((category) {
+                  final isSelected = _selectedCategories.contains(category);
+                  return FilterChip(
+                    label: Text(category),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedCategories.add(category);
+                        } else {
+                          _selectedCategories.remove(category);
+                        }
+                      });
+                    },
+                    selectedColor: AppConstants.primaryColor.withOpacity(0.2),
+                    checkmarkColor: AppConstants.primaryColor,
+                  );
+                }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHoursSection() {
+    return _buildSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(text: 'Opening Hours'),
+          SizedBox(height: ResponsiveSize.getHeight(2)),
+          ...[
+            'Monday',
+            'Tuesday',
+            'Wednesday',
+            'Thursday',
+            'Friday',
+            'Saturday',
+            'Sunday',
+          ].map((day) => _buildDayHours(day)).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDayHours(String day) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              day,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildTextField(
+                    controller: _openingTimeControllers[day]!,
+                    label: 'Open',
+                    hintText: '09:00',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text('-'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildTextField(
+                    controller: _closingTimeControllers[day]!,
+                    label: 'Close',
+                    hintText: '18:00',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentSection() {
+    return _buildSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(text: 'Payment Methods'),
+          SizedBox(height: ResponsiveSize.getHeight(2)),
+          CheckboxListTile(
+            title: const Text('Cash'),
+            value: _acceptsCash,
+            onChanged: (value) {
+              setState(() {
+                _acceptsCash = value ?? false;
+              });
+            },
+          ),
+          CheckboxListTile(
+            title: const Text('QR Payment'),
+            value: _acceptsQR,
+            onChanged: (value) {
+              setState(() {
+                _acceptsQR = value ?? false;
+              });
+            },
+          ),
+          CheckboxListTile(
+            title: const Text('Credit Card'),
+            value: _acceptsCredit,
+            onChanged: (value) {
+              setState(() {
+                _acceptsCredit = value ?? false;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotosSection() {
+    return _buildSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(text: 'Photos'),
+          SizedBox(height: ResponsiveSize.getHeight(2)),
+          if (_existingPhotos.isNotEmpty) ...[
+            Text('Existing Photos:'),
+            SizedBox(height: ResponsiveSize.getHeight(1)),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children:
-                  ['Cash', 'Credit Card', 'Mobile Banking', 'PromptPay'].map((
-                    method,
-                  ) {
-                    final isSelected = _selectedPaymentMethods.contains(method);
-                    return FilterChip(
-                      label: Text(method),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            _selectedPaymentMethods.add(method);
-                          } else {
-                            _selectedPaymentMethods.remove(method);
-                          }
-                        });
-                      },
-                      backgroundColor: Colors.grey[200],
-                      selectedColor: AppConstants.primaryColor.withOpacity(0.2),
-                      checkmarkColor: AppConstants.primaryColor,
-                      labelStyle: TextStyle(
-                        color:
-                            isSelected
-                                ? AppConstants.primaryColor
-                                : Colors.black87,
-                      ),
+                  _existingPhotos.map((photo) {
+                    return Stack(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            image: DecorationImage(
+                              image: NetworkImage(photo),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _existingPhotos.remove(photo);
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     );
                   }).toList(),
             ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Try-on Area Available'),
-              value: _tryOnAreaAvailable,
-              onChanged: (value) {
-                setState(() {
-                  _tryOnAreaAvailable = value;
-                });
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Opening Hours Section
-            const SectionTitle(text: 'Opening Hours'),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Irregular Hours'),
-              value: _hasIrregularHours,
-              onChanged: (value) {
-                setState(() {
-                  _hasIrregularHours = value;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildOpeningHoursFields(),
-            const SizedBox(height: 24),
-
-            // Additional Information Section
-            const SectionTitle(text: 'Additional Information'),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _notesOrConditionsController,
-              decoration: const InputDecoration(
-                labelText: 'Notes or Conditions',
-                hintText: 'Enter any additional notes or conditions',
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 32),
-
-            // Submit Button
-            ElevatedButton(
-              onPressed: _isSubmitting ? null : _submitForm,
+            SizedBox(height: ResponsiveSize.getHeight(2)),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _pickImage,
+              icon: const Icon(Icons.add_a_photo),
+              label: const Text('Add Photo'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppConstants.primaryColor,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child:
-                  _isSubmitting
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Save Changes'),
-            ),
-            const SizedBox(height: 32),
-
-            // Delete Shop Button
-            ElevatedButton.icon(
-              onPressed: _isSubmitting ? null : _onDeleteShopPressed,
-              icon: const Icon(Icons.delete, color: Colors.white),
-              label: const Text('Delete Shop'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
-            const SizedBox(height: 32),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildOptionsSection() {
+    return _buildSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionTitle(text: 'Options'),
+          SizedBox(height: ResponsiveSize.getHeight(2)),
+          CheckboxListTile(
+            title: const Text('Requires Purchase'),
+            value: _requiresPurchase,
+            onChanged: (value) {
+              setState(() {
+                _requiresPurchase = value ?? false;
+              });
+            },
+          ),
+          CheckboxListTile(
+            title: const Text('Try-on Area Available'),
+            value: _tryOnAreaAvailable,
+            onChanged: (value) {
+              setState(() {
+                _tryOnAreaAvailable = value ?? false;
+              });
+            },
+          ),
+          SizedBox(height: ResponsiveSize.getHeight(1)),
+          DropdownButtonFormField<String>(
+            value: _priceRange,
+            decoration: const InputDecoration(
+              labelText: 'Price Range',
+              border: OutlineInputBorder(),
+            ),
+            items:
+                ['₿', '₿₿', '₿₿₿'].map((range) {
+                  return DropdownMenuItem(value: range, child: Text(range));
+                }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _priceRange = value ?? '₿';
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _isSaving ? null : _saveShop,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppConstants.primaryColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+        child:
+            _isSaving
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text(
+                  'Save Changes',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: ResponsiveSize.getScaledPadding(const EdgeInsets.all(16)),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    String? hintText,
+    int maxLines = 1,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        border: const OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      validator: validator,
+    );
+  }
+
+  Future<void> _pickLocation() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const MapPickerScreen()),
+    );
+
+    if (result != null && result is LatLng) {
+      setState(() {
+        _latitudeController.text = result.latitude.toString();
+        _longitudeController.text = result.longitude.toString();
+      });
+    }
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+
+      if (image != null) {
+        setState(() {
+          _isProcessingImage = true;
+          _imageError = null;
+        });
+
+        Uint8List? compressedImage;
+        if (kIsWeb) {
+          compressedImage = await image.readAsBytes();
+        } else {
+          compressedImage = await FlutterImageCompress.compressWithList(
+            await image.readAsBytes(),
+            quality: 80,
+          );
+        }
+
+        setState(() {
+          _selectedImageBytes = compressedImage;
+          _isProcessingImage = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _imageError = 'Error picking image: $e';
+        _isProcessingImage = false;
+      });
+    }
+  }
+
+  Future<void> _saveShop() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      // Upload new image if selected
+      String? newImageUrl;
+      if (_selectedImageBytes != null) {
+        newImageUrl = await _uploadImage(_selectedImageBytes!);
+      }
+
+      // Prepare payment methods
+      List<String> paymentMethods = [];
+      if (_acceptsCash) paymentMethods.add('cash');
+      if (_acceptsQR) paymentMethods.add('qr');
+      if (_acceptsCredit) paymentMethods.add('card');
+
+      // Prepare hours
+      Map<String, String> hours = {};
+      final days = [
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+        'sunday',
+      ];
+      for (final day in days) {
+        final dayName = day.substring(0, 1).toUpperCase() + day.substring(1);
+        final openingTime = _openingTimeControllers[dayName]!.text.trim();
+        final closingTime = _closingTimeControllers[dayName]!.text.trim();
+
+        if (openingTime.isNotEmpty && closingTime.isNotEmpty) {
+          hours[day] = '$openingTime - $closingTime';
+        } else {
+          hours[day] = 'Closed';
+        }
+      }
+
+      // Prepare photos
+      List<String> photos = List.from(_existingPhotos);
+      if (newImageUrl != null) {
+        photos.add(newImageUrl);
+      }
+
+      // Update shop data
+      final updatedShop = RepairShop(
+        id: widget.shop.id,
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        address: _addressController.text.trim(),
+        area: _areaController.text.trim(),
+        categories: _selectedCategories,
+        rating: widget.shop.rating,
+        amenities: widget.shop.amenities,
+        hours: hours,
+        closingDays: widget.shop.closingDays,
+        latitude: double.tryParse(_latitudeController.text) ?? 0.0,
+        longitude: double.tryParse(_longitudeController.text) ?? 0.0,
+        durationMinutes: widget.shop.durationMinutes,
+        requiresPurchase: _requiresPurchase,
+        photos: photos,
+        priceRange: _priceRange,
+        features: widget.shop.features,
+        approved: widget.shop.approved,
+        irregularHours: widget.shop.irregularHours,
+        subServices: widget.shop.subServices,
+        buildingNumber: _buildingNumberController.text.trim(),
+        buildingName: _buildingNameController.text.trim(),
+        soi: _soiController.text.trim(),
+        district: _districtController.text.trim(),
+        province: widget.shop.province,
+        landmark: _landmarkController.text.trim(),
+        lineId: _lineIdController.text.trim(),
+        facebookPage: _facebookPageController.text.trim(),
+        otherContacts: _otherContactsController.text.trim(),
+        paymentMethods: paymentMethods.isNotEmpty ? paymentMethods : null,
+        tryOnAreaAvailable: _tryOnAreaAvailable,
+        notesOrConditions: _notesOrConditionsController.text.trim(),
+        usualOpeningTime: _usualOpeningTimeController.text.trim(),
+        instagramPage: _instagramPageController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
+        buildingFloor: _buildingFloorController.text.trim(),
+      );
+
+      // Save to Firestore
+      await FirebaseFirestore.instance
+          .collection('shops')
+          .doc(widget.shop.id)
+          .update(updatedShop.toMap());
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Shop updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context, true); // Return true to indicate success
+      }
+    } catch (e) {
+      appLog('Error updating shop: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating shop: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  Future<String> _uploadImage(Uint8List imageBytes) async {
+    final fileName =
+        'shop_${widget.shop.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final ref = FirebaseStorage.instance.ref().child('shop_photos/$fileName');
+
+    final uploadTask = ref.putData(imageBytes);
+    final snapshot = await uploadTask;
+    return await snapshot.ref.getDownloadURL();
   }
 }

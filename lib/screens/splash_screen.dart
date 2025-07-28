@@ -52,7 +52,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     // Navigate to home screen after delay
     Timer(const Duration(seconds: 3), () {
-      context.go('/');
+      context.go('/home');
     });
   }
 

@@ -3,6 +3,7 @@ import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/screens/main_navigation.dart';
 import 'package:wonwonw2/screens/signup_screen.dart';
 import 'package:wonwonw2/screens/splash_screen.dart';
+import 'package:wonwonw2/screens/desktop_splash_screen.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
@@ -29,6 +30,9 @@ import 'screens/admin_manage_users_screen.dart';
 import 'screens/admin_unapprove_pages_screen.dart';
 import 'screens/admin_reports_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
+import 'screens/forum_screen.dart';
+import 'screens/forum_create_topic_screen.dart';
+import 'screens/forum_topic_detail_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/terms_of_use_screen.dart';
@@ -99,7 +103,25 @@ class _MyAppState extends State<MyApp> {
   Locale _locale = const Locale('en');
 
   late final GoRouter _router = GoRouter(
+    redirect: (context, state) {
+      // Show splash screen for initial load
+      if (state.uri.path == '/') {
+        return '/splash';
+      }
+      return null;
+    },
     routes: [
+      // Splash screen route
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) {
+          // Use desktop splash screen for desktop layout
+          if (ResponsiveSize.shouldShowDesktopLayout()) {
+            return const DesktopSplashScreen();
+          }
+          return const SplashScreen();
+        },
+      ),
       // Standalone routes (outside of ShellRoute)
       GoRoute(
         path: '/signup',
@@ -125,6 +147,18 @@ class _MyAppState extends State<MyApp> {
           return ShopDetailScreen(shopId: shopId);
         },
       ),
+      // Forum routes (outside ShellRoute for standalone screens)
+      GoRoute(
+        path: '/forum/create',
+        builder: (context, state) => const ForumCreateTopicScreen(),
+      ),
+      GoRoute(
+        path: '/forum/topic/:topicId',
+        builder: (context, state) {
+          final topicId = state.pathParameters['topicId']!;
+          return ForumTopicDetailScreen(topicId: topicId);
+        },
+      ),
       // ShellRoute for main navigation
       ShellRoute(
         builder: (context, state, child) {
@@ -138,21 +172,27 @@ class _MyAppState extends State<MyApp> {
             initialIndex = 2;
           } else if (path.startsWith('/profile')) {
             initialIndex = 3;
-          } else if (path.startsWith('/admin/dashboard')) {
+          } else if (path.startsWith('/forum')) {
             initialIndex = 4;
-          } else if (path.startsWith('/admin/manage-shops')) {
+          } else if (path.startsWith('/admin/dashboard')) {
             initialIndex = 5;
-          } else if (path.startsWith('/admin/manage-users')) {
+          } else if (path.startsWith('/admin/manage-shops')) {
             initialIndex = 6;
-          } else if (path.startsWith('/admin/unapprove-pages')) {
+          } else if (path.startsWith('/admin/manage-users')) {
             initialIndex = 7;
-          } else if (path.startsWith('/admin/reports')) {
+          } else if (path.startsWith('/admin/unapprove-pages')) {
             initialIndex = 8;
+          } else if (path.startsWith('/admin/reports')) {
+            initialIndex = 9;
           }
 
           return MainNavigation(initialIndex: initialIndex, child: child);
         },
         routes: [
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => const HomeScreen(),
+          ),
           GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
           GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
           GoRoute(
@@ -162,6 +202,10 @@ class _MyAppState extends State<MyApp> {
           GoRoute(
             path: '/profile',
             builder: (context, state) => const ProfileScreen(),
+          ),
+          GoRoute(
+            path: '/forum',
+            builder: (context, state) => const ForumScreen(),
           ),
           GoRoute(
             path: '/admin/dashboard',

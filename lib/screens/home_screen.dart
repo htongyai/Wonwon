@@ -24,6 +24,7 @@ import 'package:wonwonw2/services/service_providers.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:wonwonw2/widgets/performance_loading_widget.dart';
 // Conditional import for web
 // ignore: uri_does_not_exist
 import 'dart:html' as html;
@@ -228,10 +229,9 @@ class _HomeScreenState extends State<HomeScreen>
               child: Stack(
                 children: [
                   if (_isLoading)
-                    Center(
-                      child: CircularProgressIndicator(
-                        color: AppConstants.primaryColor,
-                      ),
+                    const PerformanceLoadingWidget(
+                      message: 'Loading shops and services...',
+                      size: 60,
                     )
                   else
                     _buildMainContent(),

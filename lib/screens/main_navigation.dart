@@ -12,6 +12,7 @@ import 'package:wonwonw2/screens/admin_manage_shops_screen.dart';
 import 'package:wonwonw2/screens/admin_manage_users_screen.dart';
 import 'package:wonwonw2/screens/admin_unapprove_pages_screen.dart';
 import 'package:wonwonw2/screens/admin_reports_screen.dart';
+import 'package:wonwonw2/screens/forum_screen.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
 import 'package:wonwonw2/widgets/custom_navigation_bar.dart';
 import 'package:wonwonw2/widgets/desktop_navigation.dart';
@@ -58,18 +59,21 @@ class MainNavigationState extends State<MainNavigation> {
         context.go('/profile');
         break;
       case 4:
-        context.go('/admin/dashboard');
+        context.go('/forum');
         break;
       case 5:
-        context.go('/admin/manage-shops');
+        context.go('/admin/dashboard');
         break;
       case 6:
-        context.go('/admin/manage-users');
+        context.go('/admin/manage-shops');
         break;
       case 7:
-        context.go('/admin/unapprove-pages');
+        context.go('/admin/manage-users');
         break;
       case 8:
+        context.go('/admin/unapprove-pages');
+        break;
+      case 9:
         context.go('/admin/reports');
         break;
     }
@@ -124,14 +128,16 @@ class MainNavigationState extends State<MainNavigation> {
         case 3:
           return const ProfileScreen();
         case 4:
-          return const AdminDashboardScreen();
+          return const ForumScreen();
         case 5:
-          return const AdminManageShopsScreen();
+          return const AdminDashboardScreen();
         case 6:
-          return const AdminManageUsersScreen();
+          return const AdminManageShopsScreen();
         case 7:
-          return const AdminUnapprovePagesScreen();
+          return const AdminManageUsersScreen();
         case 8:
+          return const AdminUnapprovePagesScreen();
+        case 9:
           return const AdminReportsScreen();
         default:
           return const HomeScreen();

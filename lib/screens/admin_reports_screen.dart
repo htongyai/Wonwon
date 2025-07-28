@@ -8,6 +8,7 @@ import '../constants/app_constants.dart';
 import '../utils/app_logger.dart';
 import '../utils/responsive_size.dart';
 import '../widgets/section_title.dart';
+import '../widgets/performance_loading_widget.dart';
 
 class AdminReportsScreen extends StatefulWidget {
   const AdminReportsScreen({super.key});
@@ -662,15 +663,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   }
 
   Widget _buildLoadingState() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Loading reports...'),
-        ],
-      ),
+    return const PerformanceLoadingWidget(
+      message: 'Loading reports...',
+      size: 50,
     );
   }
 

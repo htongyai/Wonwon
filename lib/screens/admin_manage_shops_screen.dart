@@ -15,6 +15,12 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:uuid/uuid.dart';
 import 'package:wonwonw2/screens/add_shop_screen.dart';
+import 'package:wonwonw2/screens/edit_shop_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AdminManageShopsScreen extends StatefulWidget {
   const AdminManageShopsScreen({Key? key}) : super(key: key);
@@ -30,6 +36,71 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
   String _searchQuery = '';
   String _sortBy = 'name';
   bool _sortAscending = true;
+
+  final List<String> _availableCategories = [
+    'clothing',
+    'footwear',
+    'watch',
+    'bag',
+    'electronics',
+    'appliance',
+  ];
+
+  // Map of categories to their sub-services
+  final Map<String, List<String>> _categorySubServices = {
+    'clothing': [
+      'zipper_replacement',
+      'pants_hemming',
+      'waist_adjustment',
+      'elastic_replacement',
+      'button_replacement',
+      'collar_replacement',
+      'tear_repair',
+      'add_pockets',
+    ],
+    'footwear': [
+      'sole_replacement',
+      'leather_repair',
+      'heel_repair',
+      'shoe_cleaning',
+    ],
+    'watch': [
+      'scratch_removal',
+      'battery_replacement',
+      'watch_cleaning',
+      'strap_replacement',
+      'glass_replacement',
+      'authenticity_check',
+    ],
+    'bag': [
+      'bag_repair',
+      'women_bags',
+      'brand_bags',
+      'travel_bags',
+      'document_bags',
+      'backpacks',
+      'sports_bags',
+      'student_bags',
+      'golf_bags',
+      'belts',
+      'leather_jackets',
+      'laptop_bags',
+      'music_instruments',
+      'food_delivery',
+      'shoe_repair',
+      'stroller_repair',
+    ],
+    'electronics': [
+      'laptop',
+      'mac',
+      'mobile',
+      'network',
+      'printer',
+      'audio',
+      'other_electronics',
+    ],
+    'appliance': ['small_appliances', 'large_appliances'],
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -247,7 +318,9 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   int comparison = 0;
                   switch (_sortBy) {
                     case 'name':
-                      comparison = a.name.compareTo(b.name);
+                      comparison = a.name.toLowerCase().compareTo(
+                        b.name.toLowerCase(),
+                      );
                       break;
                     case 'rating':
                       comparison = a.rating.compareTo(b.rating);
@@ -256,10 +329,36 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                       comparison = a.reviewCount.compareTo(b.reviewCount);
                       break;
                     case 'address':
-                      comparison = a.address.compareTo(b.address);
+                      comparison = a.address.toLowerCase().compareTo(
+                        b.address.toLowerCase(),
+                      );
+                      break;
+                    case 'categories':
+                      final aCategories = a.categories.join(', ').toLowerCase();
+                      final bCategories = b.categories.join(', ').toLowerCase();
+                      comparison = aCategories.compareTo(bCategories);
+                      break;
+                    case 'services':
+                      final aServices = a.subServices.values.fold<int>(
+                        0,
+                        (sum, services) => sum + services.length,
+                      );
+                      final bServices = b.subServices.values.fold<int>(
+                        0,
+                        (sum, services) => sum + services.length,
+                      );
+                      comparison = aServices.compareTo(bServices);
+                      break;
+                    case 'latitude':
+                      comparison = a.latitude.compareTo(b.latitude);
+                      break;
+                    case 'longitude':
+                      comparison = a.longitude.compareTo(b.longitude);
                       break;
                     default:
-                      comparison = a.name.compareTo(b.name);
+                      comparison = a.name.toLowerCase().compareTo(
+                        b.name.toLowerCase(),
+                      );
                   }
                   return _sortAscending ? comparison : -comparison;
                 });
@@ -345,26 +444,37 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
           scrollDirection: Axis.horizontal,
           child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: DataTable(
-              columnSpacing: isLargeScreen ? 32 : (isMediumScreen ? 24 : 16),
-              horizontalMargin: isLargeScreen ? 24 : 16,
-              columns: [
-                _buildSortableColumn('Name', 'name'),
-                if (isMediumScreen) _buildSortableColumn('Rating', 'rating'),
-                if (isMediumScreen)
-                  _buildSortableColumn('Reviews', 'reviewCount'),
-                _buildSortableColumn('Address', 'address'),
-                if (isLargeScreen) const DataColumn(label: Text('Categories')),
-                if (isLargeScreen) const DataColumn(label: Text('Services')),
-                const DataColumn(label: Text('Actions')),
-              ],
-              rows:
-                  shops
-                      .map(
-                        (shop) =>
-                            _buildShopRow(shop, isLargeScreen, isMediumScreen),
-                      )
-                      .toList(),
+            child: SingleChildScrollView(
+              child: DataTable(
+                columnSpacing: isLargeScreen ? 20 : (isMediumScreen ? 16 : 12),
+                horizontalMargin: isLargeScreen ? 16 : 12,
+                columns: [
+                  _buildSortableColumn('Name', 'name'),
+                  if (isMediumScreen) _buildSortableColumn('Rating', 'rating'),
+                  if (isMediumScreen)
+                    _buildSortableColumn('Reviews', 'reviewCount'),
+                  _buildSortableColumn('Address', 'address'),
+                  if (isLargeScreen)
+                    _buildSortableColumn('Categories', 'categories'),
+                  if (isLargeScreen)
+                    _buildSortableColumn('Services', 'services'),
+                  if (isLargeScreen)
+                    _buildSortableColumn('Latitude', 'latitude'),
+                  if (isLargeScreen)
+                    _buildSortableColumn('Longitude', 'longitude'),
+                  const DataColumn(label: Text('Actions')),
+                ],
+                rows:
+                    shops
+                        .map(
+                          (shop) => _buildShopRow(
+                            shop,
+                            isLargeScreen,
+                            isMediumScreen,
+                          ),
+                        )
+                        .toList(),
+              ),
             ),
           ),
         );
@@ -377,13 +487,23 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label),
+          Text(
+            label,
+            style: GoogleFonts.montserrat(
+              fontWeight:
+                  _sortBy == sortKey ? FontWeight.w600 : FontWeight.normal,
+              color: _sortBy == sortKey ? AppConstants.primaryColor : null,
+            ),
+          ),
+          const SizedBox(width: 4),
           if (_sortBy == sortKey)
             Icon(
               _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
               size: 16,
               color: AppConstants.primaryColor,
-            ),
+            )
+          else
+            Icon(Icons.unfold_more, size: 16, color: Colors.grey[400]),
         ],
       ),
       onSort: (columnIndex, ascending) {
@@ -408,69 +528,48 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       key: ValueKey(shop.id),
       cells: [
         DataCell(
-          Text(
-            shop.name,
-            style: GoogleFonts.montserrat(fontWeight: FontWeight.w600),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Expanded(
+                child: SizedBox(
+                  width: 120, // Reduced by ~15% from typical name column width
+                  child: Text(
+                    shop.name,
+                    style: GoogleFonts.montserrat(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => _showNameEditor(shop),
+                icon: const Icon(Icons.edit, size: 12),
+                tooltip: 'Edit Name',
+                padding: const EdgeInsets.all(2),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              ),
+            ],
           ),
         ),
         DataCell(
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.star, color: Colors.amber, size: 16),
-              const SizedBox(width: 4),
-              Text(shop.rating.toStringAsFixed(1)),
+              const Icon(Icons.star, color: Colors.amber, size: 14),
+              const SizedBox(width: 2),
+              Text(
+                shop.rating.toStringAsFixed(1),
+                style: GoogleFonts.montserrat(fontSize: 12),
+              ),
             ],
-          ),
-        ),
-        DataCell(Text(shop.reviewCount.toString())),
-        DataCell(
-          SizedBox(
-            width: 200,
-            child: Text(
-              shop.address,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-            ),
-          ),
-        ),
-        DataCell(
-          SizedBox(
-            width: 150,
-            child: Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children:
-                  shop.categories
-                      .take(3)
-                      .map(
-                        (category) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppConstants.primaryColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            category,
-                            style: GoogleFonts.montserrat(
-                              fontSize: 10,
-                              color: AppConstants.primaryColor,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-            ),
           ),
         ),
         DataCell(
           Text(
-            shop.subServices.isNotEmpty
-                ? '${shop.subServices.values.first.length} services'
-                : 'No services',
+            shop.reviewCount.toString(),
             style: GoogleFonts.montserrat(fontSize: 12),
           ),
         ),
@@ -478,20 +577,200 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Expanded(
+                child: SizedBox(
+                  width: 180,
+                  child: Text(
+                    shop.address,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                    style: GoogleFonts.montserrat(fontSize: 12),
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => _showAddressEditor(shop),
+                icon: const Icon(Icons.edit, size: 12),
+                tooltip: 'Edit Address',
+                padding: const EdgeInsets.all(2),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              ),
+            ],
+          ),
+        ),
+        DataCell(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Expanded(
+                child: SizedBox(
+                  width: 120,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (shop.categories.isNotEmpty)
+                        ...shop.categories
+                            .take(2)
+                            .map(
+                              (category) => Container(
+                                margin: const EdgeInsets.only(bottom: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppConstants.primaryColor.withOpacity(
+                                    0.1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: Text(
+                                  category,
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 9,
+                                    color: AppConstants.primaryColor,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                      if (shop.categories.length > 2)
+                        Text(
+                          '+${shop.categories.length - 2} more',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 8,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => _showCategoryDropdown(shop),
+                icon: const Icon(Icons.settings, size: 14),
+                tooltip: 'Manage Categories',
+                padding: const EdgeInsets.all(2),
+                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+              ),
+              IconButton(
+                onPressed: () => _showAddCategoryDropdown(shop),
+                icon: const Icon(Icons.add_circle_outline, size: 14),
+                tooltip: 'Add Category',
+                padding: const EdgeInsets.all(2),
+                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+              ),
+            ],
+          ),
+        ),
+        DataCell(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Expanded(
+                child: Text(
+                  shop.subServices.isNotEmpty
+                      ? '${shop.subServices.values.fold<int>(0, (sum, services) => sum + services.length)} services'
+                      : 'No services',
+                  style: GoogleFonts.montserrat(fontSize: 11),
+                ),
+              ),
+              IconButton(
+                onPressed: () => _showSubServiceDropdown(shop),
+                icon: const Icon(Icons.settings, size: 14),
+                tooltip: 'Manage Sub-Services',
+                padding: const EdgeInsets.all(2),
+                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+              ),
+              IconButton(
+                onPressed: () => _showAddServiceDropdown(shop),
+                icon: const Icon(Icons.add_circle_outline, size: 14),
+                tooltip: 'Add Service',
+                padding: const EdgeInsets.all(2),
+                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+              ),
+            ],
+          ),
+        ),
+        if (isLargeScreen)
+          DataCell(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Expanded(
+                  child: Text(
+                    shop.latitude.toStringAsFixed(6),
+                    style: GoogleFonts.montserrat(fontSize: 11),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => _showCoordinateEditor(shop, 'latitude'),
+                  icon: const Icon(Icons.edit, size: 12),
+                  tooltip: 'Edit Latitude',
+                  padding: const EdgeInsets.all(2),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (isLargeScreen)
+          DataCell(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Expanded(
+                  child: Text(
+                    shop.longitude.toStringAsFixed(6),
+                    style: GoogleFonts.montserrat(fontSize: 11),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => _showCoordinateEditor(shop, 'longitude'),
+                  icon: const Icon(Icons.edit, size: 12),
+                  tooltip: 'Edit Longitude',
+                  padding: const EdgeInsets.all(2),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        DataCell(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               IconButton(
                 onPressed: () => _viewShopDetails(shop),
-                icon: const Icon(Icons.visibility, size: 16),
+                icon: const Icon(Icons.visibility, size: 14),
                 tooltip: 'View Details',
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
               ),
               IconButton(
                 onPressed: () => _editShop(shop),
-                icon: const Icon(Icons.edit, size: 16),
+                icon: const Icon(Icons.edit, size: 14),
                 tooltip: 'Edit Shop',
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+              ),
+              IconButton(
+                onPressed: () => _showPhotoOptions(shop),
+                icon: const Icon(Icons.photo_camera, size: 14),
+                tooltip: 'Photo Options',
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
               ),
               IconButton(
                 onPressed: () => _deleteShop(shop),
-                icon: const Icon(Icons.delete, size: 16, color: Colors.red),
+                icon: const Icon(Icons.delete, size: 14, color: Colors.red),
                 tooltip: 'Delete Shop',
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
               ),
             ],
           ),
@@ -505,38 +784,1623 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
   }
 
   void _editShop(RepairShop shop) {
-    // TODO: Implement edit shop functionality
-    ScaffoldMessenger.of(
+    Navigator.push(
       context,
-    ).showSnackBar(SnackBar(content: Text('Edit shop: ${shop.name}')));
+      MaterialPageRoute(builder: (context) => EditShopScreen(shop: shop)),
+    ).then((result) {
+      if (result == true) {
+        // Refresh the list if shop was updated successfully
+        setState(() {
+          // Force rebuild
+        });
+      }
+    });
   }
 
-  void _deleteShop(RepairShop shop) {
+  Future<void> _assignCategory(RepairShop shop, String category) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Updating category...'),
+                ],
+              ),
+            ),
+      );
+
+      // Update the shop's categories
+      List<String> updatedCategories = List.from(shop.categories);
+      if (!updatedCategories.contains(category)) {
+        updatedCategories.add(category);
+      }
+
+      // Update in Firestore
+      await _firestore.collection('shops').doc(shop.id).update({
+        'categories': updatedCategories,
+      });
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Category "$category" added to "${shop.name}"'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating category: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      appLog('Error updating category: $e');
+    }
+  }
+
+  Future<void> _removeCategory(RepairShop shop, String category) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Removing category...'),
+                ],
+              ),
+            ),
+      );
+
+      // Update the shop's categories
+      List<String> updatedCategories = List.from(shop.categories);
+      updatedCategories.remove(category);
+
+      // Update in Firestore
+      await _firestore.collection('shops').doc(shop.id).update({
+        'categories': updatedCategories,
+      });
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Category "$category" removed from "${shop.name}"'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error removing category: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      appLog('Error removing category: $e');
+    }
+  }
+
+  void _showCategoryDropdown(RepairShop shop) {
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Delete Shop'),
-            content: Text('Are you sure you want to delete "${shop.name}"?'),
+            title: Text('Manage Categories for ${shop.name}'),
+            content: SizedBox(
+              width: 350,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Current categories: ${shop.categories.isEmpty ? "None" : shop.categories.join(", ")}',
+                    style: GoogleFonts.montserrat(fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  ..._availableCategories.map((category) {
+                    final isAssigned = shop.categories.contains(category);
+                    return ListTile(
+                      leading: Icon(
+                        isAssigned
+                            ? Icons.check_circle
+                            : Icons.radio_button_unchecked,
+                        color: isAssigned ? Colors.green : Colors.grey,
+                      ),
+                      title: Text(
+                        category,
+                        style: GoogleFonts.montserrat(
+                          fontWeight:
+                              isAssigned ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      ),
+                      trailing:
+                          isAssigned
+                              ? IconButton(
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  _removeCategory(shop, category);
+                                },
+                                icon: const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: Colors.red,
+                                ),
+                                tooltip: 'Remove category',
+                              )
+                              : null,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        if (!isAssigned) {
+                          _assignCategory(shop, category);
+                        }
+                      },
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Cancel'),
               ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _assignSubService(
+    RepairShop shop,
+    String category,
+    String subService,
+  ) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Adding sub-service...'),
+                ],
+              ),
+            ),
+      );
+
+      // Update the shop's sub-services
+      Map<String, List<String>> updatedSubServices = Map.from(shop.subServices);
+      if (!updatedSubServices.containsKey(category)) {
+        updatedSubServices[category] = [];
+      }
+      if (!updatedSubServices[category]!.contains(subService)) {
+        updatedSubServices[category]!.add(subService);
+      }
+
+      // Update in Firestore
+      await _firestore.collection('shops').doc(shop.id).update({
+        'subServices': updatedSubServices,
+      });
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sub-service "$subService" added to "${shop.name}"'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error adding sub-service: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      appLog('Error adding sub-service: $e');
+    }
+  }
+
+  Future<void> _removeSubService(
+    RepairShop shop,
+    String category,
+    String subService,
+  ) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Removing sub-service...'),
+                ],
+              ),
+            ),
+      );
+
+      // Update the shop's sub-services
+      Map<String, List<String>> updatedSubServices = Map.from(shop.subServices);
+      if (updatedSubServices.containsKey(category)) {
+        updatedSubServices[category]!.remove(subService);
+        if (updatedSubServices[category]!.isEmpty) {
+          updatedSubServices.remove(category);
+        }
+      }
+
+      // Update in Firestore
+      await _firestore.collection('shops').doc(shop.id).update({
+        'subServices': updatedSubServices,
+      });
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Sub-service "$subService" removed from "${shop.name}"',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error removing sub-service: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      appLog('Error removing sub-service: $e');
+    }
+  }
+
+  void _showSubServiceDropdown(RepairShop shop) {
+    if (shop.categories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please assign categories first before managing sub-services',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Manage Sub-Services for ${shop.name}'),
+            content: SizedBox(
+              width: 400,
+              height: 500,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: shop.categories.length,
+                      itemBuilder: (context, index) {
+                        final category = shop.categories[index];
+                        final subServices =
+                            _categorySubServices[category] ?? [];
+                        final currentSubServices =
+                            shop.subServices[category] ?? [];
+
+                        return ExpansionTile(
+                          title: Text(
+                            category,
+                            style: GoogleFonts.montserrat(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          children:
+                              subServices.map((subService) {
+                                final isAssigned = currentSubServices.contains(
+                                  subService,
+                                );
+                                return ListTile(
+                                  leading: Icon(
+                                    isAssigned
+                                        ? Icons.check_circle
+                                        : Icons.radio_button_unchecked,
+                                    color:
+                                        isAssigned ? Colors.green : Colors.grey,
+                                    size: 20,
+                                  ),
+                                  title: Text(
+                                    subService.replaceAll('_', ' '),
+                                    style: GoogleFonts.montserrat(
+                                      fontWeight:
+                                          isAssigned
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  trailing:
+                                      isAssigned
+                                          ? IconButton(
+                                            onPressed: () {
+                                              Navigator.of(context).pop();
+                                              _removeSubService(
+                                                shop,
+                                                category,
+                                                subService,
+                                              );
+                                            },
+                                            icon: const Icon(
+                                              Icons.remove_circle_outline,
+                                              color: Colors.red,
+                                              size: 20,
+                                            ),
+                                            tooltip: 'Remove sub-service',
+                                          )
+                                          : null,
+                                  onTap: () {
+                                    Navigator.of(context).pop();
+                                    if (!isAssigned) {
+                                      _assignSubService(
+                                        shop,
+                                        category,
+                                        subService,
+                                      );
+                                    }
+                                  },
+                                );
+                              }).toList(),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
               TextButton(
-                onPressed: () {
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showAddCategoryDropdown(RepairShop shop) {
+    final availableCategories =
+        _availableCategories
+            .where((category) => !shop.categories.contains(category))
+            .toList();
+
+    if (availableCategories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All categories are already assigned to this shop'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    Set<String> selectedCategories = {};
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: Text('Add Categories to ${shop.name}'),
+                  content: SizedBox(
+                    width: 350,
+                    height: 400,
+                    child: Column(
+                      children: [
+                        Text(
+                          'Select categories to add:',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: availableCategories.length,
+                            itemBuilder: (context, index) {
+                              final category = availableCategories[index];
+                              final isSelected = selectedCategories.contains(
+                                category,
+                              );
+
+                              return CheckboxListTile(
+                                value: isSelected,
+                                onChanged: (bool? value) {
+                                  setState(() {
+                                    if (value == true) {
+                                      selectedCategories.add(category);
+                                    } else {
+                                      selectedCategories.remove(category);
+                                    }
+                                  });
+                                },
+                                title: Text(
+                                  category,
+                                  style: GoogleFonts.montserrat(fontSize: 13),
+                                ),
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                              );
+                            },
+                          ),
+                        ),
+                        if (selectedCategories.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              '${selectedCategories.length} category(ies) selected',
+                              style: GoogleFonts.montserrat(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed:
+                          selectedCategories.isEmpty
+                              ? null
+                              : () async {
+                                Navigator.of(context).pop();
+                                await _assignMultipleCategories(
+                                  shop,
+                                  selectedCategories.toList(),
+                                );
+                              },
+                      child: const Text('Add Selected'),
+                    ),
+                  ],
+                ),
+          ),
+    );
+  }
+
+  Future<void> _assignMultipleCategories(
+    RepairShop shop,
+    List<String> categories,
+  ) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Adding categories...'),
+                ],
+              ),
+            ),
+      );
+
+      // Update the shop's categories
+      List<String> updatedCategories = List.from(shop.categories);
+      for (final category in categories) {
+        if (!updatedCategories.contains(category)) {
+          updatedCategories.add(category);
+        }
+      }
+
+      // Update in Firestore
+      await _firestore.collection('shops').doc(shop.id).update({
+        'categories': updatedCategories,
+      });
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${categories.length} category(ies) added to "${shop.name}"',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error adding categories: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      appLog('Error adding multiple categories: $e');
+    }
+  }
+
+  void _showAddServiceDropdown(RepairShop shop) {
+    if (shop.categories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please assign categories first before adding services',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    Map<String, Set<String>> selectedServices = {};
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: Text('Add Services to ${shop.name}'),
+                  content: SizedBox(
+                    width: 400,
+                    height: 500,
+                    child: Column(
+                      children: [
+                        Text(
+                          'Select services to add:',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: shop.categories.length,
+                            itemBuilder: (context, index) {
+                              final category = shop.categories[index];
+                              final subServices =
+                                  _categorySubServices[category] ?? [];
+                              final currentSubServices =
+                                  shop.subServices[category] ?? [];
+                              final availableSubServices =
+                                  subServices
+                                      .where(
+                                        (subService) =>
+                                            !currentSubServices.contains(
+                                              subService,
+                                            ),
+                                      )
+                                      .toList();
+
+                              if (availableSubServices.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+
+                              return ExpansionTile(
+                                title: Text(
+                                  category,
+                                  style: GoogleFonts.montserrat(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${availableSubServices.length} services available',
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                children:
+                                    availableSubServices.map((subService) {
+                                      final isSelected =
+                                          selectedServices[category]?.contains(
+                                            subService,
+                                          ) ??
+                                          false;
+
+                                      return CheckboxListTile(
+                                        value: isSelected,
+                                        onChanged: (bool? value) {
+                                          setState(() {
+                                            if (!selectedServices.containsKey(
+                                              category,
+                                            )) {
+                                              selectedServices[category] = {};
+                                            }
+                                            if (value == true) {
+                                              selectedServices[category]!.add(
+                                                subService,
+                                              );
+                                            } else {
+                                              selectedServices[category]!
+                                                  .remove(subService);
+                                            }
+                                          });
+                                        },
+                                        title: Text(
+                                          subService.replaceAll('_', ' '),
+                                          style: GoogleFonts.montserrat(
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        controlAffinity:
+                                            ListTileControlAffinity.leading,
+                                      );
+                                    }).toList(),
+                              );
+                            },
+                          ),
+                        ),
+                        if (selectedServices.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              '${selectedServices.values.fold<int>(0, (sum, services) => sum + services.length)} service(s) selected',
+                              style: GoogleFonts.montserrat(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed:
+                          selectedServices.isEmpty
+                              ? null
+                              : () async {
+                                Navigator.of(context).pop();
+                                await _assignMultipleServices(
+                                  shop,
+                                  selectedServices,
+                                );
+                              },
+                      child: const Text('Add Selected'),
+                    ),
+                  ],
+                ),
+          ),
+    );
+  }
+
+  Future<void> _assignMultipleServices(
+    RepairShop shop,
+    Map<String, Set<String>> selectedServices,
+  ) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Adding services...'),
+                ],
+              ),
+            ),
+      );
+
+      // Update the shop's sub-services
+      Map<String, List<String>> updatedSubServices = Map.from(shop.subServices);
+
+      for (final entry in selectedServices.entries) {
+        final category = entry.key;
+        final services = entry.value;
+
+        if (!updatedSubServices.containsKey(category)) {
+          updatedSubServices[category] = [];
+        }
+
+        for (final service in services) {
+          if (!updatedSubServices[category]!.contains(service)) {
+            updatedSubServices[category]!.add(service);
+          }
+        }
+      }
+
+      // Update in Firestore
+      await _firestore.collection('shops').doc(shop.id).update({
+        'subServices': updatedSubServices,
+      });
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Calculate total services added
+      final totalServices = selectedServices.values.fold<int>(
+        0,
+        (sum, services) => sum + services.length,
+      );
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$totalServices service(s) added to "${shop.name}"'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error adding services: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      appLog('Error adding multiple services: $e');
+    }
+  }
+
+  void _showCoordinateEditor(RepairShop shop, String coordinateType) {
+    final TextEditingController coordinateController = TextEditingController();
+    final String currentValue =
+        coordinateType == 'latitude'
+            ? shop.latitude.toStringAsFixed(6)
+            : shop.longitude.toStringAsFixed(6);
+
+    coordinateController.text = currentValue;
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              'Edit ${coordinateType.toUpperCase()} for ${shop.name}',
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Current ${coordinateType}: $currentValue',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: coordinateController,
+                  decoration: InputDecoration(
+                    labelText: 'New ${coordinateType.toUpperCase()}',
+                    hintText:
+                        coordinateType == 'latitude' ? '13.7563' : '100.5018',
+                    border: const OutlineInputBorder(),
+                    helperText:
+                        coordinateType == 'latitude'
+                            ? 'Enter latitude (e.g., 13.7563 for Bangkok)'
+                            : 'Enter longitude (e.g., 100.5018 for Bangkok)',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Format: Decimal degrees (e.g., 13.7563, 100.5018)',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 10,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final newValue = coordinateController.text.trim();
+                  if (newValue.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter a valid coordinate'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  final double? parsedValue = double.tryParse(newValue);
+                  if (parsedValue == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter a valid number'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  // Validate coordinate ranges
+                  if (coordinateType == 'latitude' &&
+                      (parsedValue < -90 || parsedValue > 90)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Latitude must be between -90 and 90 degrees',
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (coordinateType == 'longitude' &&
+                      (parsedValue < -180 || parsedValue > 180)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Longitude must be between -180 and 180 degrees',
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
                   Navigator.of(context).pop();
-                  // TODO: Implement delete shop functionality
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Delete shop: ${shop.name}')),
+                  await _updateCoordinate(shop, coordinateType, parsedValue);
+                },
+                child: const Text('Update'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _updateCoordinate(
+    RepairShop shop,
+    String coordinateType,
+    double newValue,
+  ) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Updating coordinate...'),
+                ],
+              ),
+            ),
+      );
+
+      // Update the coordinate in Firestore
+      final updateData =
+          coordinateType == 'latitude'
+              ? {'latitude': newValue}
+              : {'longitude': newValue};
+
+      await _firestore.collection('shops').doc(shop.id).update(updateData);
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${coordinateType.toUpperCase()} updated for "${shop.name}"',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating ${coordinateType}: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      appLog('Error updating coordinate: $e');
+    }
+  }
+
+  void _showNameEditor(RepairShop shop) {
+    final TextEditingController nameController = TextEditingController();
+    nameController.text = shop.name;
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Edit Shop Name'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Current name: ${shop.name}',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'New Shop Name',
+                    hintText: 'Enter shop name',
+                    border: OutlineInputBorder(),
+                    helperText: 'Enter the complete shop name',
+                  ),
+                  maxLength: 100,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final newName = nameController.text.trim();
+                  if (newName.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter a valid shop name'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (newName.length < 2) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Shop name must be at least 2 characters long',
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  Navigator.of(context).pop();
+                  await _updateShopName(shop, newName);
+                },
+                child: const Text('Update'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showAddressEditor(RepairShop shop) {
+    final TextEditingController addressController = TextEditingController();
+    addressController.text = shop.address;
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Edit Address for ${shop.name}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Current address: ${shop.address}',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: addressController,
+                  decoration: const InputDecoration(
+                    labelText: 'New Address',
+                    hintText: 'Enter complete address',
+                    border: OutlineInputBorder(),
+                    helperText: 'Enter the full shop address',
+                  ),
+                  maxLines: 3,
+                  maxLength: 200,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final newAddress = addressController.text.trim();
+                  if (newAddress.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please enter a valid address'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (newAddress.length < 5) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Address must be at least 5 characters long',
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  Navigator.of(context).pop();
+                  await _updateShopAddress(shop, newAddress);
+                },
+                child: const Text('Update'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _updateShopName(RepairShop shop, String newName) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Updating shop name...'),
+                ],
+              ),
+            ),
+      );
+
+      // Update the shop name in Firestore
+      await _firestore.collection('shops').doc(shop.id).update({
+        'name': newName,
+      });
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Shop name updated to "$newName"'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating shop name: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      appLog('Error updating shop name: $e');
+    }
+  }
+
+  Future<void> _updateShopAddress(RepairShop shop, String newAddress) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Updating address...'),
+                ],
+              ),
+            ),
+      );
+
+      // Update the shop address in Firestore
+      await _firestore.collection('shops').doc(shop.id).update({
+        'address': newAddress,
+      });
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Address updated for "${shop.name}"'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating address: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      appLog('Error updating address: $e');
+    }
+  }
+
+  Future<void> _uploadCoverPhoto(RepairShop shop) async {
+    try {
+      // Pick image
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Uploading photo...'),
+                ],
+              ),
+            ),
+      );
+
+      // Read image bytes
+      final Uint8List imageBytes = await image.readAsBytes();
+
+      // Compress image for web
+      Uint8List compressedBytes = imageBytes;
+      if (kIsWeb) {
+        compressedBytes = await FlutterImageCompress.compressWithList(
+          imageBytes,
+          minHeight: 800,
+          minWidth: 600,
+          quality: 85,
+        );
+      }
+
+      // Upload to Firebase Storage
+      final String fileName =
+          'shop_${shop.id}_cover_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final Reference storageRef = FirebaseStorage.instance
+          .ref()
+          .child('shop_photos')
+          .child(fileName);
+
+      final UploadTask uploadTask = storageRef.putData(compressedBytes);
+      final TaskSnapshot snapshot = await uploadTask;
+      final String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      // Update shop with new cover photo
+      List<String> updatedPhotos = List.from(shop.photos);
+      if (updatedPhotos.isNotEmpty) {
+        // Replace the first photo (cover image)
+        updatedPhotos[0] = downloadUrl;
+      } else {
+        // Add as first photo if no photos exist
+        updatedPhotos.insert(0, downloadUrl);
+      }
+
+      await _firestore.collection('shops').doc(shop.id).update({
+        'photos': updatedPhotos,
+      });
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Cover photo updated for "${shop.name}"'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading photo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      appLog('Error uploading cover photo: $e');
+    }
+  }
+
+  void _showPhotoOptions(RepairShop shop) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Photo Options for ${shop.name}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (shop.photos.isNotEmpty) ...[
+                  Container(
+                    width: 200,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        shop.photos.first,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            color: Colors.grey[200],
+                            child: const Icon(
+                              Icons.image_not_supported,
+                              size: 40,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Current cover photo',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: Colors.blue),
+                  title: const Text('Upload New Cover Photo'),
+                  subtitle: const Text('Select from gallery'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _uploadCoverPhoto(shop);
+                  },
+                ),
+                if (shop.photos.isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.visibility, color: Colors.green),
+                    title: const Text('View All Photos'),
+                    subtitle: Text('${shop.photos.length} photos'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _viewAllPhotos(shop);
+                    },
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _viewAllPhotos(RepairShop shop) {
+    if (shop.photos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No photos available for this shop'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Photos for ${shop.name}'),
+            content: SizedBox(
+              width: 400,
+              height: 300,
+              child: ListView.builder(
+                itemCount: shop.photos.length,
+                itemBuilder: (context, index) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.network(
+                              shop.photos[index],
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[200],
+                                  child: const Icon(
+                                    Icons.image_not_supported,
+                                    size: 20,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Photo ${index + 1}',
+                                style: GoogleFonts.montserrat(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (index == 0)
+                                Text(
+                                  'Cover Photo',
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 12,
+                                    color: Colors.green[600],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _deleteShop(RepairShop shop) async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Shop'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Are you sure you want to delete "${shop.name}"?'),
+                const SizedBox(height: 8),
+                const Text(
+                  'This action cannot be undone. All shop data, reviews, and photos will be permanently deleted.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.red,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
                 child: const Text('Delete'),
               ),
             ],
           ),
     );
+
+    if (confirmed != true) {
+      return; // User cancelled
+    }
+
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => const AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Deleting shop...'),
+                ],
+              ),
+            ),
+      );
+
+      // Delete the shop document from Firestore
+      await _firestore.collection('shops').doc(shop.id).delete();
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Shop "${shop.name}" deleted successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting shop: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      appLog('Error deleting shop: $e');
+    }
   }
 
   Future<void> _importFromExcel() async {

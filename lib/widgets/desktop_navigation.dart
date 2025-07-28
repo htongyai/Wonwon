@@ -202,6 +202,13 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
                         'profile',
                         _isSidebarCollapsed,
                       ),
+                      _buildNavItem(
+                        context,
+                        4,
+                        FontAwesomeIcons.comments,
+                        'forum',
+                        _isSidebarCollapsed,
+                      ),
                       // Admin section
                       if (_isAdmin) ...[
                         const SizedBox(height: 20),
@@ -234,7 +241,7 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
                         // Dashboard option
                         _buildNavItem(
                           context,
-                          4,
+                          5,
                           FontAwesomeIcons.chartLine,
                           'dashboard',
                           _isSidebarCollapsed,
@@ -242,7 +249,7 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
                         // Manage Shops option
                         _buildNavItem(
                           context,
-                          5,
+                          6,
                           FontAwesomeIcons.store,
                           'manage_shops',
                           _isSidebarCollapsed,
@@ -250,7 +257,7 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
                         // Manage Users option
                         _buildNavItem(
                           context,
-                          6,
+                          7,
                           FontAwesomeIcons.users,
                           'manage_users',
                           _isSidebarCollapsed,
@@ -258,7 +265,7 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
                         // Unapprove Pages option
                         _buildNavItem(
                           context,
-                          7,
+                          8,
                           FontAwesomeIcons.clock,
                           'unapprove_pages',
                           _isSidebarCollapsed,
@@ -266,7 +273,7 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
                         // Reports option
                         _buildNavItem(
                           context,
-                          8,
+                          9,
                           FontAwesomeIcons.chartBar,
                           'reports',
                           _isSidebarCollapsed,
