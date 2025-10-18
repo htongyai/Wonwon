@@ -57,6 +57,8 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
 
   Position? _userPosition;
   String? _userDistrict;
+  String _currentLanguage = 'en';
+  bool _locationPermissionDenied = false;
 
   @override
   void onInitState() {

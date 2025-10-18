@@ -37,6 +37,7 @@ class _DesktopSavedLocationsScreenState
   String _searchQuery = '';
   bool _isLoading = true;
   bool _hasError = false;
+  bool _isLoggedIn = false;
 
   @override
   void initState() {

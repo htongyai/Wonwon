@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/services/performance_monitor.dart';
-import 'package:wonwonw2/services/memory_manager.dart';
+import 'package:wonwonw2/services/unified_memory_manager.dart';
 
 class WidgetLifecycleManager {
   static final WidgetLifecycleManager _instance =
@@ -9,7 +9,7 @@ class WidgetLifecycleManager {
   WidgetLifecycleManager._internal();
 
   final PerformanceMonitor _performanceMonitor = PerformanceMonitor();
-  final MemoryManager _memoryManager = MemoryManager();
+  final UnifiedMemoryManager _memoryManager = UnifiedMemoryManager();
   final Map<String, WidgetLifecycleState> _widgetStates = {};
 
   void registerWidget(String key, Widget widget) {

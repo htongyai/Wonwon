@@ -50,6 +50,8 @@ class _EditShopScreenState extends State<EditShopScreen> {
   // Image variables
   Uint8List? _selectedImageBytes;
   List<String> _existingPhotos = [];
+  String? _imageError;
+  bool _isProcessingImage = false;
 
   List<String> _selectedCategories = [];
   final List<String> _availableCategories = [

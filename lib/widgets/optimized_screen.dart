@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/services/performance_monitor.dart';
-import 'package:wonwonw2/services/memory_manager.dart';
+import 'package:wonwonw2/services/unified_memory_manager.dart';
 import 'package:wonwonw2/widgets/error_boundary.dart';
 
 /// Base class for optimized screens with performance monitoring and error handling
@@ -23,7 +23,7 @@ abstract class OptimizedScreen extends StatefulWidget {
 abstract class OptimizedScreenState<T extends OptimizedScreen>
     extends State<T> with AutomaticKeepAliveClientMixin {
   final PerformanceMonitor _performanceMonitor = PerformanceMonitor();
-  final MemoryManager _memoryManager = MemoryManager();
+  final UnifiedMemoryManager _memoryManager = UnifiedMemoryManager();
   bool _isDisposed = false;
   bool _isInitialized = false;
 

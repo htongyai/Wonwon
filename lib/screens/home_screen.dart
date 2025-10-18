@@ -363,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen>
         context,
         e,
         customMessage: 'Failed to refresh. Please try again.',
-        onRetry: _refreshShops,
+        onRetry: _loadShops,
       );
     }
   }
