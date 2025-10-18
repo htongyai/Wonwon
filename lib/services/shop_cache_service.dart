@@ -2,12 +2,13 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/constants/api_constants.dart';
 
 /// Service for caching shop data to reduce Firestore queries
 class ShopCacheService {
   static const String _cacheKey = 'cached_shops';
   static const String _cacheTimestampKey = 'shops_cache_timestamp';
-  static const Duration _cacheValidityDuration = Duration(hours: 1);
+  static const Duration _cacheValidityDuration = ApiConstants.shopCacheDuration;
 
   /// Get cached shops if available and not expired
   static Future<List<RepairShop>?> getCachedShops() async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/constants/api_constants.dart';
 
 /// Centralized error handling utilities
 class ErrorHandler {
@@ -47,17 +48,17 @@ class ErrorHandler {
   /// Get user-friendly error message
   static String _getErrorMessage(dynamic error) {
     if (error.toString().contains('network')) {
-      return 'Network error. Please check your internet connection.';
+      return ApiConstants.networkErrorMessage;
     } else if (error.toString().contains('permission')) {
       return 'Permission denied. Please check your app permissions.';
     } else if (error.toString().contains('timeout')) {
-      return 'Request timed out. Please try again.';
+      return ApiConstants.timeoutErrorMessage;
     } else if (error.toString().contains('not found')) {
-      return 'The requested resource was not found.';
+      return ApiConstants.notFoundErrorMessage;
     } else if (error.toString().contains('unauthorized')) {
-      return 'You are not authorized to perform this action.';
+      return ApiConstants.unauthorizedErrorMessage;
     } else {
-      return 'An unexpected error occurred. Please try again.';
+      return ApiConstants.unknownErrorMessage;
     }
   }
 
