@@ -38,8 +38,6 @@ class _LazyLoadingImageState extends State<LazyLoadingImage> {
   final _memoryManager = UnifiedMemoryManager();
   final _lifecycleManager = WidgetLifecycleManager();
   bool _isVisible = false;
-  bool _isLoaded = false;
-  String? _currentImageUrl;
 
   @override
   void initState() {

@@ -482,7 +482,6 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
   bool _isLoading = true;
   bool _hasError = false;
   String? _errorMessage;
-  int _currentPage = 0;
   bool _hasMoreData = true;
 
   @override

@@ -27,8 +27,6 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
     with SingleTickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   late AnimationController _animationController;
-  late Animation<double> _curveAnimation;
-  bool _isFocused = false;
 
   @override
   void initState() {

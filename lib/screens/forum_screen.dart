@@ -64,7 +64,6 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
 
   List<ForumTopic> _topics = [];
   bool _isLoading = true;
-  bool _isRefreshing = false;
   Stream<List<ForumTopic>>? _topicsStream;
   Timer? _searchDebounceTimer;
 

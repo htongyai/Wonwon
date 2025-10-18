@@ -123,7 +123,6 @@ void main() {
     group('Age Calculation', () {
       test('should calculate age correctly', () {
         final birthDate = DateTime(1990, 1, 1);
-        final currentDate = DateTime(2023, 1, 1);
         // Mock current time for testing
         expect(DateUtils.getAge(birthDate), greaterThan(30));
       });

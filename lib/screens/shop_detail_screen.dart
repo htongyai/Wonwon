@@ -13,7 +13,6 @@ import 'package:wonwonw2/services/content_management_service.dart';
 import 'package:wonwonw2/utils/asset_helpers.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
 import 'package:flutter/services.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
@@ -51,7 +50,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   final ReportService _reportService = ReportService();
   final SavedShopService _savedShopService = SavedShopService();
   final AuthService _authService = AuthService();
-  final ContentManagementService _contentService = ContentManagementService();
 
   RepairShop? _shop;
   bool _isLoadingShop = true;
@@ -66,8 +64,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   bool _isAdmin = false;
   Map<String, bool> _showReplyInput = {};
   Map<String, TextEditingController> _replyControllers = {};
-  Map<String, bool> _expandedReplies = {};
-  Map<String, bool> _userExistsCache = {};
   GoogleMapController? _mapController;
 
   @override
@@ -348,61 +344,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     }
   }
 
-  /// Open maps with directions to the shop
-  Future<void> _openMapsWithDirections() async {
-    // Show loading message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('opening_maps'.tr(context)),
-        duration: const Duration(seconds: 1),
-      ),
-    );
-
-    // Get the shop's coordinates
-    final double latitude = _shop!.latitude;
-    final double longitude = _shop!.longitude;
-
-    // Create Google Maps URL with directions
-    final Uri googleMapsUrl = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=$latitude,$longitude&travelmode=driving',
-    );
-
-    // Create Apple Maps URL for iOS devices
-    final Uri appleMapsUrl = Uri.parse(
-      'https://maps.apple.com/?daddr=$latitude,$longitude&dirflg=d',
-    );
-
-    try {
-      // Try to launch Google Maps first
-      if (await canLaunchUrl(googleMapsUrl)) {
-        await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
-      }
-      // If Google Maps can't be launched, try Apple Maps
-      else if (await canLaunchUrl(appleMapsUrl)) {
-        await launchUrl(appleMapsUrl, mode: LaunchMode.externalApplication);
-      }
-      // If neither can be launched, show error message
-      else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('could_not_open_directions'.tr(context)),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('could_not_open_directions'.tr(context)),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 
   @override
   void onDispose() {
@@ -575,13 +516,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 SizedBox(height: ResponsiveSize.getHeight(6)),
                 _buildContactInfo(),
                 SizedBox(height: ResponsiveSize.getHeight(6)),
-                _buildBusinessInfo(),
+                _buildBusinessInfoSection(),
                 SizedBox(height: ResponsiveSize.getHeight(6)),
-                _buildPaymentMethods(),
+                _buildPaymentMethodsSection(),
                 SizedBox(height: ResponsiveSize.getHeight(6)),
-                _buildFeatures(),
+                _buildFeaturesSection(),
                 SizedBox(height: ResponsiveSize.getHeight(6)),
-                _buildMapLocation(),
+                _buildDesktopMapLocation(),
                 SizedBox(height: ResponsiveSize.getHeight(6)),
                 _buildReviews(),
                 SizedBox(
@@ -1811,12 +1752,10 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     );
   }
 
-
-  // Removed unused desktop methods: _buildDesktopShopInfo, _buildDesktopServices, 
-  // _buildDesktopReviews, _buildDesktopActionCard, _buildDesktopInfoCard, 
+  // Removed unused desktop methods: _buildDesktopShopInfo, _buildDesktopServices,
+  // _buildDesktopReviews, _buildDesktopActionCard, _buildDesktopInfoCard,
   // _buildDesktopContactCard, _buildDesktopHoursCard, _buildDesktopBusinessInfoCard,
   // _buildDesktopPaymentMethodsCard, _buildDesktopFeaturesCard
-
 
   Widget _buildShopInfo() {
     return Column(
@@ -1867,10 +1806,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         if (_shop!.area.isNotEmpty) ...[
           Text(
             _shop!.area,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
         ],
@@ -1914,10 +1850,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.grey[200]!),
           ),
-          child: Text(
-            _shop!.address,
-            style: const TextStyle(fontSize: 16),
-          ),
+          child: Text(_shop!.address, style: const TextStyle(fontSize: 16)),
         ),
       ],
     );
@@ -1972,20 +1905,26 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                        color: isToday ? AppConstants.primaryColor : Colors.grey[700],
+                        color:
+                            isToday
+                                ? AppConstants.primaryColor
+                                : Colors.grey[700],
                       ),
                     ),
                     Text(
                       HoursFormatter.formatHours(hours, context),
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                        color: isToday
-                            ? AppConstants.primaryColor
-                            : (hours != null
-                                ? Colors.grey[800]
-                                : Colors.grey[500]),
-                        fontStyle: hours == null ? FontStyle.italic : FontStyle.normal,
+                        fontWeight:
+                            isToday ? FontWeight.bold : FontWeight.normal,
+                        color:
+                            isToday
+                                ? AppConstants.primaryColor
+                                : (hours != null
+                                    ? Colors.grey[800]
+                                    : Colors.grey[500]),
+                        fontStyle:
+                            hours == null ? FontStyle.italic : FontStyle.normal,
                       ),
                     ),
                   ],
@@ -2004,36 +1943,31 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       if (shop.phoneNumber != null && shop.phoneNumber!.isNotEmpty)
         InfoRow(
           icon: Icons.phone,
-          label: 'phone_label'.tr(context),
-          value: shop.phoneNumber!,
+          text: '${'phone_label'.tr(context)}: ${shop.phoneNumber!}',
           onTap: () => _launchUrl('tel:${shop.phoneNumber}'),
         ),
       if (shop.facebookPage != null && shop.facebookPage!.isNotEmpty)
         InfoRow(
           icon: Icons.facebook,
-          label: 'facebook_label'.tr(context),
-          value: 'Facebook Page',
+          text: '${'facebook_label'.tr(context)}: Facebook Page',
           onTap: () => _launchUrl(shop.facebookPage!),
         ),
       if (shop.instagramPage != null && shop.instagramPage!.isNotEmpty)
         InfoRow(
           icon: Icons.camera_alt,
-          label: 'instagram_label'.tr(context),
-          value: 'Instagram',
+          text: '${'instagram_label'.tr(context)}: Instagram',
           onTap: () => _launchUrl(shop.instagramPage!),
         ),
       if (shop.lineId != null && shop.lineId!.isNotEmpty)
         InfoRow(
           icon: Icons.chat,
-          label: 'line_label'.tr(context),
-          value: 'Line: ${shop.lineId}',
+          text: '${'line_label'.tr(context)}: Line: ${shop.lineId}',
           onTap: () => _launchUrl('https://line.me/ti/p/${shop.lineId}'),
         ),
       if (shop.otherContacts != null && shop.otherContacts!.isNotEmpty)
         InfoRow(
           icon: Icons.contact_phone,
-          label: 'other_contacts_label'.tr(context),
-          value: shop.otherContacts!,
+          text: '${'other_contacts_label'.tr(context)}: ${shop.otherContacts!}',
           onTap: () => _launchUrl('tel:${shop.otherContacts}'),
         ),
     ];
@@ -2063,9 +1997,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
             border: Border.all(color: Colors.grey[200]!),
           ),
           padding: const EdgeInsets.all(16),
-          child: Column(
-            children: info.map((item) => item).toList(),
-          ),
+          child: Column(children: info.map((item) => item).toList()),
         ),
       ],
     );
@@ -2102,7 +2034,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           _buildNoReviews()
         else
           Column(
-            children: _reviews.take(3).map((review) => _buildReviewItem(review)).toList(),
+            children:
+                _reviews
+                    .take(3)
+                    .map((review) => _buildReviewItem(review))
+                    .toList(),
           ),
         if (_reviews.length > 3)
           TextButton(
@@ -2157,7 +2093,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 radius: 20,
                 backgroundColor: Colors.grey[300],
                 child: Text(
-                  review.userName.isNotEmpty ? review.userName[0].toUpperCase() : 'U',
+                  review.userName.isNotEmpty
+                      ? review.userName[0].toUpperCase()
+                      : 'U',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -2170,7 +2108,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      review.userName.isNotEmpty ? review.userName : 'Anonymous',
+                      review.userName.isNotEmpty
+                          ? review.userName
+                          : 'Anonymous',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -2178,10 +2118,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                     ),
                     Text(
                       _formatDate(review.createdAt),
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                   ],
                 ),
@@ -2198,10 +2135,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            review.comment,
-            style: const TextStyle(fontSize: 14),
-          ),
+          Text(review.comment, style: const TextStyle(fontSize: 14)),
           if (review.replies.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
@@ -2211,46 +2145,51 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
-                children: review.replies.map((reply) {
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: Colors.grey[400],
-                          child: Text(
-                            reply.userName.isNotEmpty ? reply.userName[0].toUpperCase() : 'U',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                reply.userName.isNotEmpty ? reply.userName : 'Anonymous',
+                children:
+                    review.replies.map((reply) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor: Colors.grey[400],
+                              child: Text(
+                                reply.userName.isNotEmpty
+                                    ? reply.userName[0].toUpperCase()
+                                    : 'U',
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                   fontSize: 12,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              Text(
-                                reply.comment,
-                                style: const TextStyle(fontSize: 12),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    reply.userName.isNotEmpty
+                                        ? reply.userName
+                                        : 'Anonymous',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    reply.comment,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
               ),
             ),
           ],
@@ -2259,46 +2198,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     );
   }
 
-  void _submitReply(Review review) async {
-    if (!_isLoggedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('please_login_to_reply'.tr(context)),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final replyText = _replyControllers[review.id]?.text.trim();
-    if (replyText == null || replyText.isEmpty) return;
-
-    try {
-      final user = FirebaseAuth.instance.currentUser!;
-      final reply = ReviewReply(
-        id: '',
-        reviewId: review.id,
-        userId: user.uid,
-        userName: user.displayName ?? 'Anonymous',
-        comment: replyText,
-        createdAt: DateTime.now(),
-      );
-
-      await _reviewService.addReply(reply);
-      _replyControllers[review.id]?.clear();
-      setState(() {
-        _showReplyInput[review.id] = false;
-      });
-      _loadReviews();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('error_adding_reply'.tr(context)),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 
   void _showAddReviewDialog() async {
     if (!_isLoggedIn) {
@@ -2313,64 +2212,69 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
     final rating = await showDialog<int>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('add_review'.tr(context)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('select_rating'.tr(context)),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (i) {
-                return IconButton(
-                  icon: Icon(
-                    Icons.star,
-                    color: i < 3 ? Colors.amber : Colors.grey[300],
-                  ),
-                  onPressed: () => Navigator.pop(context, i + 1),
-                );
-              }),
+      builder:
+          (context) => AlertDialog(
+            title: Text('add_review'.tr(context)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('select_rating'.tr(context)),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    return IconButton(
+                      icon: Icon(
+                        Icons.star,
+                        color: i < 3 ? Colors.amber : Colors.grey[300],
+                      ),
+                      onPressed: () => Navigator.pop(context, i + 1),
+                    );
+                  }),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('cancel'.tr(context)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('cancel'.tr(context)),
+              ),
+            ],
           ),
-        ],
-      ),
     );
 
     if (rating == null) return;
 
-    final comment = await showDialog<String>(
+    String? comment;
+    final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('add_comment'.tr(context)),
-        content: TextField(
-          decoration: InputDecoration(
-            hintText: 'enter_comment'.tr(context),
-            border: const OutlineInputBorder(),
+      builder:
+          (context) => AlertDialog(
+            title: Text('add_comment'.tr(context)),
+            content: TextField(
+              decoration: InputDecoration(
+                hintText: 'enter_comment'.tr(context),
+                border: const OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              onChanged: (value) => comment = value,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('cancel'.tr(context)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, comment),
+                child: Text('submit'.tr(context)),
+              ),
+            ],
           ),
-          maxLines: 3,
-          onChanged: (value) => comment = value,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('cancel'.tr(context)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, comment),
-            child: Text('submit'.tr(context)),
-          ),
-        ],
-      ),
     );
+    
+    comment = result;
 
-    if (comment == null || comment.isEmpty) return;
+    if (comment == null || comment!.isEmpty) return;
 
     try {
       final user = FirebaseAuth.instance.currentUser!;
@@ -2379,8 +2283,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         shopId: widget.shopId,
         userId: user.uid,
         userName: user.displayName ?? 'Anonymous',
-        rating: rating,
-        comment: comment,
+        rating: rating.toDouble(),
+        comment: comment!,
         createdAt: DateTime.now(),
         replies: [],
       );
@@ -2406,28 +2310,30 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   void _showReportDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('report_shop'.tr(context)),
-        content: Text('report_shop_message'.tr(context)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('cancel'.tr(context)),
+      builder:
+          (context) => AlertDialog(
+            title: Text('report_shop'.tr(context)),
+            content: Text('report_shop_message'.tr(context)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('cancel'.tr(context)),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) => ReportFormScreen(shopId: widget.shopId),
+                    ),
+                  );
+                },
+                child: Text('report'.tr(context)),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ReportFormScreen(shopId: widget.shopId),
-                ),
-              );
-            },
-            child: Text('report'.tr(context)),
-          ),
-        ],
-      ),
     );
   }
 
@@ -2442,18 +2348,21 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     return shortKeys[weekday - 1]; // weekday is 1-7, array is 0-6
   }
 
-  Widget _buildAdditionalInfo() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildBusinessInfo(),
-        const SizedBox(height: 16),
-        _buildPaymentMethods(),
-        const SizedBox(height: 16),
-        _buildFeatures(),
-      ],
-    );
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
   }
+
 
   Widget _buildBottomBar() {
     return Container(
@@ -2482,7 +2391,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 style: const TextStyle(color: Colors.white),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isSaved ? Colors.orange : AppConstants.primaryColor,
+                backgroundColor:
+                    _isSaved ? Colors.orange : AppConstants.primaryColor,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -2538,60 +2448,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     );
   }
 
-  // Add this function to normalize payment method keys
-  String _normalizePaymentMethod(String method) {
-    final m = method.toLowerCase();
-    if (m.contains('credit') || m.contains('card')) return 'credit_card';
-    if (m.contains('cash')) return 'cash';
-    if (m.contains('qr')) return 'qr_code';
-    if (m.contains('linepay')) return 'line_pay';
-    return m;
-  }
 
-  // Delete review method
-  void _deleteReview(Review review) async {
-    if (!_isLoggedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('please_login_to_delete'.tr(context)),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final user = FirebaseAuth.instance.currentUser!;
-    if (review.userId != user.uid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('can_only_delete_own_review'.tr(context)),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    try {
-      await _reviewService.deleteReview(review.id);
-      _loadReviews();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('review_deleted'.tr(context)),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('error_deleting_review'.tr(context)),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // Removed unused desktop methods: _buildDesktopShopInfo, _buildDesktopServices, 
-  // _buildDesktopReviews, _buildDesktopActionCard, _buildDesktopInfoCard, 
+  // Removed unused desktop methods: _buildDesktopShopInfo, _buildDesktopServices,
+  // _buildDesktopReviews, _buildDesktopActionCard, _buildDesktopInfoCard,
   // _buildDesktopContactCard, _buildDesktopHoursCard, _buildDesktopBusinessInfoCard,
   // _buildDesktopPaymentMethodsCard, _buildDesktopFeaturesCard
 
@@ -2610,10 +2469,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           Marker(
             markerId: MarkerId(_shop!.id),
             position: LatLng(_shop!.latitude, _shop!.longitude),
-            infoWindow: InfoWindow(
-              title: _shop!.name,
-              snippet: _shop!.address,
-            ),
+            infoWindow: InfoWindow(title: _shop!.name, snippet: _shop!.address),
           ),
         },
       ),

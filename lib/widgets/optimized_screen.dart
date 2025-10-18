@@ -20,8 +20,8 @@ abstract class OptimizedScreen extends StatefulWidget {
   OptimizedScreenState createState();
 }
 
-abstract class OptimizedScreenState<T extends OptimizedScreen>
-    extends State<T> with AutomaticKeepAliveClientMixin {
+abstract class OptimizedScreenState<T extends OptimizedScreen> extends State<T>
+    with AutomaticKeepAliveClientMixin {
   final PerformanceMonitor _performanceMonitor = PerformanceMonitor();
   final UnifiedMemoryManager _memoryManager = UnifiedMemoryManager();
   bool _isDisposed = false;
@@ -41,7 +41,9 @@ abstract class OptimizedScreenState<T extends OptimizedScreen>
     _isInitialized = true;
 
     if (widget.enablePerformanceMonitoring) {
-      _performanceMonitor.startOperation('${widget.debugLabel ?? widget.runtimeType}_init');
+      _performanceMonitor.startOperation(
+        '${widget.debugLabel ?? widget.runtimeType}_init',
+      );
     }
 
     if (widget.enableMemoryManagement) {
@@ -60,7 +62,9 @@ abstract class OptimizedScreenState<T extends OptimizedScreen>
     _isDisposed = true;
 
     if (widget.enablePerformanceMonitoring) {
-      _performanceMonitor.endOperation('${widget.debugLabel ?? widget.runtimeType}_init');
+      _performanceMonitor.endOperation(
+        '${widget.debugLabel ?? widget.runtimeType}_init',
+      );
     }
 
     if (widget.enableMemoryManagement) {
@@ -77,7 +81,9 @@ abstract class OptimizedScreenState<T extends OptimizedScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isDisposed && widget.enablePerformanceMonitoring) {
-      _performanceMonitor.startOperation('${widget.debugLabel ?? widget.runtimeType}_dependencies');
+      _performanceMonitor.startOperation(
+        '${widget.debugLabel ?? widget.runtimeType}_dependencies',
+      );
     }
   }
 
@@ -90,11 +96,14 @@ abstract class OptimizedScreenState<T extends OptimizedScreen>
     }
 
     if (widget.enablePerformanceMonitoring) {
-      _performanceMonitor.startOperation('${widget.debugLabel ?? widget.runtimeType}_build');
+      _performanceMonitor.startOperation(
+        '${widget.debugLabel ?? widget.runtimeType}_build',
+      );
     }
 
     return ErrorBoundary(
-      fallbackBuilder: (context, error, stackTrace) => _buildErrorWidget(error, stackTrace),
+      fallbackBuilder:
+          (context, error, stackTrace) => _buildErrorWidget(error, stackTrace),
       child: buildOptimizedScreen(context),
     );
   }
@@ -104,13 +113,17 @@ abstract class OptimizedScreenState<T extends OptimizedScreen>
     if (_isDisposed) return;
 
     if (widget.enablePerformanceMonitoring) {
-      _performanceMonitor.startOperation('${widget.debugLabel ?? widget.runtimeType}_setState');
+      _performanceMonitor.startOperation(
+        '${widget.debugLabel ?? widget.runtimeType}_setState',
+      );
     }
 
     super.setState(fn);
 
     if (widget.enablePerformanceMonitoring) {
-      _performanceMonitor.endOperation('${widget.debugLabel ?? widget.runtimeType}_setState');
+      _performanceMonitor.endOperation(
+        '${widget.debugLabel ?? widget.runtimeType}_setState',
+      );
     }
   }
 
@@ -118,8 +131,12 @@ abstract class OptimizedScreenState<T extends OptimizedScreen>
   void didUpdateWidget(covariant T oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_isDisposed && widget.enablePerformanceMonitoring) {
-      _performanceMonitor.startOperation('${widget.debugLabel ?? widget.runtimeType}_update');
-      _performanceMonitor.endOperation('${widget.debugLabel ?? widget.runtimeType}_update');
+      _performanceMonitor.startOperation(
+        '${widget.debugLabel ?? widget.runtimeType}_update',
+      );
+      _performanceMonitor.endOperation(
+        '${widget.debugLabel ?? widget.runtimeType}_update',
+      );
     }
   }
 
@@ -141,25 +158,21 @@ abstract class OptimizedScreenState<T extends OptimizedScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.error_outline,
-                color: Colors.red,
-                size: 64,
-              ),
+              const Icon(Icons.error_outline, color: Colors.red, size: 64),
               const SizedBox(height: 16),
               Text(
                 'Something went wrong',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.red,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineSmall?.copyWith(color: Colors.red),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 'We\'re sorry, but something went wrong. Please try again later.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -194,7 +207,10 @@ abstract class OptimizedScreenState<T extends OptimizedScreen>
       }
     } catch (e) {
       if (!_isDisposed && mounted) {
-        _performanceMonitor.recordError('${widget.debugLabel ?? widget.runtimeType}_async', e);
+        _performanceMonitor.recordError(
+          '${widget.debugLabel ?? widget.runtimeType}_async',
+          e,
+        );
       }
     }
     return null;
@@ -202,7 +218,8 @@ abstract class OptimizedScreenState<T extends OptimizedScreen>
 }
 
 /// Optimized screen with loading states
-abstract class OptimizedLoadingScreen<T extends OptimizedScreen> extends OptimizedScreenState<T> {
+abstract class OptimizedLoadingScreen<T extends OptimizedScreen>
+    extends OptimizedScreenState<T> {
   bool _isLoading = false;
   String? _loadingMessage;
   dynamic _error;
@@ -270,9 +287,9 @@ abstract class OptimizedLoadingScreen<T extends OptimizedScreen> extends Optimiz
               const SizedBox(height: 16),
               Text(
                 _loadingMessage!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -291,25 +308,21 @@ abstract class OptimizedLoadingScreen<T extends OptimizedScreen> extends Optimiz
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.error_outline,
-                color: Colors.red,
-                size: 64,
-              ),
+              const Icon(Icons.error_outline, color: Colors.red, size: 64),
               const SizedBox(height: 16),
               Text(
                 'Error',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.red,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.headlineSmall?.copyWith(color: Colors.red),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 _errorMessage ?? 'An unexpected error occurred',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -330,4 +343,3 @@ abstract class OptimizedLoadingScreen<T extends OptimizedScreen> extends Optimiz
   /// Override this method for retry logic
   void onRetry() {}
 }
-

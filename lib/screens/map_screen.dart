@@ -3,7 +3,6 @@ import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'package:wonwonw2/services/location_service.dart';
 import 'package:wonwonw2/services/service_providers.dart';

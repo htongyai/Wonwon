@@ -243,7 +243,6 @@ class AdvancedSearchService extends ChangeNotifier {
 
     for (final shop in shops) {
       bool isExactMatch = false;
-      bool isFuzzyMatch = false;
 
       // Check for exact matches first
       if (_hasExactMatch(queryLower, shop)) {

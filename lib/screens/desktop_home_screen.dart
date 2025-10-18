@@ -723,7 +723,6 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
     await _loadShops();
   }
 
-
   Widget _buildLoadingScreen() {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -947,7 +946,6 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
         return FontAwesomeIcons.screwdriverWrench;
     }
   }
-
 
   Widget _buildSubServiceItem(
     String subServiceId,
