@@ -35,8 +35,8 @@ class LazyLoadingImage extends StatefulWidget {
 }
 
 class _LazyLoadingImageState extends State<LazyLoadingImage> {
-  final _memoryManager = UnifiedMemoryManager();
-  final _lifecycleManager = WidgetLifecycleManager();
+  final UnifiedMemoryManager _memoryManager = UnifiedMemoryManager();
+  final WidgetLifecycleManager _lifecycleManager = WidgetLifecycleManager();
   bool _isVisible = false;
 
   @override
@@ -68,8 +68,7 @@ class _LazyLoadingImageState extends State<LazyLoadingImage> {
       _lifecycleManager.onWidgetUpdate(widget.lifecycleKey!);
     }
     if (widget.imageUrl != oldWidget.imageUrl) {
-      _isLoaded = false;
-      _currentImageUrl = widget.imageUrl;
+      // Image URL changed, will reload
     }
   }
 
@@ -110,7 +109,6 @@ class _LazyLoadingImageState extends State<LazyLoadingImage> {
                         widget.errorWidget ??
                         const Icon(Icons.error_outline, color: Colors.red),
                 imageBuilder: (context, imageProvider) {
-                  _isLoaded = true;
                   return Image(
                     image: imageProvider,
                     fit: widget.fit,

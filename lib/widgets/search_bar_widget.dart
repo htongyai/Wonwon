@@ -36,10 +36,7 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
       duration: const Duration(milliseconds: 300),
     );
 
-    _curveAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
+    // Animation setup
   }
 
   @override
@@ -50,9 +47,6 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
   }
 
   void _onFocusChange(bool isFocused) {
-    setState(() {
-      _isFocused = isFocused;
-    });
     if (isFocused) {
       _animationController.forward();
     } else if (_controller.text.isEmpty) {

@@ -339,7 +339,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     }
   }
 
-
   @override
   void onDispose() {
     // Clean up map controller (not managed by mixin)
@@ -1481,10 +1480,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           ),
         ),
         const SizedBox(height: 12),
-        _buildInfoItem(
-          'Price Range',
-          _shop!.priceRange.toString(),
-        ),
+        _buildInfoItem('Price Range', _shop!.priceRange.toString()),
         _buildInfoItem(
           'Duration',
           _shop!.durationMinutes > 0
@@ -2193,7 +2189,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     );
   }
 
-
   void _showAddReviewDialog() async {
     if (!_isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2266,7 +2261,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
             ],
           ),
     );
-    
+
     comment = result;
 
     if (comment == null || comment!.isEmpty) return;
@@ -2346,7 +2341,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays == 0) {
       return 'Today';
     } else if (difference.inDays == 1) {
@@ -2357,7 +2352,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       return '${date.day}/${date.month}/${date.year}';
     }
   }
-
 
   Widget _buildBottomBar() {
     return Container(
@@ -2442,7 +2436,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       ),
     );
   }
-
 
   // Removed unused desktop methods: _buildDesktopShopInfo, _buildDesktopServices,
   // _buildDesktopReviews, _buildDesktopActionCard, _buildDesktopInfoCard,

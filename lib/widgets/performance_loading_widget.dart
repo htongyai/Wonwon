@@ -493,7 +493,6 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
   Future<void> _loadData({bool refresh = false}) async {
     if (refresh) {
       setState(() {
-        _currentPage = 0;
         _items = [];
         _hasMoreData = true;
       });
@@ -518,7 +517,6 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
           }
           _isLoading = false;
           _hasMoreData = newItems.length >= widget.pageSize;
-          _currentPage++;
         });
       }
     } catch (e) {
