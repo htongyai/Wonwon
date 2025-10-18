@@ -1,5 +1,6 @@
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/services/firebase_shop_service.dart';
+import 'package:wonwonw2/services/shop_cache_service.dart';
 import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -12,7 +13,14 @@ class ShopService {
   // Get all approved shops
   Future<List<RepairShop>> getAllShops() async {
     try {
-      appLog('Querying Firestore for all approved shops...');
+      // Try to get from cache first
+      final cachedShops = await ShopCacheService.getCachedShops();
+      if (cachedShops != null) {
+        appLog('Returning ${cachedShops.length} shops from cache');
+        return cachedShops;
+      }
+
+      appLog('Cache miss - querying Firestore for all approved shops...');
 
       // Get the shops collection reference
       final CollectionReference shopsCollection = FirebaseFirestore.instance
@@ -73,9 +81,11 @@ class ShopService {
       }
 
       final uniqueShopsList = uniqueShops.values.toList();
-      appLog(
-        'After removing duplicates: ${uniqueShopsList.length} unique shops',
-      );
+      appLog('After removing duplicates: ${uniqueShopsList.length} unique shops');
+
+      // Cache the results
+      await ShopCacheService.cacheShops(uniqueShopsList);
+
       return uniqueShopsList;
     } catch (e) {
       appLog('Error getting all shops: $e');
@@ -121,22 +131,42 @@ class ShopService {
 
   // Add a new shop
   Future<bool> addShop(RepairShop shop) async {
-    return await _firebaseService.addShop(shop);
+    final result = await _firebaseService.addShop(shop);
+    if (result) {
+      // Clear cache when new shop is added
+      await ShopCacheService.clearCache();
+    }
+    return result;
   }
 
   // Update a shop
   Future<bool> updateShop(RepairShop shop) async {
-    return await _firebaseService.updateShop(shop);
+    final result = await _firebaseService.updateShop(shop);
+    if (result) {
+      // Clear cache when shop is updated
+      await ShopCacheService.clearCache();
+    }
+    return result;
   }
 
   // Approve a shop
   Future<bool> approveShop(String shopId) async {
-    return await _firebaseService.approveShop(shopId);
+    final result = await _firebaseService.approveShop(shopId);
+    if (result) {
+      // Clear cache when shop is approved
+      await ShopCacheService.clearCache();
+    }
+    return result;
   }
 
   // Delete a shop
   Future<bool> deleteShop(String shopId) async {
-    return await _firebaseService.deleteShop(shopId);
+    final result = await _firebaseService.deleteShop(shopId);
+    if (result) {
+      // Clear cache when shop is deleted
+      await ShopCacheService.clearCache();
+    }
+    return result;
   }
 
   // Get user-submitted shops (both approved and pending)
