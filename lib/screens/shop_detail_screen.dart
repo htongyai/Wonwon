@@ -1483,7 +1483,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         const SizedBox(height: 12),
         _buildInfoItem(
           'Price Range',
-          _shop!.priceRange?.toString() ?? 'No information',
+          _shop!.priceRange.toString(),
         ),
         _buildInfoItem(
           'Duration',

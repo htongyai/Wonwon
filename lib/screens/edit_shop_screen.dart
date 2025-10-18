@@ -50,8 +50,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
   // Image variables
   Uint8List? _selectedImageBytes;
   List<String> _existingPhotos = [];
-  String? _imageError;
-  bool _isProcessingImage = false;
+  // Removed unused fields: _imageError, _isProcessingImage
 
   List<String> _selectedCategories = [];
   final List<String> _availableCategories = [
@@ -150,7 +149,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
     }
 
     // Other options
-    _requiresPurchase = shop.requiresPurchase ?? false;
+    _requiresPurchase = shop.requiresPurchase;
     _tryOnAreaAvailable = shop.tryOnAreaAvailable ?? false;
     _priceRange = shop.priceRange;
 
@@ -786,8 +785,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
 
       if (image != null) {
         setState(() {
-          _isProcessingImage = true;
-          _imageError = null;
+          // Processing image
         });
 
         Uint8List? compressedImage;
@@ -802,13 +800,11 @@ class _EditShopScreenState extends State<EditShopScreen> {
 
         setState(() {
           _selectedImageBytes = compressedImage;
-          _isProcessingImage = false;
         });
       }
     } catch (e) {
       setState(() {
-        _imageError = 'Error picking image: $e';
-        _isProcessingImage = false;
+        // Error picking image: $e
       });
     }
   }

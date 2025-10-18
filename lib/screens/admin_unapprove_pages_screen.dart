@@ -22,7 +22,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
   List<RepairShop> _filteredShops = [];
   bool _isLoading = true;
   bool _hasError = false;
-  String _searchQuery = '';
+  // Removed unused _searchQuery field
   String _sortBy = 'name';
   bool _sortAscending = true;
 
@@ -61,7 +61,6 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
 
   void _applySearch(String query) {
     setState(() {
-      _searchQuery = query;
       if (query.isEmpty) {
         _filteredShops = _unapprovedShops;
       } else {

@@ -57,8 +57,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
 
   Position? _userPosition;
   String? _userDistrict;
-  String _currentLanguage = 'en';
-  bool _locationPermissionDenied = false;
+  // Removed unused fields: _currentLanguage, _locationPermissionDenied
 
   @override
   void onInitState() {
@@ -75,9 +74,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
 
     AppLocalizationsService().localeStream.listen((locale) async {
       if (mounted) {
-        setState(() {
-          _currentLanguage = locale.languageCode;
-        });
+        // Language change handled by AppLocalizationsService
       }
     });
   }
@@ -126,9 +123,8 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
 
   Future<void> _loadCurrentLanguage() async {
     try {
-      final locale = await AppLocalizationsService.getLocale();
+      await AppLocalizationsService.getLocale();
       setState(() {
-        _currentLanguage = locale.languageCode;
         _isLanguageLoading = false;
       });
       _checkIfAllDataLoaded();
@@ -152,14 +148,14 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
       );
       setState(() {
         _isLocationLoading = false;
-        _locationPermissionDenied = true;
+        // Location permission denied
         _userDistrict = 'Location timeout - showing all shops';
       });
     } catch (e) {
       appLog('Desktop Home Screen: Error getting location: $e');
       setState(() {
         _isLocationLoading = false;
-        _locationPermissionDenied = true;
+        // Location permission denied
         _userDistrict = 'Location unavailable - showing all shops';
       });
     }
@@ -233,7 +229,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
       if (!serviceEnabled) {
         appLog('Desktop Home Screen: Location service disabled');
         setState(() {
-          _locationPermissionDenied = true;
+          // Location permission denied
           _userDistrict = 'Location disabled';
         });
         return;
@@ -248,7 +244,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
         if (permission == LocationPermission.denied) {
           appLog('Desktop Home Screen: Permission denied');
           setState(() {
-            _locationPermissionDenied = true;
+            // Location permission denied
             _userDistrict = 'Location denied';
           });
           return;
@@ -258,7 +254,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
       if (permission == LocationPermission.deniedForever) {
         appLog('Desktop Home Screen: Permission denied forever');
         setState(() {
-          _locationPermissionDenied = true;
+          // Location permission denied
           _userDistrict = 'Location denied forever';
         });
         return;
@@ -947,44 +943,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
     }
   }
 
-  Widget _buildSubServiceItem(
-    String subServiceId,
-    String name,
-    bool isSelected,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _filterShopsBySubService(subServiceId),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color:
-                  isSelected ? AppConstants.primaryColor : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color:
-                    isSelected
-                        ? AppConstants.primaryColor
-                        : Colors.grey.withOpacity(0.3),
-              ),
-            ),
-            child: Text(
-              name,
-              style: GoogleFonts.montserrat(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? Colors.white : AppConstants.darkColor,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // Removed unused method: _buildSubServiceItem
 
   Widget _buildSubServicesHorizontalList() {
     if (_selectedCategoryId == 'all') return const SizedBox.shrink();

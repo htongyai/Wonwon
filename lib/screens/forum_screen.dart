@@ -64,6 +64,7 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
 
   List<ForumTopic> _topics = [];
   bool _isLoading = true;
+  // Removed unused _isRefreshing field
   Stream<List<ForumTopic>>? _topicsStream;
   Timer? _searchDebounceTimer;
 
@@ -95,7 +96,7 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
           setState(() {
             _topics = topics;
             _isLoading = false;
-            _isRefreshing = false;
+            // Refresh complete
           });
         }
       },
@@ -103,7 +104,7 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _isRefreshing = false;
+            // Refresh complete
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -117,9 +118,6 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   }
 
   Future<void> _refreshTopics() async {
-    setState(() {
-      _isRefreshing = true;
-    });
     _loadTopics();
   }
 
