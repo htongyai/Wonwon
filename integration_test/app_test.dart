@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:integration_test/integration_test.dart';
+import 'package:flutter/semantics.dart';
 import 'package:wonwonw2/main.dart' as app;
 
 void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  // Integration test setup
 
   group('App Integration Tests', () {
     testWidgets('App launches and shows home screen', (WidgetTester tester) async {
@@ -18,7 +18,7 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 5));
       
       // Verify home screen elements are present
-      expect(find.text('Wonwonw2'), findsAtLeastOneWidget);
+      expect(find.text('Wonwonw2'), findsWidgets);
     });
 
     testWidgets('Navigation between screens works', (WidgetTester tester) async {
@@ -52,7 +52,7 @@ void main() {
         await tester.pumpAndSettle();
         
         // Verify search was performed
-        expect(find.text('test'), findsAtLeastOneWidget);
+        expect(find.text('test'), findsWidgets);
       }
     });
 
@@ -65,7 +65,7 @@ void main() {
 
       // Verify shop list is displayed
       // This might be empty if no shops are loaded, which is expected
-      expect(find.byType(ListView), findsAtLeastOneWidget);
+      expect(find.byType(ListView), findsWidgets);
     });
 
     testWidgets('Language switching works', (WidgetTester tester) async {
@@ -78,7 +78,7 @@ void main() {
         await tester.pumpAndSettle();
         
         // Verify language changed
-        expect(find.text('ไทย'), findsAtLeastOneWidget);
+        expect(find.text('ไทย'), findsWidgets);
       }
     });
 
@@ -94,12 +94,10 @@ void main() {
 
   group('Performance Tests', () {
     testWidgets('App performance is acceptable', (WidgetTester tester) async {
-      final binding = tester.binding;
-      
       app.main();
       
       // Measure frame rendering time
-      final stopwatch = Stopwatch()..start();
+      final Stopwatch stopwatch = Stopwatch()..start();
       await tester.pumpAndSettle(const Duration(seconds: 10));
       stopwatch.stop();
       
@@ -135,7 +133,7 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
       // Test accessibility features
-      final semantics = tester.binding.pipelineOwner.semanticsOwner;
+      final SemanticsOwner? semantics = tester.binding.pipelineOwner.semanticsOwner;
       expect(semantics, isNotNull);
     });
 
