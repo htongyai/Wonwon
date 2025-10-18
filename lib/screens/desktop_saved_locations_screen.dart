@@ -37,7 +37,7 @@ class _DesktopSavedLocationsScreenState
   String _searchQuery = '';
   bool _isLoading = true;
   bool _hasError = false;
-  bool _isLoggedIn = false;
+  // Removed unused _isLoggedIn field - using AuthStateMixin instead
 
   @override
   void initState() {
@@ -47,10 +47,6 @@ class _DesktopSavedLocationsScreenState
     // Listen for auth state changes
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
       if (mounted) {
-        setState(() {
-          _isLoggedIn = user != null;
-        });
-
         if (user != null) {
           _loadSavedShops();
         } else {
@@ -68,10 +64,6 @@ class _DesktopSavedLocationsScreenState
     final isLoggedIn = await _authService.isLoggedIn();
 
     if (mounted) {
-      setState(() {
-        _isLoggedIn = isLoggedIn;
-      });
-
       if (isLoggedIn) {
         _loadSavedShops();
       } else {

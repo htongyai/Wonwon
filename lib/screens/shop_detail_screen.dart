@@ -9,12 +9,9 @@ import 'package:wonwonw2/services/auth_service.dart';
 import 'package:wonwonw2/services/review_service.dart';
 import 'package:wonwonw2/services/report_service.dart';
 import 'package:wonwonw2/services/saved_shop_service.dart';
-import 'package:wonwonw2/services/content_management_service.dart';
 import 'package:wonwonw2/utils/asset_helpers.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:ui';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wonwonw2/widgets/info_row.dart';
@@ -62,8 +59,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   bool _isLoadingSavedState = true;
   bool _isLoggedIn = false;
   bool _isAdmin = false;
-  Map<String, bool> _showReplyInput = {};
-  Map<String, TextEditingController> _replyControllers = {};
+  // Removed unused fields: _showReplyInput, _replyControllers
   GoogleMapController? _mapController;
 
   @override
@@ -308,8 +304,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           }
         }
       }
-      // Cache for session
-      _userExistsCache = existsMap;
+      // Cache for session (removed _userExistsCache field)
       if (mounted) {
         setState(() {
           _reviews = reviews;
