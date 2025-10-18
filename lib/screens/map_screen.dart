@@ -781,24 +781,4 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   }
 
   /// Launch Google Maps app with current location
-  Future<void> _launchMapsUrl() async {
-    // Use user location if available, otherwise use Bangkok
-    final location = _locationService.currentLatLng ?? bangkokLocation;
-
-    final url = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}',
-    );
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('could_not_open_map'.tr(context)),
-            backgroundColor: mapAccentColor,
-          ),
-        );
-      }
-    }
-  }
 }

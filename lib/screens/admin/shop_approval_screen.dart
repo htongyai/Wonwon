@@ -48,46 +48,6 @@ class _ShopApprovalScreenState extends State<ShopApprovalScreen> {
     }
   }
 
-  Future<void> _updateShopApprovalStatus(RepairShop shop, bool approved) async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      final success = await _shopService.updateShopApprovalStatus(
-        shop.id,
-        approved,
-      );
-
-      if (success) {
-        setState(() {
-          _unapprovedShops.removeWhere((s) => s.id == shop.id);
-          _isLoading = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              approved ? 'Shop approved successfully' : 'Shop rejected',
-            ),
-            backgroundColor: approved ? Colors.green : Colors.red,
-          ),
-        );
-      } else {
-        throw Exception('Failed to update shop status');
-      }
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

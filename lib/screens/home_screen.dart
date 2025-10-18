@@ -18,6 +18,7 @@ import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/utils/error_handler.dart';
 import 'package:wonwonw2/models/repair_sub_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -352,26 +353,17 @@ class _HomeScreenState extends State<HomeScreen>
           _sortShopsByDistance();
         }
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Shop list refreshed'),
-          backgroundColor: AppConstants.primaryColor,
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ErrorHandler.showSuccess(context, 'Shop list refreshed');
     } catch (e) {
       appLog('Error loading shops: $e');
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to refresh. Please try again.'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
+      ErrorHandler.handleError(
+        context,
+        e,
+        customMessage: 'Failed to refresh. Please try again.',
+        onRetry: _refreshShops,
       );
     }
   }

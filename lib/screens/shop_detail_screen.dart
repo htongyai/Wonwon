@@ -3499,8 +3499,12 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     }
   }
 
-  // Desktop-specific widget methods
-  Widget _buildDesktopShopInfo() {
+  // Removed unused desktop methods: _buildDesktopShopInfo, _buildDesktopServices, 
+  // _buildDesktopReviews, _buildDesktopActionCard, _buildDesktopInfoCard, 
+  // _buildDesktopContactCard, _buildDesktopHoursCard, _buildDesktopBusinessInfoCard,
+  // _buildDesktopPaymentMethodsCard, _buildDesktopFeaturesCard
+
+  Widget _buildShopInfo() {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(

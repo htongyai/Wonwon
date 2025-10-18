@@ -242,15 +242,6 @@ class ShopService {
   }
 
   // Private method to save user-submitted shops to SharedPreferences
-  Future<void> _saveUserSubmittedShops(List<RepairShop> shops) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final shopsJson = shops.map((shop) => jsonEncode(shop.toMap())).toList();
-      await prefs.setStringList('user_submitted_shops', shopsJson);
-    } catch (e) {
-      appLog('Error saving user-submitted shops: $e');
-    }
-  }
 
   // Get shop by ID
   Future<RepairShop?> getShopById(String shopId) async {
