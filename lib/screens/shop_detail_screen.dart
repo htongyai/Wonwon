@@ -1811,79 +1811,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     );
   }
 
-  Widget _buildDesktopPhotoGallery() {
-    if (_shop!.photos.isEmpty) {
-      return Container(
-        color: Colors.grey.shade100,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.photo_library_outlined,
-                size: 64,
-                color: Colors.grey.shade400,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No photos available',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Photos (${_shop!.photos.length})',
-            style: GoogleFonts.montserrat(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-                childAspectRatio: 1,
-              ),
-              itemCount: _shop!.photos.length,
-              itemBuilder: (context, index) {
-                return ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: getCachedImage(
-                    imageUrl: _shop!.photos[index],
-                    imageType: ImageType.shop,
-                    priority: MemoryPriority.normal,
-                    fit: BoxFit.cover,
-                    errorWidget: Container(
-                      color: Colors.grey.shade200,
-                      child: Icon(
-                        Icons.image_not_supported,
-                        color: Colors.grey.shade400,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDesktopHeader() {
+  // Removed unused method _buildDesktopHeader
     return Container(
       height: 400, // Increased height for better visual impact
       width: double.infinity,

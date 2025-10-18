@@ -14,6 +14,7 @@ import 'package:wonwonw2/screens/activity_log_screen.dart';
 import 'package:wonwonw2/screens/admin_settings_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 class AdminDashboardMainScreen extends OptimizedScreen {
   const AdminDashboardMainScreen({Key? key}) : super(key: key);
@@ -75,8 +76,8 @@ class _AdminDashboardMainScreenState
   @override
   void onScreenInit() {
     super.onScreenInit();
-    print('=== ADMIN DASHBOARD MAIN SCREEN INIT ===');
-    print('AdminDashboardMainScreen: onScreenInit called');
+    appLog('=== ADMIN DASHBOARD MAIN SCREEN INIT ===');
+    appLog('AdminDashboardMainScreen: onScreenInit called');
     _loadDashboardData();
     _loadUserInfo();
     _loadAppVersion();
@@ -105,13 +106,13 @@ class _AdminDashboardMainScreenState
     try {
       final isAdmin = await _authManager.isAdmin();
       if (!isAdmin) {
-        print('AdminDashboardMainScreen: Access denied - not an admin');
+        appLog('AdminDashboardMainScreen: Access denied - not an admin');
         setError('Access Denied', message: 'You do not have admin privileges');
         return;
       }
-      print('AdminDashboardMainScreen: Admin access confirmed');
+      appLog('AdminDashboardMainScreen: Admin access confirmed');
     } catch (e) {
-      print('AdminDashboardMainScreen: Error checking admin access: $e');
+      appLog('AdminDashboardMainScreen: Error checking admin access: $e');
       setError(
         'Authentication Error',
         message: 'Failed to verify admin privileges',
@@ -125,15 +126,15 @@ class _AdminDashboardMainScreenState
     try {
       // Check admin access
       final isAdmin = await _authManager.isAdmin();
-      print(
+      appLog(
         'AdminDashboardMainScreen: Checking admin access. Is admin? $isAdmin',
       );
       if (!isAdmin) {
-        print('AdminDashboardMainScreen: Access denied - not an admin');
+        appLog('AdminDashboardMainScreen: Access denied - not an admin');
         setError('Access Denied', message: 'You do not have admin privileges');
         return;
       }
-      print(
+      appLog(
         'AdminDashboardMainScreen: Admin access confirmed, loading dashboard...',
       );
 
@@ -159,7 +160,7 @@ class _AdminDashboardMainScreenState
         });
       }
     } catch (e) {
-      print('Error loading user info: $e');
+      appLog('Error loading user info: $e');
     }
   }
 
@@ -172,7 +173,7 @@ class _AdminDashboardMainScreenState
         });
       }
     } catch (e) {
-      print('Error loading app version: $e');
+      appLog('Error loading app version: $e');
     }
   }
 
