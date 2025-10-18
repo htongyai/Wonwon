@@ -7,21 +7,25 @@ void main() {
   // Integration test setup
 
   group('App Integration Tests', () {
-    testWidgets('App launches and shows home screen', (WidgetTester tester) async {
+    testWidgets('App launches and shows home screen', (
+      WidgetTester tester,
+    ) async {
       app.main();
       await tester.pumpAndSettle();
 
       // Verify app launches
       expect(find.byType(MaterialApp), findsOneWidget);
-      
+
       // Wait for initial loading to complete
       await tester.pumpAndSettle(const Duration(seconds: 5));
-      
+
       // Verify home screen elements are present
       expect(find.text('Wonwonw2'), findsWidgets);
     });
 
-    testWidgets('Navigation between screens works', (WidgetTester tester) async {
+    testWidgets('Navigation between screens works', (
+      WidgetTester tester,
+    ) async {
       app.main();
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
@@ -50,7 +54,7 @@ void main() {
       if (find.byType(TextField).evaluate().isNotEmpty) {
         await tester.enterText(find.byType(TextField).first, 'test');
         await tester.pumpAndSettle();
-        
+
         // Verify search was performed
         expect(find.text('test'), findsWidgets);
       }
@@ -76,7 +80,7 @@ void main() {
       if (find.text('ไทย').evaluate().isNotEmpty) {
         await tester.tap(find.text('ไทย'));
         await tester.pumpAndSettle();
-        
+
         // Verify language changed
         expect(find.text('ไทย'), findsWidgets);
       }
@@ -95,12 +99,12 @@ void main() {
   group('Performance Tests', () {
     testWidgets('App performance is acceptable', (WidgetTester tester) async {
       app.main();
-      
+
       // Measure frame rendering time
       final Stopwatch stopwatch = Stopwatch()..start();
       await tester.pumpAndSettle(const Duration(seconds: 10));
       stopwatch.stop();
-      
+
       // Verify app loads within reasonable time
       expect(stopwatch.elapsedMilliseconds, lessThan(15000));
     });
@@ -115,7 +119,7 @@ void main() {
           await tester.tap(find.byIcon(Icons.search));
           await tester.pumpAndSettle();
         }
-        
+
         if (find.byIcon(Icons.bookmark).evaluate().isNotEmpty) {
           await tester.tap(find.byIcon(Icons.bookmark));
           await tester.pumpAndSettle();
@@ -133,7 +137,8 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 5));
 
       // Test accessibility features
-      final SemanticsOwner? semantics = tester.binding.pipelineOwner.semanticsOwner;
+      final SemanticsOwner? semantics =
+          tester.binding.pipelineOwner.semanticsOwner;
       expect(semantics, isNotNull);
     });
 

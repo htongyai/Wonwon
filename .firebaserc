@@ -1,0 +1,13 @@
+{
+  "projects": {},
+  "targets": {
+    "nexus-962bd": {
+      "hosting": {
+        "admin": [
+          "nexus-962bd"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
