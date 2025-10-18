@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/models/forum_topic.dart';
 import 'package:wonwonw2/models/forum_reply.dart';
 import 'package:wonwonw2/services/forum_service.dart';
-import 'package:wonwonw2/utils/responsive_size.dart';
+import 'package:wonwonw2/services/content_management_service.dart';
+import 'package:wonwonw2/services/auth_service.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:go_router/go_router.dart';
 
 class ForumTopicDetailScreen extends StatefulWidget {
   final String topicId;
@@ -30,6 +30,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
   bool _showNestedReply = false;
   late AnimationController _fadeController;
   late AnimationController _slideController;
+  final ContentManagementService _contentService = ContentManagementService();
+  final AuthService _authService = AuthService();
+  bool _isAdmin = false;
 
   @override
   void initState() {
@@ -46,6 +49,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     // Start animations
     _fadeController.forward();
     _slideController.forward();
+
+    // Check admin status
+    _checkAdminStatus();
 
     // Increment view count when topic is opened
     ForumService.incrementTopicViews(widget.topicId);
@@ -78,35 +84,22 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         iconTheme: const IconThemeData(color: AppConstants.darkColor),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/forum'),
+          onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
-          IconButton(
-            onPressed: () async {
-              try {
-                await ForumService.addSampleReply(widget.topicId);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Sample reply added successfully!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error adding sample reply: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            icon: const Icon(Icons.add_comment),
-            tooltip: 'Add Sample Reply',
-          ),
+          if (_isAdmin)
+            IconButton(
+              onPressed: () {
+                // Get the current topic to show moderator dialog
+                ForumService.getTopic(widget.topicId).then((topic) {
+                  if (topic != null) {
+                    _showModeratorDialog(topic);
+                  }
+                });
+              },
+              icon: const Icon(Icons.admin_panel_settings),
+              tooltip: 'Moderate Topic',
+            ),
           IconButton(
             onPressed: () {
               // TODO: Add share functionality
@@ -971,6 +964,20 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                                   ],
                                 ),
                               ),
+                            if (_isAdmin)
+                              const PopupMenuItem(
+                                value: 'moderate',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.admin_panel_settings,
+                                      color: Colors.blue,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('Moderate'),
+                                  ],
+                                ),
+                              ),
                           ],
                       icon: Icon(Icons.more_vert, color: Colors.grey[600]),
                     ),
@@ -982,13 +989,18 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
           // Reply content
           Container(
             padding: const EdgeInsets.all(20),
-            child: Text(
-              reply.content,
-              style: GoogleFonts.montserrat(
-                fontSize: 15,
-                height: 1.6,
-                color: Colors.grey[800],
-                letterSpacing: 0.2,
+            width: double.infinity,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                reply.content,
+                style: GoogleFonts.montserrat(
+                  fontSize: 15,
+                  height: 1.6,
+                  color: Colors.grey[800],
+                  letterSpacing: 0.2,
+                ),
+                textAlign: TextAlign.left,
               ),
             ),
           ),
@@ -997,7 +1009,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
             _buildNestedReplyInput(reply.id),
           // Show nested replies
           StreamBuilder<List<ForumReply>>(
-            stream: ForumService.getNestedReplies(reply.id),
+            stream: ForumService.getNestedReplies(widget.topicId, reply.id),
             builder: (context, nestedSnapshot) {
               final nestedReplies = nestedSnapshot.data ?? [];
               if (nestedReplies.isEmpty) return const SizedBox.shrink();
@@ -1079,8 +1091,10 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                                           currentUser?.uid)
                                         IconButton(
                                           onPressed:
-                                              () =>
-                                                  _deleteReply(nestedReply.id),
+                                              () => _deleteReply(
+                                                nestedReply.id,
+                                                nestedReply.authorId,
+                                              ),
                                           icon: const Icon(
                                             Icons.delete,
                                             size: 16,
@@ -1091,12 +1105,19 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                                     ],
                                   ),
                                   const SizedBox(height: 8),
-                                  Text(
-                                    nestedReply.content,
-                                    style: GoogleFonts.montserrat(
-                                      fontSize: 13,
-                                      height: 1.4,
-                                      color: Colors.grey[800],
+                                  Container(
+                                    width: double.infinity,
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        nestedReply.content,
+                                        style: GoogleFonts.montserrat(
+                                          fontSize: 13,
+                                          height: 1.4,
+                                          color: Colors.grey[800],
+                                        ),
+                                        textAlign: TextAlign.left,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -1395,7 +1416,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
 
   Future<void> _toggleReplyLike(String replyId) async {
     try {
-      await ForumService.toggleReplyLike(replyId);
+      await ForumService.toggleReplyLike(widget.topicId, replyId);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1422,8 +1443,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     if (currentUser == null) return false;
 
     try {
-      final reply = await ForumService.getReply(replyId);
-      return reply?.likedBy.contains(currentUser.uid) ?? false;
+      // getReply method removed - we'll handle this differently
+      // For now, we'll just return false
+      return false;
     } catch (e) {
       return false;
     }
@@ -1442,14 +1464,21 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         await _markReplyAsSolution(reply.id, false);
         break;
       case 'delete':
-        await _deleteReply(reply.id);
+        await _deleteReply(reply.id, reply.authorId);
+        break;
+      case 'moderate':
+        _showReplyModeratorDialog(reply);
         break;
     }
   }
 
   Future<void> _markReplyAsSolution(String replyId, bool isSolution) async {
     try {
-      await ForumService.markReplyAsSolution(replyId, isSolution);
+      await ForumService.markReplyAsSolution(
+        widget.topicId,
+        replyId,
+        isSolution,
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -1491,7 +1520,30 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     }
   }
 
-  Future<void> _deleteReply(String replyId) async {
+  Future<void> _deleteReply(String replyId, String replyAuthorId) async {
+    // Check if user has permission to delete this reply
+    final canDelete = await _contentService.canDeleteContent(replyAuthorId);
+    if (!canDelete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error, color: Colors.white),
+              const SizedBox(width: 8),
+              Text(
+                'You do not have permission to delete this reply.',
+                style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
@@ -1538,7 +1590,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
 
     if (confirmed == true) {
       try {
-        await ForumService.deleteReply(replyId);
+        await ForumService.deleteReply(widget.topicId, replyId);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -1579,6 +1631,309 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
           ),
         );
       }
+    }
+  }
+
+  // ==================== MODERATOR METHODS ====================
+
+  Future<void> _checkAdminStatus() async {
+    try {
+      final isAdmin = await _authService.isAdmin();
+      if (mounted) {
+        setState(() {
+          _isAdmin = isAdmin;
+        });
+      }
+    } catch (e) {
+      appLog('Error checking admin status: $e');
+    }
+  }
+
+  void _showModeratorDialog(ForumTopic topic) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              'Moderate Topic',
+              style: GoogleFonts.montserrat(fontWeight: FontWeight.w600),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Topic: ${topic.title}',
+                  style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 16),
+                _buildModeratorButtons(topic),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildModeratorButtons(ForumTopic topic) {
+    return Column(
+      children: [
+        if (topic.isPinned)
+          _buildModeratorButton(
+            'Unpin Topic',
+            Icons.push_pin_outlined,
+            Colors.orange,
+            () => _moderateTopic(topic.id, 'unpin'),
+          )
+        else
+          _buildModeratorButton(
+            'Pin Topic',
+            Icons.push_pin,
+            Colors.orange,
+            () => _moderateTopic(topic.id, 'pin'),
+          ),
+        if (topic.isLocked)
+          _buildModeratorButton(
+            'Unlock Topic',
+            Icons.lock_open,
+            Colors.green,
+            () => _moderateTopic(topic.id, 'unlock'),
+          )
+        else
+          _buildModeratorButton(
+            'Lock Topic',
+            Icons.lock,
+            Colors.red,
+            () => _moderateTopic(topic.id, 'lock'),
+          ),
+        if (topic.isHidden)
+          _buildModeratorButton(
+            'Unhide Topic',
+            Icons.visibility,
+            Colors.green,
+            () => _moderateTopic(topic.id, 'unhide'),
+          )
+        else
+          _buildModeratorButton(
+            'Hide Topic',
+            Icons.visibility_off,
+            Colors.orange,
+            () => _moderateTopic(topic.id, 'hide'),
+          ),
+        _buildModeratorButton(
+          'Delete Topic',
+          Icons.delete_forever,
+          Colors.red,
+          () => _moderateTopic(topic.id, 'delete'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModeratorButton(
+    String text,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ElevatedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, color: Colors.white),
+        label: Text(text),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _moderateTopic(String topicId, String action) async {
+    Navigator.pop(context); // Close dialog
+
+    String? reason;
+    if (action == 'hide' || action == 'lock' || action == 'delete') {
+      reason = await _showReasonDialog(action);
+      if (reason == null) return;
+    }
+
+    try {
+      bool success = false;
+      switch (action) {
+        case 'pin':
+          success = await ForumService.pinTopic(topicId);
+          break;
+        case 'unpin':
+          success = await ForumService.unpinTopic(topicId);
+          break;
+        case 'lock':
+          success = await ForumService.lockTopic(topicId, reason!);
+          break;
+        case 'unlock':
+          success = await ForumService.unlockTopic(topicId);
+          break;
+        case 'hide':
+          success = await ForumService.hideTopic(topicId, reason!);
+          break;
+        case 'unhide':
+          success = await ForumService.unhideTopic(topicId);
+          break;
+        case 'delete':
+          success = await ForumService.adminDeleteTopic(topicId, reason!);
+          break;
+      }
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Topic ${action}d successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        throw Exception('Failed to $action topic');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<String?> _showReasonDialog(String action) async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Reason for ${action}ing'),
+            content: TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                hintText: 'Enter reason for ${action}ing this content...',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, controller.text.trim()),
+                child: Text('Confirm'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _showReplyModeratorDialog(ForumReply reply) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Moderate Reply'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Reply by: ${reply.authorName}'),
+                const SizedBox(height: 16),
+                _buildReplyModeratorButtons(reply),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildReplyModeratorButtons(ForumReply reply) {
+    return Column(
+      children: [
+        if (reply.isHidden)
+          _buildModeratorButton(
+            'Unhide Reply',
+            Icons.visibility,
+            Colors.green,
+            () => _moderateReply(reply, 'unhide'),
+          )
+        else
+          _buildModeratorButton(
+            'Hide Reply',
+            Icons.visibility_off,
+            Colors.orange,
+            () => _moderateReply(reply, 'hide'),
+          ),
+        _buildModeratorButton(
+          'Delete Reply',
+          Icons.delete_forever,
+          Colors.red,
+          () => _moderateReply(reply, 'delete'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _moderateReply(ForumReply reply, String action) async {
+    Navigator.pop(context); // Close dialog
+
+    String? reason;
+    if (action == 'hide' || action == 'delete') {
+      reason = await _showReasonDialog(action);
+      if (reason == null) return;
+    }
+
+    try {
+      bool success = false;
+      switch (action) {
+        case 'hide':
+          success = await ForumService.hideReply(
+            widget.topicId,
+            reply.id,
+            reason!,
+          );
+          break;
+        case 'unhide':
+          success = await ForumService.unhideReply(widget.topicId, reply.id);
+          break;
+        case 'delete':
+          success = await ForumService.adminDeleteReply(
+            widget.topicId,
+            reply.id,
+            reason!,
+          );
+          break;
+      }
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Reply ${action}d successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        throw Exception('Failed to $action reply');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 }

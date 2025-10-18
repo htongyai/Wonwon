@@ -1,25 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/screens/login_screen.dart';
-import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:wonwonw2/screens/main_navigation.dart';
-import 'package:wonwonw2/screens/home_screen.dart';
+import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:wonwonw2/services/auth_service.dart';
 import 'package:wonwonw2/services/auth_state_service.dart';
 import 'package:wonwonw2/services/saved_shop_service.dart';
 import 'package:wonwonw2/services/shop_service.dart';
-import 'package:wonwonw2/services/service_providers.dart';
-import 'package:wonwonw2/utils/asset_helpers.dart';
-import 'package:wonwonw2/utils/responsive_size.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/widgets/auth_wrapper.dart';
 import 'package:wonwonw2/models/repair_category.dart';
 import 'package:wonwonw2/widgets/search_bar_widget.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
-import 'package:go_router/go_router.dart';
+import 'package:wonwonw2/utils/asset_helpers.dart';
 
 class SavedLocationsScreen extends StatefulWidget {
   const SavedLocationsScreen({Key? key}) : super(key: key);
@@ -45,6 +42,25 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
   void initState() {
     super.initState();
     _checkLoginStatus();
+
+    // Listen for auth state changes
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      if (mounted) {
+        setState(() {
+          _isLoggedIn = user != null;
+        });
+
+        if (user != null) {
+          _loadSavedShops();
+        } else {
+          setState(() {
+            _savedShops.clear();
+            _filteredShops.clear();
+            _isLoading = false;
+          });
+        }
+      }
+    });
   }
 
   Future<void> _checkLoginStatus() async {
@@ -75,12 +91,31 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
       // Get IDs of saved shops
       final savedShopIds = await _savedShopService.getSavedShopIds();
 
-      // Load details for each saved shop
+      // Load details for each saved shop and clean up orphaned IDs
       final shops = <RepairShop>[];
+      final orphanedIds = <String>[];
+
       for (String id in savedShopIds) {
         final shop = await _shopService.getShopById(id);
         if (shop != null) {
           shops.add(shop);
+        } else {
+          // Track orphaned IDs (shops that no longer exist)
+          orphanedIds.add(id);
+          appLog('Found orphaned saved shop ID: $id');
+        }
+      }
+
+      // Clean up orphaned saved shop IDs using batch operation
+      if (orphanedIds.isNotEmpty) {
+        appLog('Cleaning up ${orphanedIds.length} orphaned saved shop IDs');
+        try {
+          await _savedShopService.cleanupOrphanedShops(orphanedIds);
+          appLog(
+            'Successfully cleaned up ${orphanedIds.length} orphaned saved shop IDs',
+          );
+        } catch (e) {
+          appLog('Failed to cleanup orphaned saved shop IDs: $e');
         }
       }
 
@@ -104,7 +139,15 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
 
   void _filterShopsByCategory(String categoryId) {
     setState(() {
-      _selectedCategoryId = categoryId;
+      if (categoryId == 'all') {
+        _selectedCategoryId = 'all';
+      } else if (_selectedCategoryId == categoryId) {
+        // If already selected, deselect and show all
+        _selectedCategoryId = 'all';
+      } else {
+        // Select the new category
+        _selectedCategoryId = categoryId;
+      }
       _applyFilters();
     });
   }
@@ -117,8 +160,15 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
   }
 
   void _applyFilters() {
-    // Start with all saved shops
-    List<RepairShop> result = List.from(_savedShops);
+    // Start with all saved shops and filter out invalid ones
+    List<RepairShop> result =
+        _savedShops.where((shop) {
+          // Filter out invalid shops (not found, empty names, etc.)
+          return shop.id != 'not-found' &&
+              shop.name.isNotEmpty &&
+              shop.name != 'Not Found' &&
+              shop.id.isNotEmpty;
+        }).toList();
 
     // Apply category filter if not 'all'
     if (_selectedCategoryId != 'all') {
@@ -505,7 +555,11 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
             ),
             child: InkWell(
               onTap: () async {
-                await context.push('/shops/${shop.id}');
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => ShopDetailScreen(shopId: shop.id),
+                  ),
+                );
 
                 // Refresh the list when returning from details
                 _loadSavedShops();
@@ -533,10 +587,16 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
                                 errorBuilder: (context, error, stackTrace) {
                                   return AssetHelpers.getShopPlaceholder(
                                     shop.name,
+                                    containerWidth: 300,
+                                    containerHeight: 200,
                                   );
                                 },
                               )
-                              : AssetHelpers.getShopPlaceholder(shop.name),
+                              : AssetHelpers.getShopPlaceholder(
+                                shop.name,
+                                containerWidth: 300,
+                                containerHeight: 200,
+                              ),
 
                           // Gradient overlay
                           Positioned.fill(

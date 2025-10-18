@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
-import 'package:wonwonw2/widgets/auth_wrapper.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
-import 'package:go_router/go_router.dart';
+import 'package:wonwonw2/screens/main_navigation.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -20,6 +19,8 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
   String _selectedLanguage = 'en';
+  bool _languageSelected = false;
+  bool _isTransitioning = false;
 
   @override
   void initState() {
@@ -50,16 +51,47 @@ class _SplashScreenState extends State<SplashScreen>
     // Start animation
     _animationController.forward();
 
-    // Navigate to home screen after delay
-    Timer(const Duration(seconds: 3), () {
-      context.go('/home');
-    });
+    // Check if language is already set
+    _checkExistingLanguage();
   }
 
   @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkExistingLanguage() async {
+    try {
+      final locale = await AppLocalizationsService.getLocale();
+      if (locale.languageCode.isNotEmpty) {
+        setState(() {
+          _selectedLanguage = locale.languageCode;
+          _languageSelected = true;
+        });
+        // If language is already set, transition after a short delay
+        Timer(const Duration(seconds: 1), () {
+          if (mounted && !_isTransitioning) {
+            _transitionToHome();
+          }
+        });
+      }
+    } catch (e) {
+      // If no language is set, wait for user selection
+      print('No language set, waiting for user selection');
+    }
+  }
+
+  void _transitionToHome() {
+    if (_isTransitioning) return;
+    setState(() {
+      _isTransitioning = true;
+    });
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => const MainNavigation(child: SizedBox()),
+      ),
+    );
   }
 
   @override
@@ -141,6 +173,13 @@ class _SplashScreenState extends State<SplashScreen>
                         await AppLocalizationsService.setLocale('en');
                         setState(() {
                           _selectedLanguage = 'en';
+                          _languageSelected = true;
+                        });
+                        // Transition to home after language selection
+                        Timer(const Duration(milliseconds: 500), () {
+                          if (mounted && !_isTransitioning) {
+                            _transitionToHome();
+                          }
                         });
                       },
                       style: ElevatedButton.styleFrom(
@@ -165,6 +204,13 @@ class _SplashScreenState extends State<SplashScreen>
                         await AppLocalizationsService.setLocale('th');
                         setState(() {
                           _selectedLanguage = 'th';
+                          _languageSelected = true;
+                        });
+                        // Transition to home after language selection
+                        Timer(const Duration(milliseconds: 500), () {
+                          if (mounted && !_isTransitioning) {
+                            _transitionToHome();
+                          }
                         });
                       },
                       style: ElevatedButton.styleFrom(
@@ -189,17 +235,45 @@ class _SplashScreenState extends State<SplashScreen>
 
               const SizedBox(height: 24),
 
-              // Loading indicator
+              // Loading indicator or transition message
               FadeTransition(
                 opacity: _fadeAnimation,
-                child: const SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    strokeWidth: 3,
-                  ),
-                ),
+                child:
+                    _languageSelected
+                        ? Column(
+                          children: [
+                            const SizedBox(
+                              width: 40,
+                              height: 40,
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                                strokeWidth: 3,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'preparing_your_experience'.tr(context),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w300,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        )
+                        : const SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                            strokeWidth: 3,
+                          ),
+                        ),
               ),
 
               Spacer(flex: 1),

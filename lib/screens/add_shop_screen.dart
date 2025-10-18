@@ -9,7 +9,6 @@ import 'package:wonwonw2/screens/map_picker_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -419,79 +418,76 @@ class _AddShopScreenState extends State<AddShopScreen> {
                       SizedBox(height: ResponsiveSize.getHeight(2)),
                       Row(
                         children: [
-                          // Left side: Coordinates display
+                          // Left side: Editable coordinates
                           Expanded(
                             flex: 3,
-                            child: Container(
-                              padding: ResponsiveSize.getScaledPadding(
-                                const EdgeInsets.all(12),
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.grey[300]!,
-                                  width: 1,
-                                ),
-                              ),
-                              child:
-                                  _latitudeController.text.isNotEmpty &&
-                                          _longitudeController.text.isNotEmpty
-                                      ? Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.location_on,
-                                                size: 16,
-                                                color:
-                                                    AppConstants.primaryColor,
-                                              ),
-                                              SizedBox(
-                                                width: ResponsiveSize.getWidth(
-                                                  1,
-                                                ),
-                                              ),
-                                              Text(
-                                                'Coordinates:',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.grey[700],
-                                                ),
-                                              ),
-                                            ],
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _latitudeController,
+                                        decoration: InputDecoration(
+                                          labelText: 'Latitude',
+                                          hintText: '13.7563',
+                                          prefixIcon: Icon(
+                                            Icons.location_on,
+                                            size: 16,
+                                            color: AppConstants.primaryColor,
                                           ),
-                                          SizedBox(
-                                            height: ResponsiveSize.getHeight(1),
-                                          ),
-                                          Text(
-                                            'Lat: ${_latitudeController.text}',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.grey[700],
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
                                             ),
                                           ),
-                                          Text(
-                                            'Lng: ${_longitudeController.text}',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.grey[700],
-                                            ),
-                                          ),
-                                        ],
-                                      )
-                                      : Center(
-                                        child: Text(
-                                          'no_location_selected'.tr(context),
-                                          style: TextStyle(
-                                            color: Colors.grey[500],
-                                            fontStyle: FontStyle.italic,
-                                          ),
+                                          helperText: 'e.g., 13.7563',
                                         ),
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                              signed: true,
+                                            ),
                                       ),
+                                    ),
+                                    SizedBox(width: ResponsiveSize.getWidth(2)),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _longitudeController,
+                                        decoration: InputDecoration(
+                                          labelText: 'Longitude',
+                                          hintText: '100.5018',
+                                          prefixIcon: Icon(
+                                            Icons.location_on,
+                                            size: 16,
+                                            color: AppConstants.primaryColor,
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          helperText: 'e.g., 100.5018',
+                                        ),
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                              signed: true,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: ResponsiveSize.getHeight(1)),
+                                Text(
+                                  'You can paste coordinates directly or use the map picker below',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           SizedBox(width: ResponsiveSize.getWidth(3)),

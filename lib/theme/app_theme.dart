@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const primaryColor = Colors.brown;
+  static const primaryColor = Color(0xFFc3c130); // Green accent
   static const errorColor = Colors.red;
-  static const successColor = Colors.green;
+  static const successColor = Color(0xFFc3c130); // Green accent
 
   static const double defaultBorderRadius = 12.0;
   static const double defaultPadding = 16.0;
@@ -28,7 +28,7 @@ class AppTheme {
         horizontal: defaultPadding,
       ),
       filled: true,
-      fillColor: Colors.grey.shade50,
+      fillColor: Colors.white,
     );
   }
 

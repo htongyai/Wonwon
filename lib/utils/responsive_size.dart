@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 
 class ResponsiveSize {
-  static late MediaQueryData _mediaQueryData;
-  static late double screenWidth;
-  static late double screenHeight;
-  static late double blockSizeHorizontal;
-  static late double blockSizeVertical;
-  static late double _safeAreaHorizontal;
-  static late double _safeAreaVertical;
-  static late double safeBlockHorizontal;
-  static late double safeBlockVertical;
-  static late double textScaleFactor;
-  static late double fontSize;
+  static MediaQueryData? _mediaQueryData;
+  static double screenWidth = 0;
+  static double screenHeight = 0;
+  static double blockSizeHorizontal = 0;
+  static double blockSizeVertical = 0;
+  static double _safeAreaHorizontal = 0;
+  static double _safeAreaVertical = 0;
+  static double safeBlockHorizontal = 0;
+  static double safeBlockVertical = 0;
+  static double textScaleFactor = 1.0;
+  static double fontSize = 14.0;
+  static bool _isInitialized = false;
 
   // Breakpoints for responsive design
   static const double mobileBreakpoint = 600;
@@ -20,20 +21,28 @@ class ResponsiveSize {
 
   static void init(BuildContext context) {
     _mediaQueryData = MediaQuery.of(context);
-    screenWidth = _mediaQueryData.size.width;
-    screenHeight = _mediaQueryData.size.height;
+    screenWidth = _mediaQueryData!.size.width;
+    screenHeight = _mediaQueryData!.size.height;
     blockSizeHorizontal = screenWidth / 100;
     blockSizeVertical = screenHeight / 100;
 
     _safeAreaHorizontal =
-        _mediaQueryData.padding.left + _mediaQueryData.padding.right;
+        _mediaQueryData!.padding.left + _mediaQueryData!.padding.right;
     _safeAreaVertical =
-        _mediaQueryData.padding.top + _mediaQueryData.padding.bottom;
+        _mediaQueryData!.padding.top + _mediaQueryData!.padding.bottom;
     safeBlockHorizontal = (screenWidth - _safeAreaHorizontal) / 100;
     safeBlockVertical = (screenHeight - _safeAreaVertical) / 100;
 
-    textScaleFactor = _mediaQueryData.textScaleFactor;
+    textScaleFactor = _mediaQueryData!.textScaleFactor;
     fontSize = safeBlockHorizontal * 4; // Base font size
+    _isInitialized = true;
+  }
+
+  // Ensure initialization before accessing values
+  static void _ensureInitialized(BuildContext? context) {
+    if (!_isInitialized && context != null) {
+      init(context);
+    }
   }
 
   // Get responsive width based on screen size
@@ -51,33 +60,61 @@ class ResponsiveSize {
     return fontSize * (size / 14); // Using 14 as base size
   }
 
+  // Get responsive font size based on container width
+  static double getResponsiveFontSize(double baseSize, double containerWidth) {
+    // Base font size calculation
+    double responsiveSize = baseSize;
+
+    // Adjust based on container width
+    if (containerWidth < 200) {
+      responsiveSize = baseSize * 0.7; // Small containers
+    } else if (containerWidth < 300) {
+      responsiveSize = baseSize * 0.85; // Medium containers
+    } else if (containerWidth < 400) {
+      responsiveSize = baseSize * 1.0; // Normal containers
+    } else if (containerWidth < 500) {
+      responsiveSize = baseSize * 1.1; // Large containers
+    } else {
+      responsiveSize = baseSize * 1.2; // Extra large containers
+    }
+
+    // Ensure minimum and maximum sizes
+    return responsiveSize.clamp(10.0, 24.0);
+  }
+
   // Check if device is a tablet
-  static bool isTablet() {
+  static bool isTablet([BuildContext? context]) {
+    _ensureInitialized(context);
     return screenWidth > mobileBreakpoint && screenWidth <= tabletBreakpoint;
   }
 
   // Check if device is desktop
-  static bool isDesktop() {
+  static bool isDesktop([BuildContext? context]) {
+    _ensureInitialized(context);
     return screenWidth > tabletBreakpoint && screenWidth <= desktopBreakpoint;
   }
 
   // Check if device is large desktop
-  static bool isLargeDesktop() {
+  static bool isLargeDesktop([BuildContext? context]) {
+    _ensureInitialized(context);
     return screenWidth > desktopBreakpoint;
   }
 
   // Check if device is mobile
-  static bool isMobile() {
+  static bool isMobile([BuildContext? context]) {
+    _ensureInitialized(context);
     return screenWidth <= mobileBreakpoint;
   }
 
   // Check if device is in landscape mode
-  static bool isLandscape() {
-    return _mediaQueryData.orientation == Orientation.landscape;
+  static bool isLandscape([BuildContext? context]) {
+    _ensureInitialized(context);
+    return _mediaQueryData!.orientation == Orientation.landscape;
   }
 
   // Get device type as string
-  static String getDeviceType() {
+  static String getDeviceType([BuildContext? context]) {
+    _ensureInitialized(context);
     if (isMobile()) return 'mobile';
     if (isTablet()) return 'tablet';
     if (isDesktop()) return 'desktop';
@@ -86,7 +123,8 @@ class ResponsiveSize {
   }
 
   // Get appropriate max width for content container
-  static double getMaxContentWidth() {
+  static double getMaxContentWidth([BuildContext? context]) {
+    _ensureInitialized(context);
     if (isMobile()) return screenWidth;
     if (isTablet()) return 768;
     if (isDesktop()) return 1200;
@@ -94,8 +132,15 @@ class ResponsiveSize {
     return screenWidth;
   }
 
+  // Check if should show desktop layout
+  static bool shouldShowDesktopLayout([BuildContext? context]) {
+    _ensureInitialized(context);
+    return screenWidth > tabletBreakpoint;
+  }
+
   // Get appropriate padding for different screen sizes
-  static EdgeInsets getResponsivePadding() {
+  static EdgeInsets getResponsivePadding([BuildContext? context]) {
+    _ensureInitialized(context);
     if (isMobile()) {
       return const EdgeInsets.all(16.0);
     } else if (isTablet()) {
@@ -128,10 +173,5 @@ class ResponsiveSize {
       maxWidth: getMaxContentWidth(),
       minHeight: screenHeight * 0.8,
     );
-  }
-
-  // Check if we should show desktop layout
-  static bool shouldShowDesktopLayout() {
-    return isDesktop() || isLargeDesktop();
   }
 }

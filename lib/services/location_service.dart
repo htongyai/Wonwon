@@ -21,6 +21,10 @@ class LocationService with ChangeNotifier {
   // Current state of location permission
   LocationPermissionStatus _permissionStatus = LocationPermissionStatus.unknown;
 
+  // Cooldown mechanism to prevent infinite retries
+  DateTime? _lastFailedAttempt;
+  static const Duration _retryCooldown = Duration(seconds: 10); // Reduced for testing
+
   // Getters for internal state
   Position? get currentPosition => _currentPosition;
   bool get isTracking => _isTracking;
@@ -42,32 +46,43 @@ class LocationService with ChangeNotifier {
   /// Updates the _permissionStatus field and notifies listeners
   Future<void> _checkPermission() async {
     try {
-      final locationPermission = await Geolocator.checkPermission();
+      debugPrint('Checking location permission status...');
 
-      switch (locationPermission) {
+      // Check if location services are enabled first
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      debugPrint('Location services enabled: $serviceEnabled');
+
+      if (!serviceEnabled) {
+        _permissionStatus = LocationPermissionStatus.denied;
+        notifyListeners();
+        return;
+      }
+
+      // Check current permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      debugPrint('Current permission status: $permission');
+
+      switch (permission) {
+        case LocationPermission.whileInUse:
+        case LocationPermission.always:
+          _permissionStatus = LocationPermissionStatus.whileInUse;
+          break;
         case LocationPermission.denied:
           _permissionStatus = LocationPermissionStatus.denied;
           break;
         case LocationPermission.deniedForever:
+        case LocationPermission.unableToDetermine:
           _permissionStatus = LocationPermissionStatus.permanentlyDenied;
           break;
-        case LocationPermission.whileInUse:
-          _permissionStatus = LocationPermissionStatus.whileInUse;
-          break;
-        case LocationPermission.always:
-          _permissionStatus = LocationPermissionStatus.always;
-          break;
-        case LocationPermission.unableToDetermine:
-          _permissionStatus = LocationPermissionStatus.unknown;
-          break;
       }
+
+      debugPrint('Set permission status to: $_permissionStatus');
+      notifyListeners();
     } catch (e) {
       debugPrint('Error checking permission: $e');
-      // Default to unknown status if there's an error
       _permissionStatus = LocationPermissionStatus.unknown;
+      notifyListeners();
     }
-
-    notifyListeners();
   }
 
   /// Request location permission from the user
@@ -121,25 +136,149 @@ class LocationService with ChangeNotifier {
   /// Get the user's current position as a one-time request
   /// Requests permission if needed and returns null if permission denied
   Future<Position?> getCurrentPosition() async {
-    // Check if permission is needed before proceeding
-    if (_permissionStatus == LocationPermissionStatus.denied ||
-        _permissionStatus == LocationPermissionStatus.permanentlyDenied) {
-      final permissionGranted = await requestPermission();
-      if (!permissionGranted) return null;
+    // Check cooldown to prevent infinite retries
+    if (_lastFailedAttempt != null) {
+      final timeSinceLastFail = DateTime.now().difference(_lastFailedAttempt!);
+      if (timeSinceLastFail < _retryCooldown) {
+        debugPrint(
+          'Location request in cooldown. ${_retryCooldown.inSeconds - timeSinceLastFail.inSeconds}s remaining',
+        );
+        return null;
+      }
     }
 
     try {
-      // Request position with high accuracy
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      // First check if location services are enabled
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('Location services are disabled');
+        _lastFailedAttempt = DateTime.now();
+        return null;
+      }
 
-      // Update internal state and notify listeners
-      _currentPosition = position;
+      // Check current permission status
+      LocationPermission permission = await Geolocator.checkPermission();
+      debugPrint('Current location permission: $permission');
+
+      if (permission == LocationPermission.denied) {
+        debugPrint('Requesting location permission...');
+        permission = await Geolocator.requestPermission();
+        debugPrint('Permission after request: $permission');
+
+        if (permission == LocationPermission.denied) {
+          debugPrint('Location permission denied');
+          _permissionStatus = LocationPermissionStatus.denied;
+          notifyListeners();
+          return null;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        debugPrint('Location permission denied forever');
+        _permissionStatus = LocationPermissionStatus.permanentlyDenied;
+        notifyListeners();
+        return null;
+      }
+
+      // Update permission status
+      _permissionStatus = LocationPermissionStatus.whileInUse;
       notifyListeners();
-      return position;
+
+      // Request position with web-specific handling
+      debugPrint('Getting current position...');
+
+      if (kIsWeb) {
+        // Web-specific approach with multiple fallbacks
+        debugPrint('Web location: Starting geolocation attempts...');
+        debugPrint('Web location: User agent: ${kIsWeb ? "Web" : "Mobile"}');
+        debugPrint('Web location: Current URL: ${Uri.base}');
+        
+        try {
+          // First attempt: High accuracy with timeout
+          debugPrint('Web location: Attempting high accuracy...');
+          final position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+            timeLimit: const Duration(seconds: 10),
+          );
+          debugPrint(
+            'Got position (high accuracy): ${position.latitude}, ${position.longitude}',
+          );
+          _currentPosition = position;
+          notifyListeners();
+          return position;
+        } catch (e1) {
+          debugPrint('High accuracy failed: $e1');
+
+          try {
+            // Second attempt: Medium accuracy with shorter timeout
+            debugPrint('Retrying with medium accuracy...');
+            final position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.medium,
+              timeLimit: const Duration(seconds: 8),
+            );
+            debugPrint(
+              'Got position (medium accuracy): ${position.latitude}, ${position.longitude}',
+            );
+            _currentPosition = position;
+            notifyListeners();
+            return position;
+          } catch (e2) {
+            debugPrint('Medium accuracy failed: $e2');
+
+            try {
+              // Third attempt: Low accuracy with very short timeout
+              debugPrint('Retrying with low accuracy...');
+              final position = await Geolocator.getCurrentPosition(
+                desiredAccuracy: LocationAccuracy.low,
+                timeLimit: const Duration(seconds: 5),
+              );
+              debugPrint(
+                'Got position (low accuracy): ${position.latitude}, ${position.longitude}',
+              );
+              _currentPosition = position;
+              notifyListeners();
+              return position;
+            } catch (e3) {
+              debugPrint('All web attempts failed: $e3');
+              // If all attempts fail, provide a helpful error message
+              if (e3.toString().contains('Position update is unavailable')) {
+                debugPrint(
+                  'Web geolocation unavailable - likely HTTPS required or blocked by browser',
+                );
+                debugPrint(
+                  'This is a common issue when running on localhost or non-HTTPS sites',
+                );
+                debugPrint(
+                  'Current URL: ${Uri.base}',
+                );
+                debugPrint(
+                  'Is HTTPS: ${Uri.base.scheme == "https"}',
+                );
+                debugPrint(
+                  'Try: 1) Use HTTPS production site, 2) Check browser location settings, 3) Try different browser',
+                );
+                debugPrint(
+                  'Workaround: Use production site at https://app.fixwonwon.com for location features',
+                );
+              }
+              _lastFailedAttempt = DateTime.now();
+              return null;
+            }
+          }
+        }
+      } else {
+        // Mobile approach (original)
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        debugPrint('Got position: ${position.latitude}, ${position.longitude}');
+        _currentPosition = position;
+        notifyListeners();
+        return position;
+      }
     } catch (e) {
       debugPrint('Error getting current position: $e');
+      _lastFailedAttempt = DateTime.now();
       return null;
     }
   }
@@ -204,6 +343,12 @@ class LocationService with ChangeNotifier {
     _positionStreamSubscription = null;
     _isTracking = false;
     notifyListeners();
+  }
+
+  /// Clear the cooldown for testing purposes
+  void clearCooldown() {
+    _lastFailedAttempt = null;
+    debugPrint('Location cooldown cleared');
   }
 
   /// Open app settings page to allow user to change location permissions

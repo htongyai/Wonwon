@@ -10,6 +10,7 @@ class User {
   final DateTime? lastLoginAt;
   final bool acceptedTerms;
   final bool acceptedPrivacy;
+  final String? profileImageUrl; // URL to the user's profile image
 
   User({
     required this.id,
@@ -21,6 +22,7 @@ class User {
     this.lastLoginAt,
     required this.acceptedTerms,
     required this.acceptedPrivacy,
+    this.profileImageUrl,
   });
 
   Map<String, dynamic> toMap() {
@@ -34,6 +36,7 @@ class User {
       'lastLoginAt': lastLoginAt?.toIso8601String(),
       'acceptedTerms': acceptedTerms,
       'acceptedPrivacy': acceptedPrivacy,
+      'profileImageUrl': profileImageUrl,
     };
   }
 
@@ -58,6 +61,7 @@ class User {
           map['lastLoginAt'] != null ? parseDateTime(map['lastLoginAt']) : null,
       acceptedTerms: map['acceptedTerms'] ?? false,
       acceptedPrivacy: map['acceptedPrivacy'] ?? false,
+      profileImageUrl: map['profileImageUrl'],
     );
   }
 
@@ -71,6 +75,7 @@ class User {
     DateTime? lastLoginAt,
     bool? acceptedTerms,
     bool? acceptedPrivacy,
+    String? profileImageUrl,
   }) {
     return User(
       id: id ?? this.id,
@@ -82,6 +87,7 @@ class User {
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
       acceptedTerms: acceptedTerms ?? this.acceptedTerms,
       acceptedPrivacy: acceptedPrivacy ?? this.acceptedPrivacy,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
     );
   }
 }

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/models/repair_record.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/models/repair_sub_service.dart';
+import 'package:wonwonw2/mixins/auth_state_mixin.dart';
 
 class LogRepairScreen extends StatefulWidget {
   final RepairShop shop;
@@ -13,7 +14,7 @@ class LogRepairScreen extends StatefulWidget {
   State<LogRepairScreen> createState() => _LogRepairScreenState();
 }
 
-class _LogRepairScreenState extends State<LogRepairScreen> {
+class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _itemController = TextEditingController();
   final _priceController = TextEditingController();
@@ -51,8 +52,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> {
     setState(() {
       _isSubmitting = true;
     });
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (!isLoggedIn || currentUser == null) return;
     final record = RepairRecord(
       id: FirebaseFirestore.instance.collection('tmp').doc().id,
       shopId: widget.shop.id,
@@ -74,7 +74,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> {
     );
     await FirebaseFirestore.instance
         .collection('users')
-        .doc(user.uid)
+        .doc(currentUser!.uid)
         .collection('repairRecords')
         .doc(record.id)
         .set(record.toMap());
@@ -86,7 +86,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Log Repair')), // TODO: Localize
+      appBar: AppBar(title: Text('log_repair'.tr(context))),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Form(

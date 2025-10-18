@@ -4,8 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/services/shop_service.dart';
-import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
-import 'package:go_router/go_router.dart';
+import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:intl/intl.dart';
 
 class AdminUnapprovePagesScreen extends StatefulWidget {
@@ -403,7 +402,11 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
   }
 
   void _viewShopDetails(RepairShop shop) {
-    context.push('/shops/${shop.id}');
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ShopDetailScreen(shopId: shop.id),
+      ),
+    );
   }
 
   void _approveShop(RepairShop shop) {

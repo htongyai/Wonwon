@@ -107,6 +107,7 @@ class RepairShop {
       'timestamp': timestamp?.toIso8601String(),
       'buildingNumber': buildingNumber,
       'buildingName': buildingName,
+      'buildingFloor': buildingFloor,
       'soi': soi,
       'district': district,
       'province': province,
@@ -121,9 +122,6 @@ class RepairShop {
       'usualClosingTime': usualClosingTime,
       'instagramPage': instagramPage,
       'phoneNumber': phoneNumber,
-      'buildingName': buildingName,
-      'buildingNumber': buildingNumber,
-      'buildingFloor': buildingFloor,
     };
   }
 

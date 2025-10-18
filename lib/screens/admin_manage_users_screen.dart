@@ -4,8 +4,6 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/models/user.dart';
 import 'package:wonwonw2/services/user_service.dart';
-import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -19,7 +17,6 @@ class AdminManageUsersScreen extends StatefulWidget {
 }
 
 class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
-  final UserService _userService = UserService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String _searchQuery = '';
@@ -553,7 +550,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                           .toList(),
                   onChanged: (value) async {
                     if (value != null) {
-                      final success = await _userService.updateUserAccountType(
+                      final success = await UserService.updateUserAccountType(
                         user.id,
                         value,
                       );
@@ -581,7 +578,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                           .toList(),
                   onChanged: (value) async {
                     if (value != null) {
-                      final success = await _userService.updateUserStatus(
+                      final success = await UserService.updateUserStatus(
                         user.id,
                         value,
                       );

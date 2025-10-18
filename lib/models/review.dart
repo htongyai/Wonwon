@@ -1,10 +1,12 @@
 class ReviewReply {
+  final String id;
   final String userId;
   final String userName;
   final String comment;
   final DateTime createdAt;
 
   ReviewReply({
+    required this.id,
     required this.userId,
     required this.userName,
     required this.comment,
@@ -12,6 +14,7 @@ class ReviewReply {
   });
 
   Map<String, dynamic> toMap() => {
+    'id': id,
     'userId': userId,
     'userName': userName,
     'comment': comment,
@@ -19,6 +22,7 @@ class ReviewReply {
   };
 
   factory ReviewReply.fromMap(Map<String, dynamic> map) => ReviewReply(
+    id: map['id'] ?? '',
     userId: map['userId'],
     userName: map['userName'],
     comment: map['comment'],

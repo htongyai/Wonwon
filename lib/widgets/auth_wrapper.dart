@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wonwonw2/screens/login_screen.dart';
 import 'package:wonwonw2/screens/main_navigation.dart';
 import 'package:wonwonw2/screens/home_screen.dart';
 import 'package:wonwonw2/services/auth_state_service.dart';
 import 'package:wonwonw2/services/service_providers.dart';
-import 'package:go_router/go_router.dart';
 
 /// A wrapper widget that handles authentication state and determines which screen to show
 class AuthWrapper extends StatefulWidget {
@@ -68,41 +68,70 @@ class FeatureAuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authStateService = ServiceProvider.authStateOf(context);
+    // Use StreamBuilder to listen to Firebase auth changes directly
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Show loading while checking auth state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    if (authStateService.canAccessFeature(featureAccess)) {
-      return child;
-    }
+        final isLoggedIn = snapshot.hasData && snapshot.data != null;
 
-    // If user cannot access the feature, show the unauthorized widget or a default one
-    return unauthorizedWidget ??
-        Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
-              const SizedBox(height: 16),
-              const Text(
-                'Login Required',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        // Check if user can access the feature
+        bool canAccess = false;
+        switch (featureAccess) {
+          case FeatureAccess.public:
+            canAccess = true;
+            break;
+          case FeatureAccess.preferLoggedIn:
+            canAccess = true; // Allow guest access for preferLoggedIn features
+            break;
+          case FeatureAccess.requiresLogin:
+            canAccess = isLoggedIn;
+            break;
+        }
+
+        if (canAccess) {
+          return child;
+        }
+
+        // If user cannot access the feature, show the unauthorized widget or a default one
+        return unauthorizedWidget ??
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Login Required',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Please login to access this feature',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final result = await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
+                      );
+                      if (result == true) {
+                        // No need to manually rebuild, StreamBuilder will handle it
+                      }
+                    },
+                    child: const Text('Login'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Please login to access this feature',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () async {
-                  final result = await context.push('/login');
-                  if (result == true) {
-                    (context as Element).markNeedsBuild();
-                  }
-                },
-                child: const Text('Login'),
-              ),
-            ],
-          ),
-        );
+            );
+      },
+    );
   }
 }

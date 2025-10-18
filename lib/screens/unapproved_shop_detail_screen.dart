@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/utils/hours_formatter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/utils/asset_helpers.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -33,9 +34,17 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                             fit: BoxFit.cover,
                             errorBuilder:
                                 (context, error, stackTrace) =>
-                                    AssetHelpers.getShopPlaceholder(shop.name),
+                                    AssetHelpers.getShopPlaceholder(
+                                    shop.name,
+                                    containerWidth: MediaQuery.of(context).size.width,
+                                    containerHeight: 250,
+                                  ),
                           )
-                          : AssetHelpers.getShopPlaceholder(shop.name),
+                          : AssetHelpers.getShopPlaceholder(
+                                    shop.name,
+                                    containerWidth: MediaQuery.of(context).size.width,
+                                    containerHeight: 250,
+                                  ),
                 ),
                 Positioned(
                   top: 32,
@@ -351,7 +360,10 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  entry.value,
+                                  HoursFormatter.formatHours(
+                                    entry.value,
+                                    context,
+                                  ),
                                   style: GoogleFonts.montserrat(
                                     fontSize: 14,
                                     color: Colors.grey[700],

@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
-import 'dart:math';
 import 'package:wonwonw2/services/location_service.dart';
 import 'package:wonwonw2/services/service_providers.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -16,7 +14,6 @@ import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/screens/add_shop_screen.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
-import 'package:go_router/go_router.dart';
 
 /// Map Screen that displays repair shops on Google Maps
 /// Provides interactive markers, location tracking, and navigation to shop details
@@ -231,9 +228,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   // User location marker (separate from shop markers)
   Marker? _userMarker;
-
-  // Map of BitmapDescriptor icons for different shop categories
-  final Map<String, BitmapDescriptor> _categoryIcons = {};
 
   // Currently selected repair shop
   RepairShop? _selectedShop;
@@ -491,7 +485,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               _isFollowingUser = false;
             });
 
-            context.push('/shops/${shop.id}');
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => ShopDetailScreen(shopId: shop.id),
+              ),
+            );
           },
         ),
       );

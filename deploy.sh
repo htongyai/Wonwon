@@ -1,13 +1,21 @@
 #!/bin/bash
 
-# 1. Build the web app
-flutter build web --release
+# Deployment router script
+# Usage: ./deploy.sh [admin|user|both]
 
-# 2. Upload via FTP
-lftp -u htongyai@augmaimaginarium.com,Volta3963./ ftp://ftp.augmaimaginarium.com <<EOF
-set ssl:verify-certificate no
-mirror -R build/web .
-quit
-EOF
-
-echo "✅ Deployment finished!"
+if [ "$1" == "admin" ]; then
+    echo "🔧 Deploying Admin Portal to /admin folder..."
+    ./deploy_admin.sh
+elif [ "$1" == "user" ]; then
+    echo "👥 Deploying User Portal to /app folder..."
+    ./deploy_user.sh
+elif [ "$1" == "both" ]; then
+    echo "🚀 Deploying Both Portals..."
+    ./deploy_both.sh
+else
+    echo "❌ Please specify deployment target:"
+    echo "   ./deploy.sh admin   - Deploy to /admin folder"
+    echo "   ./deploy.sh user    - Deploy to /app folder"
+    echo "   ./deploy.sh both    - Deploy both portals"
+    exit 1
+fi

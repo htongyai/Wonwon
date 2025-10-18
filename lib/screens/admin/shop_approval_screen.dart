@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/screens/shop_detail_screen.dart';
-import 'package:go_router/go_router.dart';
 
 class ShopApprovalScreen extends StatefulWidget {
   const ShopApprovalScreen({Key? key}) : super(key: key);
@@ -140,7 +138,11 @@ class _ShopApprovalScreenState extends State<ShopApprovalScreen> {
             ),
             child: InkWell(
               onTap: () {
-                context.go('/shops/${shop.id}');
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => ShopDetailScreen(shopId: shop.id),
+                  ),
+                );
               },
               borderRadius: BorderRadius.circular(16),
               child: Column(
@@ -324,7 +326,13 @@ class _ShopApprovalScreenState extends State<ShopApprovalScreen> {
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed: () {
-                              context.go('/shops/${shop.id}');
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) =>
+                                          ShopDetailScreen(shopId: shop.id),
+                                ),
+                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppConstants.primaryColor,

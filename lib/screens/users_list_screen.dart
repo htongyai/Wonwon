@@ -16,7 +16,6 @@ class UsersListScreen extends StatefulWidget {
 }
 
 class _UsersListScreenState extends State<UsersListScreen> {
-  final UserService _userService = UserService();
   List<User> _users = [];
   bool _isLoading = true;
   bool _isAdmin = false;
@@ -27,31 +26,20 @@ class _UsersListScreenState extends State<UsersListScreen> {
   @override
   void initState() {
     super.initState();
-    _checkAdminAccess();
+    _checkAdminStatus();
   }
 
-  Future<void> _checkAdminAccess() async {
-    final isAdmin = await _userService.isCurrentUserAdmin();
-    if (!isAdmin) {
-      // If not admin, show error and go back
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Access denied. Admin privileges required.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        Navigator.of(context).pop();
-        return;
-      }
-    }
-
-    setState(() {
-      _isAdmin = isAdmin;
-    });
-
-    if (isAdmin) {
-      _loadUsers();
+  Future<void> _checkAdminStatus() async {
+    try {
+      final isAdmin = await UserService.isCurrentUserAdmin();
+      setState(() {
+        _isAdmin = isAdmin;
+      });
+    } catch (e) {
+      print('Error checking admin status: $e');
+      setState(() {
+        _isAdmin = false;
+      });
     }
   }
 
@@ -61,13 +49,13 @@ class _UsersListScreenState extends State<UsersListScreen> {
     });
 
     try {
-      final users = await _userService.getAllUsers();
+      final users = await UserService.getAllUsers();
       setState(() {
         _users = users;
         _isLoading = false;
       });
     } catch (e) {
-      appLog('Error loading users: $e');
+      print('Error loading users: $e');
       setState(() {
         _isLoading = false;
       });
@@ -92,7 +80,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
 
   Future<void> _updateUserAccountType(User user, String newAccountType) async {
     try {
-      final success = await _userService.updateUserAccountType(
+      final success = await UserService.updateUserAccountType(
         user.id,
         newAccountType,
       );
@@ -138,7 +126,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
 
   Future<void> _updateUserStatus(User user, String newStatus) async {
     try {
-      final success = await _userService.updateUserStatus(user.id, newStatus);
+      final success = await UserService.updateUserStatus(user.id, newStatus);
       if (success) {
         // Update local state
         setState(() {

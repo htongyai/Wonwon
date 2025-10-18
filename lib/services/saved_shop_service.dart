@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import '../models/repair_shop.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 
 class SavedShopService {
@@ -151,5 +149,39 @@ class SavedShopService {
 
     savedShops.remove(shopId);
     return await prefs.setStringList(_savedShopsKey, savedShops);
+  }
+
+  // Clean up orphaned saved shop IDs (shops that no longer exist)
+  Future<void> cleanupOrphanedShops(List<String> orphanedIds) async {
+    final user = _auth.currentUser;
+    if (user != null && orphanedIds.isNotEmpty) {
+      try {
+        // Remove from Firestore in batch
+        final batch = _firestore.batch();
+        for (String orphanedId in orphanedIds) {
+          final docRef = _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('savedShops')
+              .doc(orphanedId);
+          batch.delete(docRef);
+        }
+        await batch.commit();
+        appLog(
+          'Cleaned up ${orphanedIds.length} orphaned saved shops from Firestore',
+        );
+      } catch (e) {
+        appLog('Error cleaning up orphaned shops from Firestore: $e');
+        // Fallback to individual removal from SharedPreferences
+        for (String orphanedId in orphanedIds) {
+          await _removeShopFromPrefs(orphanedId);
+        }
+      }
+    } else {
+      // Clean up from SharedPreferences for non-logged in users
+      for (String orphanedId in orphanedIds) {
+        await _removeShopFromPrefs(orphanedId);
+      }
+    }
   }
 }

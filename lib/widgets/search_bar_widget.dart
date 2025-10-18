@@ -8,11 +8,15 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 class AnimatedSearchBar extends StatefulWidget {
   final Function(String) onSearch;
   final String hintText;
+  final bool showSearchSuggestions;
+  final List<String>? searchSuggestions;
 
   const AnimatedSearchBar({
     Key? key,
     required this.onSearch,
-    this.hintText = 'Search for repair services...',
+    this.hintText = 'Search shops, services, locations...',
+    this.showSearchSuggestions = false,
+    this.searchSuggestions,
   }) : super(key: key);
 
   @override
@@ -65,7 +69,13 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.grey.withOpacity(0.2), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [

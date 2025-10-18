@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/services/auth_service.dart';
-import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
 
@@ -79,209 +77,312 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 768;
+    final isMobile = screenWidth < 600;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Back button and header
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back,
+        child: Center(
+          child: Container(
+            width: isDesktop ? 400 : null,
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 400 : screenWidth * 0.9,
+            ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16.0 : 24.0,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Back button and header
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.brown,
+                              ),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                            const Spacer(),
+                          ],
+                        ),
+                      ),
+
+                      // Logo
+                      Center(
+                        child: Container(
+                          margin: EdgeInsets.only(
+                            top: isMobile ? 16 : 20,
+                            bottom: isMobile ? 24 : 32,
+                          ),
+                          width: isMobile ? 70 : 90,
+                          height: isMobile ? 70 : 90,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            image: DecorationImage(
+                              image: AssetImage('assets/images/wwg.png'),
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Title text
+                      Text(
+                        'forgot_password'.tr(context),
+                        style: TextStyle(
+                          fontSize: isMobile ? 24 : 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.brown,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(
+                        height: isMobile ? 12 : ResponsiveSize.getHeight(2),
+                      ),
+                      Text(
+                        'reset_password_description'.tr(context),
+                        style: TextStyle(
+                          fontSize: isMobile ? 14 : 16,
+                          color: Colors.grey[600],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: ResponsiveSize.getHeight(10)),
+
+                      // Email field
+                      TextFormField(
+                        controller: _emailController,
+                        decoration: InputDecoration(
+                          labelText: 'email'.tr(context),
+                          prefixIcon: const Icon(
+                            Icons.email_outlined,
                             color: Colors.brown,
                           ),
-                          onPressed: () => Navigator.pop(context),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Colors.brown,
+                              width: 2,
+                            ),
+                          ),
+                          contentPadding: EdgeInsets.symmetric(
+                            vertical: isMobile ? 12 : 16,
+                            horizontal: 16,
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
                         ),
-                        const Spacer(),
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'email_required'.tr(context);
+                          }
+                          if (!AuthService.isValidEmail(value)) {
+                            return 'valid_email_required'.tr(context);
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: ResponsiveSize.getHeight(6)),
+
+                      // Success message if email sent
+                      if (_emailSent) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.check_circle,
+                                color: Colors.green.shade600,
+                                size: 48,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'reset_email_sent'.tr(context),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green.shade800,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'check_email_instructions'.tr(context),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.green.shade700,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              // Responsive button layout
+                              isMobile
+                                  ? Column(
+                                    children: [
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed:
+                                              () => Navigator.of(context).pop(),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                Colors.green.shade600,
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'back_to_login'.tr(context),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: TextButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _emailSent = false;
+                                            });
+                                          },
+                                          style: TextButton.styleFrom(
+                                            foregroundColor:
+                                                Colors.green.shade700,
+                                          ),
+                                          child: Text(
+                                            'send_another_email'.tr(context),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                  : Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      TextButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _emailSent = false;
+                                          });
+                                        },
+                                        style: TextButton.styleFrom(
+                                          foregroundColor:
+                                              Colors.green.shade700,
+                                        ),
+                                        child: Text(
+                                          'send_another_email'.tr(context),
+                                        ),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed:
+                                            () => Navigator.of(context).pop(),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              Colors.green.shade600,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'back_to_login'.tr(context),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: ResponsiveSize.getHeight(4)),
                       ],
-                    ),
-                  ),
 
-                  // Logo
-                  Center(
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 20, bottom: 32),
-                      width: 90,
-                      height: 90,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          image: AssetImage('assets/images/wwg.png'),
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Title text
-                  Text(
-                    'forgot_password'.tr(context),
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.brown,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: ResponsiveSize.getHeight(2)),
-                  Text(
-                    'reset_password_description'.tr(context),
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: ResponsiveSize.getHeight(10)),
-
-                  // Email field
-                  TextFormField(
-                    controller: _emailController,
-                    decoration: InputDecoration(
-                      labelText: 'email'.tr(context),
-                      prefixIcon: const Icon(
-                        Icons.email_outlined,
-                        color: Colors.brown,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: Colors.brown,
-                          width: 2,
-                        ),
-                      ),
-                      contentPadding: ResponsiveSize.getScaledPadding(
-                        const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 16,
-                        ),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade50,
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'email_required'.tr(context);
-                      }
-                      if (!RegExp(
-                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                      ).hasMatch(value)) {
-                        return 'valid_email_required'.tr(context);
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: ResponsiveSize.getHeight(8)),
-
-                  // Reset Password button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _handleResetPassword,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.brown,
-                      minimumSize: Size(
-                        double.infinity,
-                        ResponsiveSize.getHeight(12),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
-                    child:
-                        _isLoading
-                            ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                            : Text(
-                              'reset_password'.tr(context),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                      // Reset Password button (hide if email sent)
+                      if (!_emailSent)
+                        ElevatedButton(
+                          onPressed: _isLoading ? null : _handleResetPassword,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.brown,
+                            minimumSize: Size(
+                              double.infinity,
+                              isMobile ? 45 : ResponsiveSize.getHeight(12),
                             ),
-                  ),
-                  SizedBox(height: ResponsiveSize.getHeight(4)),
-
-                  // Success message if email was sent
-                  if (_emailSent)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.green.withOpacity(0.3),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(
-                            Icons.check_circle_outline,
-                            color: Colors.green,
-                            size: 48,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'reset_link_sent'.tr(context),
+                          child:
+                              _isLoading
+                                  ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : Text(
+                                    'reset_password'.tr(context),
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 14 : 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                        ),
+                      SizedBox(height: ResponsiveSize.getHeight(4)),
+
+                      // Back to login link
+                      Center(
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.brown,
+                          ),
+                          child: Text(
+                            'back_to_login'.tr(context),
                             style: TextStyle(
-                              fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Colors.green[700],
+                              fontSize: isMobile ? 14 : 16,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'reset_link_message'.tr(context),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.green[700]),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  const SizedBox(height: 32),
-
-                  // Back to login link
-                  Center(
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.brown,
-                      ),
-                      child: Text(
-                        'back_to_login'.tr(context),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
                         ),
                       ),
-                    ),
+
+                      SizedBox(height: isMobile ? 24 : 40),
+                    ],
                   ),
-                  const SizedBox(height: 40),
-                ],
+                ),
               ),
             ),
           ),

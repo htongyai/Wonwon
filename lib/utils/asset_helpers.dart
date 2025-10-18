@@ -45,13 +45,43 @@ class AssetHelpers {
   }
 
   /// Generate placeholder image with shop name
-  static Widget getShopPlaceholder(String shopName) {
+  static Widget getShopPlaceholder(
+    String shopName, {
+    double? containerWidth,
+    double? containerHeight,
+  }) {
     final nameInitials =
         shopName
             .split(' ')
             .take(2)
             .map((word) => word.isNotEmpty ? word[0].toUpperCase() : '')
             .join();
+
+    // Calculate responsive font size based on container dimensions
+    double fontSize = 32; // Default size
+    if (containerWidth != null && containerHeight != null) {
+      // Use the smaller dimension to ensure the text fits well
+      final minDimension =
+          containerWidth < containerHeight ? containerWidth : containerHeight;
+
+      // Scale font size based on container size
+      if (minDimension < 80) {
+        fontSize = 16;
+      } else if (minDimension < 120) {
+        fontSize = 24;
+      } else if (minDimension < 160) {
+        fontSize = 32;
+      } else if (minDimension < 200) {
+        fontSize = 40;
+      } else {
+        fontSize = 48;
+      }
+
+      // Fine-tune based on text length
+      if (nameInitials.length > 1) {
+        fontSize *= 0.85; // Slightly smaller for two letters
+      }
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -67,10 +97,11 @@ class AssetHelpers {
       child: Center(
         child: Text(
           nameInitials,
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
-            fontSize: 32,
+            fontSize: fontSize,
             fontWeight: FontWeight.bold,
+            letterSpacing: nameInitials.length > 1 ? -1.0 : 0.0,
           ),
         ),
       ),

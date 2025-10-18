@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
-import 'package:wonwonw2/utils/responsive_size.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
-import 'package:go_router/go_router.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wonwonw2/utils/icon_helper.dart';
 import 'package:wonwonw2/screens/settings_screen.dart';
+import 'package:wonwonw2/screens/login_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:wonwonw2/widgets/notification_icon.dart';
+import 'package:wonwonw2/services/notification_controller.dart';
 
 class DesktopNavigation extends StatefulWidget {
   final int currentIndex;
@@ -34,137 +34,203 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
   static const double sidebarWidth = 280.0;
   static const double collapsedSidebarWidth = 80.0;
   bool _isSidebarCollapsed = false;
-  bool _isAdmin = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkAdminStatus();
-  }
-
-  Future<void> _checkAdminStatus() async {
-    // For now, we'll check if the user is logged in as admin
-    // You can implement your own admin check logic here
-    final user = FirebaseAuth.instance.currentUser;
-    print('Checking admin status for user: ${user?.uid}');
-
-    if (user != null) {
-      // Check if user has admin role in Firestore
-      try {
-        final userDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get();
-
-        if (userDoc.exists) {
-          final userData = userDoc.data();
-          print('User data: $userData');
-          final isAdmin =
-              userData?['role'] == 'admin' || userData?['isAdmin'] == true;
-          print('Is admin: $isAdmin');
-          setState(() {
-            _isAdmin = isAdmin;
-          });
-        } else {
-          print('User document does not exist');
-        }
-      } catch (e) {
-        print('Error checking admin status: $e');
-      }
-    } else {
-      print('No user logged in');
-    }
-
-    // Temporary: For testing, you can uncomment the line below to always show admin
-    setState(() {
-      _isAdmin = true;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       body: Row(
         children: [
           // Sidebar
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             width: _isSidebarCollapsed ? collapsedSidebarWidth : sidebarWidth,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(
-                right: BorderSide(
-                  color: Colors.grey.withOpacity(0.2),
-                  width: 1,
-                ),
+                right: BorderSide(color: Color(0xFFE2E8F0), width: 1),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  spreadRadius: 0,
-                  offset: const Offset(2, 0),
-                ),
-              ],
             ),
             child: Column(
               children: [
-                // Header with logo and collapse button
-                Container(
-                  height: 80,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Colors.grey.withOpacity(0.2),
-                        width: 1,
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      if (!_isSidebarCollapsed) ...[
-                        // Logo and name
+                // WonWon Logo
+                if (!_isSidebarCollapsed)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Logo
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Image.asset(
+                            'assets/images/wwg.png',
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              // Fallback to text logo if image fails to load
+                              return Container(
+                                width: 50,
+                                height: 50,
+                                decoration: BoxDecoration(
+                                  color: AppConstants.primaryColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'WW',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // App Name and Tagline
                         Expanded(
                           child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Image.asset(
-                                'assets/images/wwg.png',
-                                height: 32,
-                                fit: BoxFit.contain,
-                              ),
-                              const SizedBox(height: 4),
                               Text(
                                 'WonWon',
-                                style: GoogleFonts.montserrat(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppConstants.primaryColor,
+                                style: GoogleFonts.inter(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E293B),
+                                ),
+                              ),
+                              Text(
+                                'Repair Finder',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF64748B),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        // Collapse button
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _isSidebarCollapsed = !_isSidebarCollapsed;
+                            });
+                            widget.onSidebarCollapsed?.call(
+                              _isSidebarCollapsed,
+                            );
+                          },
+                          icon: Icon(
+                            Icons.menu,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
                       ],
-                      // Collapse/Expand button
-                      IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _isSidebarCollapsed = !_isSidebarCollapsed;
-                          });
-                          widget.onSidebarCollapsed?.call(_isSidebarCollapsed);
-                        },
-                        icon: Icon(
-                          _isSidebarCollapsed
-                              ? Icons.chevron_right
-                              : Icons.chevron_left,
+                    ),
+                  )
+                else
+                  // Collapsed logo
+                  Container(
+                    height: 80,
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppConstants.primaryColor,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'WW',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _isSidebarCollapsed = !_isSidebarCollapsed;
+                            });
+                            widget.onSidebarCollapsed?.call(
+                              _isSidebarCollapsed,
+                            );
+                          },
+                          icon: Icon(
+                            Icons.menu_open,
+                            color: const Color(0xFF64748B),
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Header Section
+                Container(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
                           color: AppConstants.primaryColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          FontAwesomeIcons.home,
+                          color: Colors.white,
+                          size: 20,
                         ),
                       ),
+                      if (!_isSidebarCollapsed) ...[
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Main App',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1E293B),
+                              ),
+                            ),
+                            Text(
+                              'User Dashboard',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -209,76 +275,6 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
                         'forum',
                         _isSidebarCollapsed,
                       ),
-                      // Admin section
-                      if (_isAdmin) ...[
-                        const SizedBox(height: 20),
-                        // Admin heading
-                        if (!_isSidebarCollapsed)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            child: Text(
-                              'ADMIN',
-                              style: GoogleFonts.montserrat(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[600],
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                          ),
-                        // Divider
-                        Container(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          height: 1,
-                          color: Colors.grey.withOpacity(0.3),
-                        ),
-                        // Dashboard option
-                        _buildNavItem(
-                          context,
-                          5,
-                          FontAwesomeIcons.chartLine,
-                          'dashboard',
-                          _isSidebarCollapsed,
-                        ),
-                        // Manage Shops option
-                        _buildNavItem(
-                          context,
-                          6,
-                          FontAwesomeIcons.store,
-                          'manage_shops',
-                          _isSidebarCollapsed,
-                        ),
-                        // Manage Users option
-                        _buildNavItem(
-                          context,
-                          7,
-                          FontAwesomeIcons.users,
-                          'manage_users',
-                          _isSidebarCollapsed,
-                        ),
-                        // Unapprove Pages option
-                        _buildNavItem(
-                          context,
-                          8,
-                          FontAwesomeIcons.clock,
-                          'unapprove_pages',
-                          _isSidebarCollapsed,
-                        ),
-                        // Reports option
-                        _buildNavItem(
-                          context,
-                          9,
-                          FontAwesomeIcons.chartBar,
-                          'reports',
-                          _isSidebarCollapsed,
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -308,7 +304,82 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
           ),
 
           // Main content area
-          Expanded(child: widget.child),
+          Expanded(
+            child: Column(
+              children: [
+                // Top title bar with login/profile circle
+                Container(
+                  height: 80,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.grey.withOpacity(0.2),
+                        width: 1,
+                      ),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      // Page title (will be set by individual screens)
+                      Expanded(
+                        child: Text(
+                          _getPageTitle(context),
+                          style: GoogleFonts.montserrat(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppConstants.darkColor,
+                          ),
+                        ),
+                      ),
+
+                      // Notification icon (only when logged in)
+                      FutureBuilder<User?>(
+                        future: Future.value(FirebaseAuth.instance.currentUser),
+                        builder: (context, snapshot) {
+                          final user = snapshot.data;
+                          if (user != null) {
+                            return Row(
+                              children: [
+                                NotificationIcon(
+                                  onTap: () {
+                                    NotificationController().openSidebar();
+                                  },
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                              ],
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                      // Login/Profile circle
+                      _buildLoginProfileCircle(context),
+                    ],
+                  ),
+                ),
+                // Main content
+                Expanded(
+                  child: Container(
+                    color: const Color(0xFFF8FAFC),
+                    child: widget.child,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -324,7 +395,7 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
     final isSelected = widget.currentIndex == index;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -332,32 +403,55 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: EdgeInsets.symmetric(
-              horizontal: isCollapsed ? 16 : 20,
-              vertical: 16,
+              horizontal: isCollapsed ? 12 : 16,
+              vertical: 12,
             ),
             decoration: BoxDecoration(
               color:
-                  isSelected ? AppConstants.primaryColor : Colors.transparent,
+                  isSelected
+                      ? AppConstants.primaryColor.withOpacity(0.1)
+                      : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
+              border:
+                  isSelected
+                      ? Border.all(
+                        color: AppConstants.primaryColor.withOpacity(0.2),
+                      )
+                      : null,
             ),
             child: Row(
               children: [
-                FaIcon(
-                  icon,
-                  color: isSelected ? Colors.white : AppConstants.primaryColor,
-                  size: 20,
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color:
+                        isSelected
+                            ? AppConstants.primaryColor
+                            : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: FaIcon(
+                      icon,
+                      color:
+                          isSelected ? Colors.white : const Color(0xFF64748B),
+                      size: 16,
+                    ),
+                  ),
                 ),
                 if (!isCollapsed) ...[
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       label.tr(context),
-                      style: GoogleFonts.montserrat(
-                        fontSize: 16,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                         color:
-                            isSelected ? Colors.white : AppConstants.darkColor,
+                            isSelected
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFF64748B),
                       ),
                     ),
                   ),
@@ -405,11 +499,13 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset(
-                      'assets/images/flag_us.png',
-                      width: 20,
-                      height: 15,
-                      fit: BoxFit.cover,
+                    FaIcon(
+                      FontAwesomeIcons.flag,
+                      size: 16,
+                      color:
+                          isEnglish
+                              ? AppConstants.primaryColor
+                              : Colors.grey[600],
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -455,15 +551,17 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset(
-                      'assets/images/flag_th.png',
-                      width: 20,
-                      height: 15,
-                      fit: BoxFit.cover,
+                    FaIcon(
+                      FontAwesomeIcons.flag,
+                      size: 16,
+                      color:
+                          !isEnglish
+                              ? AppConstants.primaryColor
+                              : Colors.grey[600],
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'TH',
+                      'ไทย',
                       style: GoogleFonts.montserrat(
                         fontSize: 14,
                         fontWeight:
@@ -534,5 +632,120 @@ class _DesktopNavigationState extends State<DesktopNavigation> {
         );
       }
     }
+  }
+
+  // Get page title based on current index
+  String _getPageTitle(BuildContext context) {
+    switch (widget.currentIndex) {
+      case 0:
+        return 'home'.tr(context);
+      case 1:
+        return 'search'.tr(context);
+      case 2:
+        return 'saved_locations'.tr(context);
+      case 3:
+        return 'profile'.tr(context);
+      case 4:
+        return 'forum'.tr(context);
+      case 5:
+        return 'dashboard'.tr(context);
+      case 6:
+        return 'manage_shops'.tr(context);
+      case 7:
+        return 'manage_users'.tr(context);
+      case 8:
+        return 'unapprove_pages'.tr(context);
+      case 9:
+        return 'reports'.tr(context);
+      default:
+        return 'home'.tr(context);
+    }
+  }
+
+  // Build login/profile circle
+  Widget _buildLoginProfileCircle(BuildContext context) {
+    return FutureBuilder<User?>(
+      future: Future.value(FirebaseAuth.instance.currentUser),
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+
+        if (user != null) {
+          // User is logged in - show profile circle
+          return GestureDetector(
+            onTap: () {
+              // Navigate to profile or show profile menu
+              widget.onTap(3); // Navigate to profile page
+            },
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    AppConstants.primaryColor,
+                    AppConstants.primaryColor.withOpacity(0.8),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppConstants.primaryColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  user.displayName?.isNotEmpty == true
+                      ? user.displayName![0].toUpperCase()
+                      : user.email?.isNotEmpty == true
+                      ? user.email![0].toUpperCase()
+                      : 'U',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          );
+        } else {
+          // User is not logged in - show login text button
+          return GestureDetector(
+            onTap: () {
+              // Navigate to login page
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppConstants.primaryColor,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppConstants.primaryColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                'Log In',
+                style: GoogleFonts.montserrat(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          );
+        }
+      },
+    );
   }
 }

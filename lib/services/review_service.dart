@@ -1,10 +1,11 @@
 import 'package:wonwonw2/models/review.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/services/content_management_service.dart';
+import 'package:wonwonw2/services/activity_service.dart';
 
 class ReviewService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final String _collection = 'reviews';
 
   // Get reviews for a specific shop
   Future<List<Review>> getReviewsForShop(String shopId) async {
@@ -72,6 +73,18 @@ class ReviewService {
         final avg = total / reviews.length;
         await shopRef.update({'rating': avg, 'reviewCount': reviews.length});
       }
+
+      // Log review activity
+      try {
+        await ActivityService().logReviewPosted(
+          review.id,
+          review.shopId,
+          review.rating,
+          review.userName,
+        );
+      } catch (e) {
+        appLog('Error logging review activity: $e');
+      }
     } catch (e) {
       appLog('Error adding review: $e');
       rethrow;
@@ -95,6 +108,113 @@ class ReviewService {
     } catch (e) {
       appLog('Error adding reply to review: $e');
       rethrow;
+    }
+  }
+
+  // Delete a review with permission check
+  Future<bool> deleteReview(
+    String shopId,
+    String reviewId,
+    String reviewAuthorId,
+  ) async {
+    try {
+      final contentService = ContentManagementService();
+      final canDelete = await contentService.canDeleteContent(reviewAuthorId);
+
+      if (!canDelete) {
+        appLog('User does not have permission to delete this review');
+        return false;
+      }
+
+      // Delete the review
+      await _firestore
+          .collection('shops')
+          .doc(shopId)
+          .collection('review')
+          .doc(reviewId)
+          .delete();
+
+      // Update average rating and review count
+      final reviewsSnapshot =
+          await _firestore
+              .collection('shops')
+              .doc(shopId)
+              .collection('review')
+              .get();
+
+      final reviews = reviewsSnapshot.docs;
+      if (reviews.isNotEmpty) {
+        double total = 0;
+        for (var doc in reviews) {
+          final data = doc.data();
+          if (data['rating'] != null) {
+            total += (data['rating'] as num).toDouble();
+          }
+        }
+        final avg = total / reviews.length;
+        await _firestore.collection('shops').doc(shopId).update({
+          'rating': avg,
+          'reviewCount': reviews.length,
+        });
+      } else {
+        // No reviews left, reset to default values
+        await _firestore.collection('shops').doc(shopId).update({
+          'rating': 0.0,
+          'reviewCount': 0,
+        });
+      }
+
+      appLog('Review deleted successfully: $reviewId');
+      return true;
+    } catch (e) {
+      appLog('Error deleting review: $e');
+      return false;
+    }
+  }
+
+  // Delete a review reply with permission check
+  Future<bool> deleteReviewReply(
+    String shopId,
+    String reviewId,
+    String replyId,
+    String replyAuthorId,
+  ) async {
+    try {
+      final contentService = ContentManagementService();
+      final canDelete = await contentService.canDeleteContent(replyAuthorId);
+
+      if (!canDelete) {
+        appLog('User does not have permission to delete this reply');
+        return false;
+      }
+
+      // Get the current review to find and remove the specific reply
+      final reviewRef = _firestore
+          .collection('shops')
+          .doc(shopId)
+          .collection('review')
+          .doc(reviewId);
+
+      final reviewDoc = await reviewRef.get();
+      if (!reviewDoc.exists) {
+        appLog('Review not found: $reviewId');
+        return false;
+      }
+
+      final data = reviewDoc.data()!;
+      final replies = List<Map<String, dynamic>>.from(data['replies'] ?? []);
+
+      // Remove the specific reply
+      replies.removeWhere((reply) => reply['id'] == replyId);
+
+      // Update the review with the new replies list
+      await reviewRef.update({'replies': replies});
+
+      appLog('Review reply deleted successfully: $replyId');
+      return true;
+    } catch (e) {
+      appLog('Error deleting review reply: $e');
+      return false;
     }
   }
 }

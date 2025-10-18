@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:wonwonw2/services/auth_service.dart';
 import 'package:wonwonw2/services/report_service.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
-import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/mixins/auth_state_mixin.dart';
 
 class ReportFormScreen extends StatefulWidget {
   final String shopId;
@@ -18,7 +18,8 @@ class ReportFormScreen extends StatefulWidget {
   State<ReportFormScreen> createState() => _ReportFormScreenState();
 }
 
-class _ReportFormScreenState extends State<ReportFormScreen> {
+class _ReportFormScreenState extends State<ReportFormScreen>
+    with AuthStateMixin {
   String _selectedReason = '';
   String _correctInfo = '';
   String _details = '';
@@ -74,7 +75,6 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
     return Scaffold(
       appBar: AppBar(
         title: Text('report_incorrect'.tr(context)),

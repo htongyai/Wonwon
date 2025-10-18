@@ -3,21 +3,14 @@ import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/constants/app_colors.dart';
 import 'package:wonwonw2/constants/app_text_styles.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
-import 'package:wonwonw2/models/repair_sub_service.dart';
-import 'package:wonwonw2/services/shop_service.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/screens/map_picker_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:image_cropper/image_cropper.dart';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/widgets/section_title.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -56,8 +49,6 @@ class _EditShopScreenState extends State<EditShopScreen> {
 
   // Image variables
   Uint8List? _selectedImageBytes;
-  String? _imageError;
-  bool _isProcessingImage = false;
   List<String> _existingPhotos = [];
 
   List<String> _selectedCategories = [];
@@ -69,9 +60,6 @@ class _EditShopScreenState extends State<EditShopScreen> {
     'electronics',
     'appliance',
   ];
-
-  // Map to store selected sub-services for each category
-  final Map<String, List<String>> _selectedSubServices = {};
 
   final Map<String, TextEditingController> _hoursControllers = {
     'Monday': TextEditingController(),
@@ -364,18 +352,48 @@ class _EditShopScreenState extends State<EditShopScreen> {
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: TextField(
                   controller: _latitudeController,
-                  label: 'Latitude',
-                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Latitude',
+                    hintText: '13.7563',
+                    prefixIcon: Icon(
+                      Icons.location_on,
+                      size: 16,
+                      color: AppConstants.primaryColor,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    helperText: 'e.g., 13.7563 (you can paste coordinates)',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                    signed: true,
+                  ),
                 ),
               ),
               SizedBox(width: ResponsiveSize.getWidth(2)),
               Expanded(
-                child: _buildTextField(
+                child: TextField(
                   controller: _longitudeController,
-                  label: 'Longitude',
-                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Longitude',
+                    hintText: '100.5018',
+                    prefixIcon: Icon(
+                      Icons.location_on,
+                      size: 16,
+                      color: AppConstants.primaryColor,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    helperText: 'e.g., 100.5018 (you can paste coordinates)',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                    signed: true,
+                  ),
                 ),
               ),
             ],

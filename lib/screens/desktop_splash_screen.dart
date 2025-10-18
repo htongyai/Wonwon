@@ -4,7 +4,7 @@ import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
-import 'package:go_router/go_router.dart';
+import 'package:wonwonw2/screens/main_navigation.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class DesktopSplashScreen extends StatefulWidget {
@@ -27,7 +27,8 @@ class _DesktopSplashScreenState extends State<DesktopSplashScreen>
   late Animation<double> _loadingFadeAnimation;
 
   String _selectedLanguage = 'en';
-  bool _isLoading = true;
+  bool _languageSelected = false;
+  bool _isTransitioning = false;
 
   @override
   void initState() {
@@ -90,12 +91,8 @@ class _DesktopSplashScreenState extends State<DesktopSplashScreen>
     // Start animations in sequence
     _startAnimations();
 
-    // Navigate to home screen after delay
-    Timer(const Duration(seconds: 4), () {
-      if (mounted) {
-        context.go('/home');
-      }
-    });
+    // Check if language is already set
+    _checkExistingLanguage();
   }
 
   void _startAnimations() async {
@@ -110,6 +107,39 @@ class _DesktopSplashScreenState extends State<DesktopSplashScreen>
     _textAnimationController.dispose();
     _loadingAnimationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkExistingLanguage() async {
+    try {
+      final locale = await AppLocalizationsService.getLocale();
+      if (locale.languageCode.isNotEmpty) {
+        setState(() {
+          _selectedLanguage = locale.languageCode;
+          _languageSelected = true;
+        });
+        // If language is already set, transition after a short delay
+        Timer(const Duration(seconds: 1), () {
+          if (mounted && !_isTransitioning) {
+            _transitionToHome();
+          }
+        });
+      }
+    } catch (e) {
+      // If no language is set, wait for user selection
+      print('No language set, waiting for user selection');
+    }
+  }
+
+  void _transitionToHome() {
+    if (_isTransitioning) return;
+    setState(() {
+      _isTransitioning = true;
+    });
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => const MainNavigation(child: SizedBox()),
+      ),
+    );
   }
 
   @override
@@ -152,33 +182,17 @@ class _DesktopSplashScreenState extends State<DesktopSplashScreen>
                     child: Container(
                       width: 300,
                       height: 250,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          color: Colors.white.withOpacity(0.1),
-                          child: Center(
-                            child: Image.asset(
-                              'assets/images/www.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                return FaIcon(
-                                  FontAwesomeIcons.screwdriverWrench,
-                                  size: 150,
-                                  color: Colors.white,
-                                );
-                              },
-                            ),
-                          ),
+                      child: Center(
+                        child: Image.asset(
+                          'assets/images/www.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) {
+                            return FaIcon(
+                              FontAwesomeIcons.screwdriverWrench,
+                              size: 150,
+                              color: Colors.white,
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -277,6 +291,13 @@ class _DesktopSplashScreenState extends State<DesktopSplashScreen>
                               await AppLocalizationsService.setLocale('en');
                               setState(() {
                                 _selectedLanguage = 'en';
+                                _languageSelected = true;
+                              });
+                              // Transition to home after language selection
+                              Timer(const Duration(milliseconds: 500), () {
+                                if (mounted && !_isTransitioning) {
+                                  _transitionToHome();
+                                }
                               });
                             },
                             style: ElevatedButton.styleFrom(
@@ -310,6 +331,13 @@ class _DesktopSplashScreenState extends State<DesktopSplashScreen>
                               await AppLocalizationsService.setLocale('th');
                               setState(() {
                                 _selectedLanguage = 'th';
+                                _languageSelected = true;
+                              });
+                              // Transition to home after language selection
+                              Timer(const Duration(milliseconds: 500), () {
+                                if (mounted && !_isTransitioning) {
+                                  _transitionToHome();
+                                }
                               });
                             },
                             style: ElevatedButton.styleFrom(
@@ -353,29 +381,54 @@ class _DesktopSplashScreenState extends State<DesktopSplashScreen>
                         child: child,
                       );
                     },
-                    child: Column(
-                      children: [
-                        const SizedBox(
-                          width: 60,
-                          height: 60,
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
+                    child:
+                        _languageSelected
+                            ? Column(
+                              children: [
+                                const SizedBox(
+                                  width: 60,
+                                  height: 60,
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                    strokeWidth: 4,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'preparing_your_experience'.tr(context),
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 16,
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            )
+                            : Column(
+                              children: [
+                                const SizedBox(
+                                  width: 60,
+                                  height: 60,
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                    strokeWidth: 4,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'loading'.tr(context),
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 16,
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
-                            strokeWidth: 4,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'loading'.tr(context),
-                          style: GoogleFonts.montserrat(
-                            fontSize: 16,
-                            color: Colors.white.withOpacity(0.8),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
 
                   const Spacer(flex: 2),

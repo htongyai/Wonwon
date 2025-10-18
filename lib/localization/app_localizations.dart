@@ -30,18 +30,42 @@ class AppLocalizations {
   /// Load the localization data from JSON files
   /// Returns true when loading is complete
   Future<bool> load() async {
-    // Load the language JSON file from the "lang" folder
-    String jsonString = await rootBundle.loadString(
-      'assets/lang/${locale.languageCode}.json',
-    );
-    Map<String, dynamic> jsonMap = json.decode(jsonString);
+    try {
+      // Load the language JSON file from the "lang" folder
+      String jsonString = await rootBundle.loadString(
+        'assets/lang/${locale.languageCode}.json',
+      );
+      Map<String, dynamic> jsonMap = json.decode(jsonString);
 
-    // Convert all values to strings
-    _localizedStrings = jsonMap.map((key, value) {
-      return MapEntry(key, value.toString());
-    });
+      // Convert all values to strings
+      _localizedStrings = jsonMap.map((key, value) {
+        return MapEntry(key, value.toString());
+      });
 
-    return true;
+      return true;
+    } catch (e) {
+      // Fallback to English if the requested locale fails
+      if (locale.languageCode != 'en') {
+        try {
+          String jsonString = await rootBundle.loadString(
+            'assets/lang/en.json',
+          );
+          Map<String, dynamic> jsonMap = json.decode(jsonString);
+          _localizedStrings = jsonMap.map((key, value) {
+            return MapEntry(key, value.toString());
+          });
+          return true;
+        } catch (fallbackError) {
+          // If even English fails, use empty map with key fallback
+          _localizedStrings = {};
+          return true;
+        }
+      } else {
+        // If English itself fails, use empty map
+        _localizedStrings = {};
+        return true;
+      }
+    }
   }
 
   /// Translate a key to the corresponding string in the current locale
@@ -52,7 +76,7 @@ class AppLocalizations {
 
   // Singleton instance for global access
   static final AppLocalizations _instance = AppLocalizations(
-    const Locale('en'),
+    const Locale('th'),
   );
   factory AppLocalizations.instance() => _instance;
 }
@@ -106,10 +130,10 @@ class AppLocalizationsService {
   Stream<Locale> get localeStream => _controller.stream;
 
   /// Get the user's preferred locale from persistent storage
-  /// Defaults to English ('en') if not set
+  /// Defaults to Thai ('th') if not set
   static Future<Locale> getLocale() async {
     final prefs = await SharedPreferences.getInstance();
-    String languageCode = prefs.getString(LANGUAGE_CODE) ?? 'en';
+    String languageCode = prefs.getString(LANGUAGE_CODE) ?? 'th';
     return Locale(languageCode);
   }
 

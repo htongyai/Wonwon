@@ -12,6 +12,11 @@ class ForumReply {
   final List<String> likedBy;
   final bool isSolution;
   final String? parentReplyId; // For nested replies
+  final bool isHidden;
+  final bool isDeleted;
+  final String? moderationReason;
+  final String? moderatedBy;
+  final DateTime? moderatedAt;
   final Map<String, dynamic> metadata;
 
   ForumReply({
@@ -26,6 +31,11 @@ class ForumReply {
     this.likedBy = const [],
     this.isSolution = false,
     this.parentReplyId,
+    this.isHidden = false,
+    this.isDeleted = false,
+    this.moderationReason,
+    this.moderatedBy,
+    this.moderatedAt,
     this.metadata = const {},
   });
 
@@ -45,6 +55,14 @@ class ForumReply {
       likedBy: List<String>.from(map['likedBy'] ?? []),
       isSolution: map['isSolution'] ?? false,
       parentReplyId: map['parentReplyId'],
+      isHidden: map['isHidden'] ?? false,
+      isDeleted: map['isDeleted'] ?? false,
+      moderationReason: map['moderationReason'],
+      moderatedBy: map['moderatedBy'],
+      moderatedAt:
+          map['moderatedAt'] != null
+              ? (map['moderatedAt'] as Timestamp).toDate()
+              : null,
       metadata: Map<String, dynamic>.from(map['metadata'] ?? {}),
     );
   }
@@ -61,6 +79,12 @@ class ForumReply {
       'likedBy': likedBy,
       'isSolution': isSolution,
       'parentReplyId': parentReplyId,
+      'isHidden': isHidden,
+      'isDeleted': isDeleted,
+      'moderationReason': moderationReason,
+      'moderatedBy': moderatedBy,
+      'moderatedAt':
+          moderatedAt != null ? Timestamp.fromDate(moderatedAt!) : null,
       'metadata': metadata,
     };
   }
@@ -77,6 +101,11 @@ class ForumReply {
     List<String>? likedBy,
     bool? isSolution,
     String? parentReplyId,
+    bool? isHidden,
+    bool? isDeleted,
+    String? moderationReason,
+    String? moderatedBy,
+    DateTime? moderatedAt,
     Map<String, dynamic>? metadata,
   }) {
     return ForumReply(
@@ -91,6 +120,11 @@ class ForumReply {
       likedBy: likedBy ?? this.likedBy,
       isSolution: isSolution ?? this.isSolution,
       parentReplyId: parentReplyId ?? this.parentReplyId,
+      isHidden: isHidden ?? this.isHidden,
+      isDeleted: isDeleted ?? this.isDeleted,
+      moderationReason: moderationReason ?? this.moderationReason,
+      moderatedBy: moderatedBy ?? this.moderatedBy,
+      moderatedAt: moderatedAt ?? this.moderatedAt,
       metadata: metadata ?? this.metadata,
     );
   }

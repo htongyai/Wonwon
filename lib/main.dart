@@ -1,425 +1,391 @@
 import 'package:flutter/material.dart';
-import 'package:wonwonw2/constants/app_constants.dart';
-import 'package:wonwonw2/screens/main_navigation.dart';
-import 'package:wonwonw2/screens/signup_screen.dart';
-import 'package:wonwonw2/screens/splash_screen.dart';
-import 'package:wonwonw2/screens/desktop_splash_screen.dart';
-import 'package:wonwonw2/utils/responsive_size.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
-import 'dart:math';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:wonwonw2/localization/app_localizations.dart';
-import 'package:wonwonw2/services/service_providers.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:geolocator_web/geolocator_web.dart'
-    if (dart.library.io) 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-import 'package:wonwonw2/services/auth_state_service.dart';
-import 'package:go_router/go_router.dart';
-import 'screens/shop_detail_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/map_screen.dart';
-import 'screens/saved_locations_screen.dart';
-import 'screens/profile_screen.dart';
-import 'screens/admin_manage_shops_screen.dart';
-import 'screens/admin_manage_users_screen.dart';
-import 'screens/admin_unapprove_pages_screen.dart';
-import 'screens/admin_reports_screen.dart';
-import 'screens/admin_dashboard_screen.dart';
-import 'screens/forum_screen.dart';
-import 'screens/forum_create_topic_screen.dart';
-import 'screens/forum_topic_detail_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/forgot_password_screen.dart';
-import 'screens/terms_of_use_screen.dart';
-import 'screens/privacy_policy_screen.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+// Removed go_router import - using basic navigation
+import 'package:provider/provider.dart';
 
-/// Entry point for the WonWon Repair Finder application
-/// Initializes app services and configurations before launching the UI
+// Core imports
+import 'firebase_options.dart';
+import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/localization/app_localizations.dart';
+import 'package:wonwonw2/utils/performance_utils.dart';
+import 'package:wonwonw2/config/web_config.dart';
+
+// State management
+import 'package:wonwonw2/state/app_state_manager.dart';
+import 'package:wonwonw2/services/service_manager.dart';
+import 'package:wonwonw2/services/cache_service.dart';
+import 'package:wonwonw2/services/version_service.dart';
+import 'package:wonwonw2/services/auth_manager.dart';
+
+// Screens
+import 'package:wonwonw2/widgets/auth_gate.dart';
+import 'package:wonwonw2/services/service_providers.dart';
+
+/// Optimized entry point for the WonWon Repair Finder application
 void main() async {
-  // Ensure Flutter binding is initialized
+  // Start performance measurement
+  PerformanceUtils.startMeasurement('app_startup');
+
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Web specific configuration
-  if (kIsWeb) {
-    // Use URL path strategy instead of hash strategy for cleaner URLs
-    setUrlStrategy(PathUrlStrategy());
-
-    // Initialize web renderer settings
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-
-    // Configure web renderer
-    await Future.delayed(Duration.zero); // Ensure web renderer is ready
-  }
-
-  // Initialize Firebase
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+    // Configure URL strategy for web
+    if (kIsWeb) {
+      usePathUrlStrategy();
+      WebPerformance.startMeasurement('web_init');
+    }
+
+    // Initialize Firebase
+    await PerformanceUtils.measureAsync(
+      'firebase_init',
+      () => Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ),
     );
-    print('Firebase initialized successfully');
-  } catch (e) {
-    print('Error initializing Firebase: $e');
-  }
 
-  // Initialize AuthStateService
-  await authStateService.initialize();
+    // Check for version updates and clear cache if needed
+    await PerformanceUtils.measureAsync(
+      'version_check',
+      () => VersionService().checkAndHandleVersionUpdate(),
+    );
 
-  // Lock the app to portrait orientation only for mobile devices
-  if (!kIsWeb) {
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-  }
+    // Initialize core services
+    await PerformanceUtils.measureAsync(
+      'services_init',
+      () => _initializeServices(),
+    );
 
-  // Retrieve the user's preferred language setting from local storage
-  final locale = await AppLocalizationsService.getLocale();
-
-  // Launch the app with the retrieved locale
-  runApp(MyApp(locale: locale));
-}
-
-/// Root widget of the application
-/// Manages global state, theming, and internationalization
-class MyApp extends StatefulWidget {
-  // The user's preferred locale/language setting
-  final Locale locale;
-
-  const MyApp({super.key, required this.locale});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  // Default to English locale if none is provided
-  Locale _locale = const Locale('en');
-
-  late final GoRouter _router = GoRouter(
-    redirect: (context, state) {
-      // Show splash screen for initial load
-      if (state.uri.path == '/') {
-        return '/splash';
+    // Get initial locale with fallback
+    Locale initialLocale;
+    try {
+      // Force English for admin deployments
+      if (WebConfig.isAdminOnlyDeployment) {
+        initialLocale = const Locale('en');
+      } else {
+        initialLocale = await AppLocalizationsService.getLocale();
       }
-      return null;
-    },
-    routes: [
-      // Splash screen route
-      GoRoute(
-        path: '/splash',
-        builder: (context, state) {
-          // Use desktop splash screen for desktop layout
-          if (ResponsiveSize.shouldShowDesktopLayout()) {
-            return const DesktopSplashScreen();
-          }
-          return const SplashScreen();
-        },
-      ),
-      // Standalone routes (outside of ShellRoute)
-      GoRoute(
-        path: '/signup',
-        builder: (context, state) => const SignupScreen(),
-      ),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(
-        path: '/forgot-password',
-        builder: (context, state) => const ForgotPasswordScreen(),
-      ),
-      GoRoute(
-        path: '/terms-of-use',
-        builder: (context, state) => const TermsOfUseScreen(),
-      ),
-      GoRoute(
-        path: '/privacy-policy',
-        builder: (context, state) => const PrivacyPolicyScreen(),
-      ),
-      GoRoute(
-        path: '/shops/:shopId',
-        builder: (context, state) {
-          final shopId = state.pathParameters['shopId']!;
-          return ShopDetailScreen(shopId: shopId);
-        },
-      ),
-      // Forum routes (outside ShellRoute for standalone screens)
-      GoRoute(
-        path: '/forum/create',
-        builder: (context, state) => const ForumCreateTopicScreen(),
-      ),
-      GoRoute(
-        path: '/forum/topic/:topicId',
-        builder: (context, state) {
-          final topicId = state.pathParameters['topicId']!;
-          return ForumTopicDetailScreen(topicId: topicId);
-        },
-      ),
-      // ShellRoute for main navigation
-      ShellRoute(
-        builder: (context, state, child) {
-          // Get the current path to determine the active tab
-          final path = state.uri.path;
-          int initialIndex = 0;
+    } catch (e) {
+      debugPrint('Failed to load locale, using default: $e');
+      initialLocale = const Locale('en'); // Fallback to English
+    }
 
-          if (path.startsWith('/map')) {
-            initialIndex = 1;
-          } else if (path.startsWith('/saved')) {
-            initialIndex = 2;
-          } else if (path.startsWith('/profile')) {
-            initialIndex = 3;
-          } else if (path.startsWith('/forum')) {
-            initialIndex = 4;
-          } else if (path.startsWith('/admin/dashboard')) {
-            initialIndex = 5;
-          } else if (path.startsWith('/admin/manage-shops')) {
-            initialIndex = 6;
-          } else if (path.startsWith('/admin/manage-users')) {
-            initialIndex = 7;
-          } else if (path.startsWith('/admin/unapprove-pages')) {
-            initialIndex = 8;
-          } else if (path.startsWith('/admin/reports')) {
-            initialIndex = 9;
-          }
+    // End startup measurement
+    PerformanceUtils.endMeasurement('app_startup');
 
-          return MainNavigation(initialIndex: initialIndex, child: child);
-        },
-        routes: [
-          GoRoute(
-            path: '/home',
-            builder: (context, state) => const HomeScreen(),
+    // Launch app
+    runApp(OptimizedWonWonApp(initialLocale: initialLocale));
+  } catch (e) {
+    // Handle initialization errors gracefully
+    if (kIsWeb) {
+      WebConfig.handleWebError(e, StackTrace.current);
+    }
+    debugPrint('App initialization error: $e');
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red),
+                SizedBox(height: 16),
+                Text(
+                  'App initialization failed',
+                  style: TextStyle(fontSize: 18),
+                ),
+                SizedBox(height: 8),
+                Text('Please refresh the page', style: TextStyle(fontSize: 14)),
+              ],
+            ),
           ),
-          GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
-          GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
-          GoRoute(
-            path: '/saved',
-            builder: (context, state) => const SavedLocationsScreen(),
-          ),
-          GoRoute(
-            path: '/profile',
-            builder: (context, state) => const ProfileScreen(),
-          ),
-          GoRoute(
-            path: '/forum',
-            builder: (context, state) => const ForumScreen(),
-          ),
-          GoRoute(
-            path: '/admin/dashboard',
-            builder: (context, state) => const AdminDashboardScreen(),
-          ),
-          GoRoute(
-            path: '/admin/manage-shops',
-            builder: (context, state) => const AdminManageShopsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/manage-users',
-            builder: (context, state) => const AdminManageUsersScreen(),
-          ),
-          GoRoute(
-            path: '/admin/unapprove-pages',
-            builder: (context, state) => const AdminUnapprovePagesScreen(),
-          ),
-          GoRoute(
-            path: '/admin/reports',
-            builder: (context, state) => const AdminReportsScreen(),
-          ),
-          GoRoute(
-            path: '/admin/reports',
-            builder: (context, state) => const AdminReportsScreen(),
-          ),
-        ],
+        ),
       ),
-    ],
-    errorBuilder: (context, state) => const NotFoundScreen(),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    // Set the locale from the widget parameter
-    _locale = widget.locale;
-
-    // Subscribe to locale changes to update the UI when language changes
-    AppLocalizationsService().localeStream.listen((locale) {
-      setState(() {
-        _locale = locale;
-      });
-    });
+    );
   }
+}
+
+/// Initialize all core services
+Future<void> _initializeServices() async {
+  final serviceManager = ServiceManager();
+  final cacheService = CacheService();
+  final appStateManager = AppStateManager();
+  final authManager = AuthManager();
+
+  // Initialize services in parallel where possible
+  await Future.wait([
+    serviceManager.initialize(),
+    cacheService.initialize(),
+    authManager.initialize(),
+  ]);
+
+  // Initialize app state (depends on services)
+  await appStateManager.initialize();
+}
+
+/// Optimized main application widget
+class OptimizedWonWonApp extends StatelessWidget {
+  final Locale initialLocale;
+
+  const OptimizedWonWonApp({Key? key, required this.initialLocale})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return ServiceProvider(
-      // Provide services to the entire app
       locationService: locationService,
       authStateService: authStateService,
-      child: MaterialApp.router(
-        title: AppConstants.appName,
-        locale: _locale,
-        // Define supported languages (English and Thai)
-        supportedLocales: const [
-          Locale('en', ''), // English
-          Locale('th', ''), // Thai
+      child: MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AppStateManager()),
+          Provider(create: (_) => ServiceManager()),
+          Provider(create: (_) => CacheService()),
+          Provider(create: (_) => AuthManager()),
         ],
-        // Register localization delegates for app-wide translation support
-        localizationsDelegates: [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        // App-wide theme configuration
-        theme: ThemeData(
-          // Create a consistent color scheme based on the app's primary color
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFFC3C130),
-            primary: AppConstants.primaryColor,
-            secondary: AppConstants.accentColor,
-            tertiary: AppConstants.tertiaryColor,
-            surface: Colors.white,
-            background: Colors.white,
-            onPrimary: Colors.white,
-            onSecondary: AppConstants.darkColor,
-            onTertiary: AppConstants.darkColor,
-            brightness: Brightness.light,
-          ),
-          scaffoldBackgroundColor: Colors.white,
-          cardColor: Colors.white,
-          // AppBar styling
-          appBarTheme: AppBarTheme(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            foregroundColor: AppConstants.primaryTextColor,
-            titleTextStyle: GoogleFonts.montserrat(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: AppConstants.darkColor,
-            ),
-          ),
-          // Button styling
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.accentColor,
-              foregroundColor: AppConstants.darkColor,
-            ),
-          ),
-          useMaterial3: true,
-        ),
-        // Custom builder to handle responsive layout and text scaling
-        builder: (context, child) {
-          // Initialize responsive sizing utility
-          ResponsiveSize.init(context);
+        child: Consumer<AppStateManager>(
+          builder: (context, appState, child) {
+            return PerformanceMonitorWidget(
+              showOverlay: kDebugMode && !kIsWeb, // Hide overlay on web
+              child: MaterialApp(
+                title: WebConfig.getAppTitle(),
+                debugShowCheckedModeBanner: false,
 
-          // Get current media query and text scaling
-          final mediaQuery = MediaQuery.of(context);
-          final textScaler = MediaQuery.textScalerOf(context);
+                // Theme configuration
+                theme: _buildTheme(false),
+                darkTheme: _buildTheme(true),
+                themeMode:
+                    appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
 
-          // Constrain text scaling to prevent layout issues with very large font settings
-          final constrainedTextScaler = textScaler.clamp(
-            minScaleFactor: 0.8,
-            maxScaleFactor: 1.2,
-          );
+                // Localization
+                locale: initialLocale,
+                localizationsDelegates: const [
+                  AppLocalizations.delegate,
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                supportedLocales: const [Locale('en', ''), Locale('th', '')],
 
-          // Apply constrained text scaling to the app
-          return MediaQuery(
-            data: mediaQuery.copyWith(textScaler: constrainedTextScaler),
-            child: Builder(
-              builder: (context) {
-                final screenWidth = MediaQuery.of(context).size.width;
-                // Determine if we're on a desktop-sized screen
-                final bool isDesktop = screenWidth > 900;
+                // Basic routing with authentication check
+                home: const AuthGate(),
 
-                // Create a container with appropriate styling based on device size
-                return Container(
-                  decoration: BoxDecoration(
-                    // Apply gradient background for desktop, solid color for mobile/tablet
-                    gradient:
-                        isDesktop
-                            ? const LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Color(0xFFF8F8F8), Color(0xFFEEEEEE)],
-                            )
-                            : null,
-                    color: isDesktop ? null : const Color(0xFFF5F5F5),
-                  ),
-                  child: Center(
-                    child: Builder(
-                      builder: (context) {
-                        // Get the current screen width
-                        final screenWidth = MediaQuery.of(context).size.width;
-
-                        // For desktop, use full width; for mobile/tablet, use constrained width
-                        final double maxWidth =
-                            ResponsiveSize.shouldShowDesktopLayout()
-                                ? screenWidth // Full width for desktop
-                                : screenWidth < 600
-                                ? screenWidth // Full width on phones
-                                : screenWidth < 900
-                                ? 540 // Slightly wider for tablets
-                                : 560; // Slightly wider for smaller desktop
-
-                        // For desktop, use full width without container constraints
-                        if (ResponsiveSize.shouldShowDesktopLayout()) {
-                          return child!;
-                        }
-
-                        // For mobile/tablet, use constrained container
-                        return Container(
-                          constraints: BoxConstraints(maxWidth: maxWidth),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            // Apply rounded corners only on desktop
-                            borderRadius:
-                                isDesktop ? BorderRadius.circular(8) : null,
-                            // Apply border only on desktop
-                            border:
-                                isDesktop
-                                    ? Border.all(
-                                      color: Colors.grey.withOpacity(0.2),
-                                      width: 1,
-                                    )
-                                    : null,
-                            // Apply shadow with different intensity based on device type
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(
-                                  isDesktop ? 0.1 : 0.05,
-                                ),
-                                blurRadius: isDesktop ? 20 : 10,
-                                spreadRadius: isDesktop ? 1 : 0,
-                                offset: const Offset(0, 0),
-                              ),
-                            ],
-                          ),
-                          child: child!,
-                        );
-                      },
+                // Performance optimizations
+                builder: (context, child) {
+                  return MediaQuery(
+                    data: MediaQuery.of(context).copyWith(
+                      textScaler: TextScaler.linear(
+                        kIsWeb ? 1.0 : 1.0, // Consistent scaling for web
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-        routerConfig: _router,
-        debugShowCheckedModeBanner: false,
+                    child: child ?? const SizedBox.shrink(),
+                  );
+                },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
+
+  /// Build optimized theme with white background and green accents only
+  ThemeData _buildTheme(bool isDark) {
+    // Create a custom color scheme with white background and green accents
+    final colorScheme =
+        isDark
+            ? ColorScheme.dark(
+              primary: AppConstants.primaryColor, // Green accent
+              secondary: AppConstants.primaryColor, // Green accent
+              surface: const Color(0xFF1E1E1E), // Dark surface for dark mode
+              background: const Color(
+                0xFF121212,
+              ), // Dark background for dark mode
+              onPrimary: Colors.white,
+              onSecondary: Colors.white,
+              onSurface: Colors.white,
+              onBackground: Colors.white,
+            )
+            : ColorScheme.light(
+              primary: AppConstants.primaryColor, // Green accent only
+              secondary: AppConstants.primaryColor, // Green accent only
+              surface: Colors.white, // Pure white surface
+              background: Colors.white, // Pure white background
+              onPrimary: Colors.white, // White text on green
+              onSecondary: Colors.white, // White text on green
+              onSurface: Colors.black87, // Dark text on white
+              onBackground: Colors.black87, // Dark text on white
+              outline: Colors.grey.shade300, // Light grey borders
+              surfaceVariant: Colors.grey.shade50, // Very light grey for cards
+            );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
+
+      // Performance optimizations
+      visualDensity:
+          kIsWeb
+              ? VisualDensity.standard
+              : VisualDensity.adaptivePlatformDensity,
+
+      // Typography optimized for web
+      textTheme: const TextTheme().apply(
+        fontFamily: kIsWeb ? WebConstants.primaryFontWeb : 'Roboto',
+        bodyColor: isDark ? Colors.white : Colors.black87,
+        displayColor: isDark ? Colors.white : Colors.black87,
+      ),
+
+      // Component themes
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        iconTheme: const IconThemeData(color: Colors.black87),
+        titleTextStyle: const TextStyle(
+          color: Colors.black87,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.grey.shade200, width: 1),
+        ),
+      ),
+
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppConstants.primaryColor, // Green accent
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        ),
+      ),
+
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppConstants.primaryColor, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+      ),
+
+      // Bottom navigation theme
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: Colors.white,
+        selectedItemColor: AppConstants.primaryColor, // Green accent
+        unselectedItemColor: Colors.grey.shade600,
+        elevation: 8,
+        type: BottomNavigationBarType.fixed,
+      ),
+
+      // Floating action button theme
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: AppConstants.primaryColor, // Green accent
+        foregroundColor: Colors.white,
+        elevation: 4,
+      ),
+
+      // Chip theme
+      chipTheme: ChipThemeData(
+        backgroundColor: Colors.grey.shade100,
+        selectedColor: AppConstants.primaryColor.withOpacity(0.1),
+        labelStyle: const TextStyle(color: Colors.black87),
+        side: BorderSide(color: Colors.grey.shade300),
+      ),
+
+      // Switch theme
+      switchTheme: SwitchThemeData(
+        thumbColor: MaterialStateProperty.resolveWith((states) {
+          if (states.contains(MaterialState.selected)) {
+            return AppConstants.primaryColor; // Green accent
+          }
+          return Colors.grey.shade400;
+        }),
+        trackColor: MaterialStateProperty.resolveWith((states) {
+          if (states.contains(MaterialState.selected)) {
+            return AppConstants.primaryColor.withOpacity(0.3);
+          }
+          return Colors.grey.shade300;
+        }),
+      ),
+
+      // Progress indicator theme
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: AppConstants.primaryColor, // Green accent
+      ),
+    );
+  }
+
+  // Removed GoRouter configuration - using basic navigation
 }
 
-class NotFoundScreen extends StatelessWidget {
-  const NotFoundScreen({Key? key}) : super(key: key);
+/// Error app for initialization failures
+class ErrorApp extends StatelessWidget {
+  const ErrorApp({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Text('Page not found', style: TextStyle(fontSize: 24)),
+    return MaterialApp(
+      title: 'WonWon - Error',
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                'Failed to initialize app',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text('Please refresh the page'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  if (kIsWeb) {
+                    // For web, reload the page
+                    // In a real implementation, you'd use dart:html
+                    // html.window.location.reload();
+                  } else {
+                    SystemNavigator.pop();
+                  }
+                },
+                child: Text(kIsWeb ? 'Refresh' : 'Restart'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

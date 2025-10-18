@@ -3,21 +3,16 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
-import 'package:wonwonw2/services/shop_service.dart';
-import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
-import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
+import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' as excel;
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:uuid/uuid.dart';
 import 'package:wonwonw2/screens/add_shop_screen.dart';
 import 'package:wonwonw2/screens/edit_shop_screen.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:image_cropper/image_cropper.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -30,7 +25,6 @@ class AdminManageShopsScreen extends StatefulWidget {
 }
 
 class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
-  final ShopService _shopService = ShopService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   String _searchQuery = '';
@@ -181,6 +175,30 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Delete All button
+                ElevatedButton.icon(
+                  onPressed: _showDeleteAllConfirmation,
+                  icon: const Icon(Icons.delete_forever, size: 18),
+                  label: Text(
+                    'Delete All',
+                    style: GoogleFonts.montserrat(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -780,7 +798,11 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
   }
 
   void _viewShopDetails(RepairShop shop) {
-    context.push('/shops/${shop.id}');
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ShopDetailScreen(shopId: shop.id),
+      ),
+    );
   }
 
   void _editShop(RepairShop shop) {
@@ -1656,14 +1678,20 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                     labelText: 'New ${coordinateType.toUpperCase()}',
                     hintText:
                         coordinateType == 'latitude' ? '13.7563' : '100.5018',
+                    prefixIcon: Icon(
+                      Icons.location_on,
+                      size: 16,
+                      color: AppConstants.primaryColor,
+                    ),
                     border: const OutlineInputBorder(),
                     helperText:
                         coordinateType == 'latitude'
-                            ? 'Enter latitude (e.g., 13.7563 for Bangkok)'
-                            : 'Enter longitude (e.g., 100.5018 for Bangkok)',
+                            ? 'Enter latitude (e.g., 13.7563 for Bangkok) - You can paste coordinates'
+                            : 'Enter longitude (e.g., 100.5018 for Bangkok) - You can paste coordinates',
                   ),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
+                    signed: true,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -2400,6 +2428,129 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         );
       }
       appLog('Error deleting shop: $e');
+    }
+  }
+
+  void _showDeleteAllConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning, color: Colors.red, size: 28),
+              const SizedBox(width: 8),
+              Text(
+                'Delete All Shops',
+                style: GoogleFonts.montserrat(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Text(
+            'Are you sure you want to delete ALL shops? This action cannot be undone and will permanently remove all shop data from the database.',
+            style: GoogleFonts.montserrat(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.montserrat(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteAllShops();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(
+                'Delete All',
+                style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteAllShops() async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                const SizedBox(width: 16),
+                Text('Deleting all shops...', style: GoogleFonts.montserrat()),
+              ],
+            ),
+          );
+        },
+      );
+
+      // Get all shop documents
+      final QuerySnapshot snapshot = await _firestore.collection('shops').get();
+
+      if (snapshot.docs.isEmpty) {
+        Navigator.of(context).pop(); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No shops found to delete.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      // Delete all documents in batches
+      final batch = _firestore.batch();
+      int deletedCount = 0;
+
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+        deletedCount++;
+      }
+
+      // Commit the batch
+      await batch.commit();
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Successfully deleted $deletedCount shops.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      appLog('Successfully deleted $deletedCount shops');
+    } catch (e) {
+      // Close loading dialog if it's still open
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting shops: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      appLog('Error deleting all shops: $e');
     }
   }
 

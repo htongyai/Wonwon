@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:developer' as developer;
 
@@ -18,13 +16,23 @@ class PerformanceMonitor {
     _timers[operationName] = Stopwatch()..start();
   }
 
-  void endOperation(String operationName) {
+  void endOperation(String operationName, [Duration? duration]) {
     final timer = _timers[operationName];
     if (timer != null) {
       timer.stop();
       _measurements.putIfAbsent(operationName, () => []).add(timer.elapsed);
       _timers.remove(operationName);
+    } else if (duration != null) {
+      _measurements.putIfAbsent(operationName, () => []).add(duration);
     }
+  }
+
+  void recordError(String operationName, dynamic error) {
+    developer.log(
+      'Error in operation: $operationName',
+      name: 'PerformanceMonitor',
+      error: error.toString(),
+    );
   }
 
   void startFrameMonitoring() {

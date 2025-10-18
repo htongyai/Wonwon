@@ -2,27 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/models/repair_category.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
-import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:wonwonw2/screens/add_shop_screen.dart';
 import 'package:wonwonw2/screens/settings_screen.dart';
+import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:wonwonw2/services/shop_service.dart';
-import 'package:wonwonw2/utils/asset_helpers.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
-import 'package:wonwonw2/utils/icon_helper.dart';
-import 'package:wonwonw2/widgets/search_bar_widget.dart';
-import 'package:go_router/go_router.dart';
+import 'package:wonwonw2/widgets/advanced_search_bar.dart';
+import 'package:wonwonw2/services/service_manager.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/models/repair_sub_service.dart';
-import 'package:wonwonw2/services/auth_state_service.dart';
 import 'package:wonwonw2/services/service_providers.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'dart:async';
 import 'package:wonwonw2/services/location_service.dart';
+import 'package:wonwonw2/utils/asset_helpers.dart';
 import 'package:wonwonw2/widgets/performance_loading_widget.dart';
+import 'package:wonwonw2/mixins/widget_disposal_mixin.dart';
+import 'package:wonwonw2/services/optimized_image_cache_manager.dart';
+import 'package:wonwonw2/services/unified_memory_manager.dart';
 
 class DesktopHomeScreen extends StatefulWidget {
   final bool? isMainSidebarCollapsed;
@@ -35,7 +37,9 @@ class DesktopHomeScreen extends StatefulWidget {
 }
 
 class _DesktopHomeScreenState extends State<DesktopHomeScreen>
-    with SingleTickerProviderStateMixin {
+    with
+        WidgetDisposalMixin<DesktopHomeScreen>,
+        SingleTickerProviderStateMixin {
   final ShopService _shopService = ShopService();
   late LocationService _locationService;
   List<RepairShop> _shops = [];
@@ -51,20 +55,15 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
   String _selectedCategoryId = 'all';
   String? _selectedSubServiceId;
 
-  String _currentLanguage = 'en';
   Position? _userPosition;
   String? _userDistrict;
-  bool _locationPermissionDenied = false;
 
   @override
-  void initState() {
-    super.initState();
-
+  void onInitState() {
     // Get shared location service instance
     _locationService = locationService;
 
-    _animationController = AnimationController(
-      vsync: this,
+    _animationController = createAnimationController(
       duration: const Duration(milliseconds: 400),
     );
     _animationController.forward();
@@ -82,23 +81,15 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
   }
 
   Future<void> _initializeData() async {
-    // Load all data concurrently with timeout
+    // Load all data concurrently with location timeout
     try {
       await Future.wait([
-        _getUserLocation(),
+        _getUserLocationWithTimeout(),
         _loadShops(),
         _loadCurrentLanguage(),
-      ]).timeout(const Duration(seconds: 30));
-    } on TimeoutException {
-      print('Data loading timeout - forcing completion');
-      setState(() {
-        _isLocationLoading = false;
-        _isShopsLoading = false;
-        _isLanguageLoading = false;
-        _isLoading = false;
-      });
+      ]);
     } catch (e) {
-      print('Error during data initialization: $e');
+      appLog('Error during data initialization: $e');
       // Force completion on error
       setState(() {
         _isLocationLoading = false;
@@ -121,11 +112,9 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
   }
 
   @override
-  void dispose() {
-    _animationController.dispose();
+  void onDispose() {
     // Remove the listener but don't dispose the service since it's shared
     _locationService.removeListener(_onLocationChanged);
-    super.dispose();
   }
 
   void _onLocationChanged() {
@@ -142,7 +131,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
       });
       _checkIfAllDataLoaded();
     } catch (e) {
-      print('Error loading language: $e');
+      appLog('Error loading language: $e');
       setState(() {
         _isLanguageLoading = false;
       });
@@ -150,9 +139,33 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
     }
   }
 
+  /// Get user location with 10-second timeout
+  Future<void> _getUserLocationWithTimeout() async {
+    try {
+      // Try to get location with 10-second timeout
+      await _getUserLocation().timeout(const Duration(seconds: 10));
+    } on TimeoutException {
+      appLog(
+        'Desktop Home Screen: Location request timed out after 10 seconds - showing shop list anyway',
+      );
+      setState(() {
+        _isLocationLoading = false;
+        _locationPermissionDenied = true;
+        _userDistrict = 'Location timeout - showing all shops';
+      });
+    } catch (e) {
+      appLog('Desktop Home Screen: Error getting location: $e');
+      setState(() {
+        _isLocationLoading = false;
+        _locationPermissionDenied = true;
+        _userDistrict = 'Location unavailable - showing all shops';
+      });
+    }
+  }
+
   Future<void> _getUserLocation() async {
     try {
-      print('Desktop Home Screen: Starting location fetch...');
+      appLog('Desktop Home Screen: Starting location fetch...');
 
       // Set initial state
       setState(() {
@@ -163,24 +176,24 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
       _locationService.addListener(_onLocationChanged);
 
       // Try to get current position from location service
-      print('Desktop Home Screen: Getting position from location service...');
-      print(
+      appLog('Desktop Home Screen: Getting position from location service...');
+      appLog(
         'Desktop Home Screen: Location service tracking: ${_locationService.isTracking}',
       );
-      print(
+      appLog(
         'Desktop Home Screen: Location service current position: ${_locationService.currentPosition}',
       );
 
       final position = await _locationService.getCurrentPosition();
 
       if (position != null) {
-        print(
+        appLog(
           'Desktop Home Screen: Got position from service: ${position.latitude}, ${position.longitude}',
         );
         _userPosition = position;
         await _updateLocationDisplay();
       } else {
-        print(
+        appLog(
           'Desktop Home Screen: Location service returned null, trying direct approach...',
         );
         // If location service fails, try direct geolocator approach
@@ -192,9 +205,18 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
       });
       _checkIfAllDataLoaded();
     } catch (e) {
-      print('Desktop Home Screen: Error getting location: $e');
+      appLog('Desktop Home Screen: Error getting location: $e');
       setState(() {
-        _userDistrict = 'Location error';
+        // Provide more user-friendly error message with helpful context
+        if (e.toString().contains('Position update is unavailable')) {
+          _userDistrict = 'Location unavailable (try HTTPS)';
+        } else if (e.toString().contains('denied')) {
+          _userDistrict = 'Location access denied';
+        } else if (e.toString().contains('timeout')) {
+          _userDistrict = 'Location timeout - try again';
+        } else {
+          _userDistrict = 'Location unavailable';
+        }
         _isLocationLoading = false;
       });
       _checkIfAllDataLoaded();
@@ -203,11 +225,11 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
 
   Future<void> _getLocationDirectly() async {
     try {
-      print('Desktop Home Screen: Trying direct geolocator approach...');
+      appLog('Desktop Home Screen: Trying direct geolocator approach...');
 
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        print('Desktop Home Screen: Location service disabled');
+        appLog('Desktop Home Screen: Location service disabled');
         setState(() {
           _locationPermissionDenied = true;
           _userDistrict = 'Location disabled';
@@ -216,13 +238,13 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
-      print('Desktop Home Screen: Permission status: $permission');
+      appLog('Desktop Home Screen: Permission status: $permission');
 
       if (permission == LocationPermission.denied) {
-        print('Desktop Home Screen: Requesting permission...');
+        appLog('Desktop Home Screen: Requesting permission...');
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          print('Desktop Home Screen: Permission denied');
+          appLog('Desktop Home Screen: Permission denied');
           setState(() {
             _locationPermissionDenied = true;
             _userDistrict = 'Location denied';
@@ -232,7 +254,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
       }
 
       if (permission == LocationPermission.deniedForever) {
-        print('Desktop Home Screen: Permission denied forever');
+        appLog('Desktop Home Screen: Permission denied forever');
         setState(() {
           _locationPermissionDenied = true;
           _userDistrict = 'Location denied forever';
@@ -241,13 +263,13 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
       }
 
       // Get current position with timeout
-      print('Desktop Home Screen: Getting current position...');
+      appLog('Desktop Home Screen: Getting current position...');
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
 
-      print(
+      appLog(
         'Desktop Home Screen: Got position directly: ${position.latitude}, ${position.longitude}',
       );
       setState(() {
@@ -256,48 +278,56 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
 
       await _updateLocationDisplay();
     } catch (e) {
-      print('Desktop Home Screen: Error getting location directly: $e');
+      appLog('Desktop Home Screen: Error getting location directly: $e');
       setState(() {
-        _userDistrict = 'Location error';
+        // Provide more user-friendly error message with helpful context
+        if (e.toString().contains('Position update is unavailable')) {
+          _userDistrict = 'Location unavailable (try HTTPS)';
+        } else if (e.toString().contains('denied')) {
+          _userDistrict = 'Location access denied';
+        } else if (e.toString().contains('timeout')) {
+          _userDistrict = 'Location timeout - try again';
+        } else {
+          _userDistrict = 'Location unavailable';
+        }
       });
     }
   }
 
   Future<void> _updateLocationDisplay() async {
     if (_userPosition == null) {
-      print(
+      appLog(
         'Desktop Home Screen: No user position available for display update',
       );
       return;
     }
 
     try {
-      print(
+      appLog(
         'Desktop Home Screen: Updating location display for ${_userPosition!.latitude}, ${_userPosition!.longitude}',
       );
 
       // Get city and district name with retry mechanism
       List<Placemark> placemarks = [];
-      bool geocodingSuccess = false;
 
       // Try geocoding with retry (up to 3 attempts)
       for (int attempt = 1; attempt <= 3; attempt++) {
         try {
-          print(
+          appLog(
             'Desktop Home Screen: Geocoding attempt $attempt for ${_userPosition!.latitude}, ${_userPosition!.longitude}',
           );
           placemarks = await placemarkFromCoordinates(
             _userPosition!.latitude,
             _userPosition!.longitude,
           );
-          print(
+          appLog(
             'Desktop Home Screen: Got ${placemarks.length} placemarks on attempt $attempt',
           );
 
           // Check if we got meaningful data
           if (placemarks.isNotEmpty) {
             final placemark = placemarks.first;
-            print(
+            appLog(
               'Desktop Home Screen: Placemark data - locality: "${placemark.locality}", country: "${placemark.country}", administrativeArea: "${placemark.administrativeArea}"',
             );
 
@@ -307,18 +337,17 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
                 (placemark.country != null && placemark.country!.isNotEmpty) ||
                 (placemark.administrativeArea != null &&
                     placemark.administrativeArea!.isNotEmpty)) {
-              geocodingSuccess = true;
               break;
             } else {
-              print(
+              appLog(
                 'Desktop Home Screen: Placemark has no meaningful data, retrying...',
               );
             }
           } else {
-            print('Desktop Home Screen: No placemarks returned, retrying...');
+            appLog('Desktop Home Screen: No placemarks returned, retrying...');
           }
         } catch (geocodingError) {
-          print(
+          appLog(
             'Desktop Home Screen: Geocoding error on attempt $attempt: $geocodingError',
           );
           if (attempt == 3) {
@@ -332,7 +361,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
                 _userDistrict =
                     '$manualLocation\n${_userPosition!.latitude.toStringAsFixed(4)}, ${_userPosition!.longitude.toStringAsFixed(4)}';
               });
-              print(
+              appLog(
                 'Desktop Home Screen: Using manual location after geocoding failure: $manualLocation',
               );
             } else {
@@ -351,7 +380,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
 
       if (placemarks.isNotEmpty) {
         final placemark = placemarks.first;
-        print(
+        appLog(
           'Desktop Home Screen: Got placemark - locality: ${placemark.locality}, subLocality: ${placemark.subLocality}, administrativeArea: ${placemark.administrativeArea}, country: ${placemark.country}',
         );
 
@@ -392,16 +421,16 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
           _userDistrict = locationText;
         });
 
-        print('Desktop Home Screen: Location set to: $locationText');
+        appLog('Desktop Home Screen: Location set to: $locationText');
       } else {
         // Try alternative geocoding approach if no placemarks
-        print(
+        appLog(
           'Desktop Home Screen: No placemarks found, trying alternative approach',
         );
         await _tryAlternativeGeocoding();
       }
     } catch (e) {
-      print('Desktop Home Screen: Error updating location display: $e');
+      appLog('Desktop Home Screen: Error updating location display: $e');
       setState(() {
         _userDistrict =
             '${_userPosition!.latitude.toStringAsFixed(4)}, ${_userPosition!.longitude.toStringAsFixed(4)}';
@@ -411,7 +440,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
 
   Future<void> _tryAlternativeGeocoding() async {
     try {
-      print('Desktop Home Screen: Trying alternative geocoding approach');
+      appLog('Desktop Home Screen: Trying alternative geocoding approach');
 
       // Try with different geocoding parameters
       List<Placemark> placemarks = await placemarkFromCoordinates(
@@ -419,24 +448,24 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
         _userPosition!.longitude,
       );
 
-      print(
+      appLog(
         'Desktop Home Screen: Alternative geocoding got ${placemarks.length} placemarks',
       );
 
       // Also try reverse geocoding with different approach
       if (placemarks.isEmpty) {
-        print('Desktop Home Screen: Trying reverse geocoding as fallback');
+        appLog('Desktop Home Screen: Trying reverse geocoding as fallback');
         try {
           // Try with a small offset to see if we get better results
           placemarks = await placemarkFromCoordinates(
             _userPosition!.latitude + 0.001,
             _userPosition!.longitude + 0.001,
           );
-          print(
+          appLog(
             'Desktop Home Screen: Offset geocoding got ${placemarks.length} placemarks',
           );
         } catch (e) {
-          print('Desktop Home Screen: Offset geocoding failed: $e');
+          appLog('Desktop Home Screen: Offset geocoding failed: $e');
         }
       }
 
@@ -468,7 +497,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
         setState(() {
           _userDistrict = locationText;
         });
-        print(
+        appLog(
           'Desktop Home Screen: Alternative geocoding successful: $locationText',
         );
       } else {
@@ -482,20 +511,20 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
             _userDistrict =
                 '$manualLocation\n${_userPosition!.latitude.toStringAsFixed(4)}, ${_userPosition!.longitude.toStringAsFixed(4)}';
           });
-          print('Desktop Home Screen: Using manual location: $manualLocation');
+          appLog('Desktop Home Screen: Using manual location: $manualLocation');
         } else {
           // Final fallback to coordinates
           setState(() {
             _userDistrict =
                 '${_userPosition!.latitude.toStringAsFixed(4)}, ${_userPosition!.longitude.toStringAsFixed(4)}';
           });
-          print(
+          appLog(
             'Desktop Home Screen: Alternative geocoding failed, using coordinates',
           );
         }
       }
     } catch (e) {
-      print('Desktop Home Screen: Alternative geocoding error: $e');
+      appLog('Desktop Home Screen: Alternative geocoding error: $e');
       // Final fallback to coordinates
       setState(() {
         _userDistrict =
@@ -614,7 +643,11 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
                 await Future.delayed(const Duration(milliseconds: 100));
                 if (category.id == 'all') {
                   _clearFilters();
+                } else if (isSelected) {
+                  // If already selected, deselect and show all
+                  _clearFilters();
                 } else {
+                  // Select the new category
                   _filterShopsByCategory(category.id);
                 }
               },
@@ -676,7 +709,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
 
       _checkIfAllDataLoaded();
     } catch (e) {
-      print('Error loading shops: $e');
+      appLog('Error loading shops: $e');
       setState(() {
         _isShopsLoading = false;
       });
@@ -688,13 +721,6 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
     await _loadShops();
   }
 
-  Future<void> _retryLocation() async {
-    setState(() {
-      _userDistrict = 'getting_location'.tr(context);
-      _isLocationLoading = true;
-    });
-    await _getUserLocation();
-  }
 
   Widget _buildLoadingScreen() {
     return Scaffold(
@@ -852,24 +878,11 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
                 .toList();
       }
     } else {
-      // Apply search query to current filtered results
-      final searchResults =
-          _shops.where((shop) {
-            final nameMatch = shop.name.toLowerCase().contains(
-              _searchQuery.toLowerCase(),
-            );
-            final addressMatch = shop.address.toLowerCase().contains(
-              _searchQuery.toLowerCase(),
-            );
-            final categoryMatch = shop.categories.any(
-              (category) => 'category_${category.toLowerCase()}'
-                  .tr(context)
-                  .toLowerCase()
-                  .contains(_searchQuery.toLowerCase()),
-            );
-
-            return nameMatch || addressMatch || categoryMatch;
-          }).toList();
+      // Apply fuzzy search query to current filtered results
+      final searchResults = ServiceManager().advancedSearchService.fuzzySearch(
+        _searchQuery,
+        _shops,
+      );
 
       // Apply category filter to search results
       if (_selectedCategoryId != 'all') {
@@ -933,38 +946,6 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
     }
   }
 
-  Widget _buildSubServicesSection() {
-    if (_selectedCategoryId == 'all') return const SizedBox.shrink();
-
-    final allSubServices = RepairSubService.getSubServices();
-    final subServices = allSubServices[_selectedCategoryId] ?? [];
-    if (subServices.isEmpty) return const SizedBox.shrink();
-
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: subServices.length + 1, // +1 for "All" option
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          // "All" option
-          final isSelected =
-              _selectedSubServiceId == null || _selectedSubServiceId == 'all';
-          return _buildSubServiceItem(
-            'all',
-            'all_sub_services'.tr(context),
-            isSelected,
-          );
-        }
-
-        final subService = subServices[index - 1];
-        final isSelected = _selectedSubServiceId == subService.id;
-        return _buildSubServiceItem(
-          subService.id,
-          subService.name.tr(context),
-          isSelected,
-        );
-      },
-    );
-  }
 
   Widget _buildSubServiceItem(
     String subServiceId,
@@ -1086,6 +1067,23 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      floatingActionButton:
+          ServiceProvider.authStateOf(context).isLoggedIn
+              ? FloatingActionButton(
+                heroTag: 'add_shop_desktop',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AddShopScreen(),
+                    ),
+                  );
+                },
+                backgroundColor: AppConstants.primaryColor,
+                child: const Icon(Icons.add, color: Colors.white),
+                tooltip: 'add_shop'.tr(context),
+              )
+              : null,
       body:
           _isLoading
               ? _buildLoadingScreen()
@@ -1237,7 +1235,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
                       children: [
                         // Top bar with search and location
                         Container(
-                          padding: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF8F9FA),
                             border: Border(
@@ -1252,13 +1250,22 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
                               // Search bar
                               Expanded(
                                 flex: 2,
-                                child: AnimatedSearchBar(
+                                child: AdvancedSearchBar(
                                   onSearch: (query) {
                                     setState(() {
                                       _searchQuery = query;
                                     });
                                     _applySearchFilter();
                                   },
+                                  onSuggestionSelected: (suggestion) {
+                                    setState(() {
+                                      _searchQuery = suggestion;
+                                    });
+                                    _applySearchFilter();
+                                  },
+                                  searchService:
+                                      ServiceManager().advancedSearchService,
+                                  shops: _shops,
                                   hintText: 'search_shops'.tr(context),
                                 ),
                               ),
@@ -1485,19 +1492,48 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
                                             MainAxisAlignment.center,
                                         children: [
                                           FaIcon(
-                                            FontAwesomeIcons.search,
+                                            _selectedCategoryId != 'all'
+                                                ? FontAwesomeIcons.filter
+                                                : FontAwesomeIcons.search,
                                             size: 48,
                                             color: Colors.grey[400],
                                           ),
                                           const SizedBox(height: 16),
                                           Text(
-                                            'no_shops_found'.tr(context),
+                                            _selectedCategoryId != 'all'
+                                                ? 'no_shops_in_category'.tr(
+                                                  context,
+                                                )
+                                                : 'no_shops_found'.tr(context),
                                             style: GoogleFonts.montserrat(
                                               fontSize: 18,
                                               fontWeight: FontWeight.w500,
                                               color: Colors.grey[600],
                                             ),
                                           ),
+                                          if (_selectedCategoryId != 'all') ...[
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              'try_different_category'.tr(
+                                                context,
+                                              ),
+                                              style: GoogleFonts.montserrat(
+                                                fontSize: 14,
+                                                color: Colors.grey[500],
+                                              ),
+                                            ),
+                                            const SizedBox(height: 16),
+                                            ElevatedButton(
+                                              onPressed: _clearFilters,
+                                              child: Text(
+                                                'show_all_shops'.tr(context),
+                                              ),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    AppConstants.primaryColor,
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                     )
@@ -1508,8 +1544,8 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
                                                 _getShopGridCrossAxisCount(),
                                             childAspectRatio:
                                                 _getShopGridAspectRatio(),
-                                            crossAxisSpacing: 20,
-                                            mainAxisSpacing: 20,
+                                            crossAxisSpacing: 16,
+                                            mainAxisSpacing: 16,
                                           ),
                                       itemCount: _filteredShops.length,
                                       itemBuilder: (context, index) {
@@ -1529,38 +1565,88 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
   }
 
   int _getShopGridCrossAxisCount() {
-    // Base count is 3
-    int baseCount = 3;
+    final screenWidth = MediaQuery.of(context).size.width;
 
-    // If main sidebar is collapsed, add 1 more column
-    if (widget.isMainSidebarCollapsed == true) {
-      baseCount += 1;
+    // Calculate available width for shop cards
+    double availableWidth = screenWidth;
+
+    // Subtract main sidebar width if not collapsed
+    if (widget.isMainSidebarCollapsed != true) {
+      availableWidth -= 280; // Main sidebar width
     }
 
-    // If category sidebar is collapsed, add 2 more columns
-    if (_isCategorySidebarCollapsed) {
-      baseCount += 2;
+    // Subtract category sidebar width if not collapsed
+    if (!_isCategorySidebarCollapsed) {
+      availableWidth -= 320; // Category sidebar width
     }
 
-    return baseCount;
+    // Subtract padding and margins
+    availableWidth -= 64; // Container padding (32px each side)
+
+    // Define optimal card width range (280-350px per card)
+    const double minCardWidth = 280;
+    const double maxCardWidth = 350;
+    const double spacing = 16; // Grid spacing
+
+    // Calculate how many cards can fit
+    int maxColumns =
+        ((availableWidth + spacing) / (minCardWidth + spacing)).floor();
+    int minColumns =
+        ((availableWidth + spacing) / (maxCardWidth + spacing)).floor();
+
+    // Ensure we have at least 1 column and at most 6 columns
+    int columns = maxColumns.clamp(1, 6);
+
+    // If cards would be too wide, use more columns
+    double cardWidth = (availableWidth - (spacing * (columns - 1))) / columns;
+    if (cardWidth > maxCardWidth && columns < 6) {
+      columns = minColumns.clamp(1, 6);
+    }
+
+    return columns;
   }
 
   double _getShopGridAspectRatio() {
     final crossAxisCount = _getShopGridCrossAxisCount();
+    final screenWidth = MediaQuery.of(context).size.width;
 
-    // Adjust aspect ratio based on number of columns
-    switch (crossAxisCount) {
-      case 3:
-        return 1.3; // Current ratio for 3 columns
-      case 4:
-        return 1.2; // Slightly taller for 4 columns
-      case 5:
-        return 0.85; // Even taller for 5 columns
-      case 6:
-        return 0.9; // Even taller for 6 columns
-      default:
-        return 1.3; // Default fallback
+    // Calculate available width for shop cards
+    double availableWidth = screenWidth;
+
+    // Subtract sidebar widths
+    if (widget.isMainSidebarCollapsed != true) {
+      availableWidth -= 280;
     }
+    if (!_isCategorySidebarCollapsed) {
+      availableWidth -= 320;
+    }
+    availableWidth -= 64; // Container padding
+
+    // Calculate actual card width
+    const double spacing = 16;
+    double cardWidth =
+        (availableWidth - (spacing * (crossAxisCount - 1))) / crossAxisCount;
+
+    // Maintain consistent aspect ratio based on card content
+    // Card content: Image (150px) + Content (~120px) + Padding (~20px) = ~290px height
+    // Optimal aspect ratio keeps cards looking balanced
+    double targetHeight = 290;
+    double aspectRatio = cardWidth / targetHeight;
+
+    // For single column, use a different ratio to prevent cards from being too tall
+    if (crossAxisCount == 1) {
+      aspectRatio = aspectRatio.clamp(
+        1.2,
+        2.0,
+      ); // Wider cards for single column
+    } else {
+      aspectRatio = aspectRatio.clamp(
+        0.8,
+        1.4,
+      ); // Normal range for multi-column
+    }
+
+    return aspectRatio;
   }
 
   Widget _buildCategoryCard(RepairCategory category) {
@@ -1574,7 +1660,11 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
           await Future.delayed(const Duration(milliseconds: 100));
           if (category.id == 'all') {
             _clearFilters();
+          } else if (isSelected) {
+            // If already selected, deselect and show all
+            _clearFilters();
           } else {
+            // Select the new category
             _filterShopsByCategory(category.id);
           }
         },
@@ -1626,261 +1716,277 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
   }
 
   Widget _buildShopCard(RepairShop shop) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: () async {
-          // Get the currently selected category for context
-          final selectedCategory =
-              _selectedCategoryId != 'all' ? _selectedCategoryId : null;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final containerWidth = constraints.maxWidth;
 
-          final result = await context.push('/shops/${shop.id}');
+        return Card(
+          margin: EdgeInsets.zero,
+          elevation: 3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: InkWell(
+            onTap: () async {
+              // Get the currently selected category for context
+              final selectedCategory =
+                  _selectedCategoryId != 'all' ? _selectedCategoryId : null;
 
-          // Handle returning with category filter
-          if (result is Map<String, dynamic> &&
-              result.containsKey('filterCategory')) {
-            final category = result['filterCategory'] as String;
-            _filterShopsByCategory(category);
-          }
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Shop image with gradient background
-            Hero(
-              tag: 'shop-image-${shop.id}',
-              child: Container(
-                height: 120,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                  ),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      AppConstants.primaryColor.withOpacity(0.8),
-                      AppConstants.primaryColor.withOpacity(0.6),
-                    ],
-                  ),
+              final result = await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder:
+                      (context) => ShopDetailScreen(
+                        shopId: shop.id,
+                        selectedCategory: selectedCategory,
+                      ),
                 ),
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                  ),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Image with fallback
-                      shop.photos.isNotEmpty
-                          ? Image.network(
-                            shop.photos.first,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildImagePlaceholder(shop.name);
-                            },
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Container(
-                                color: Colors.grey[200],
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    value:
-                                        loadingProgress.expectedTotalBytes !=
-                                                null
-                                            ? loadingProgress
-                                                    .cumulativeBytesLoaded /
-                                                loadingProgress
-                                                    .expectedTotalBytes!
-                                            : null,
-                                    color: AppConstants.primaryColor,
+              );
+
+              // Handle returning with category filter
+              if (result is Map<String, dynamic> &&
+                  result.containsKey('filterCategory')) {
+                final category = result['filterCategory'] as String;
+                _filterShopsByCategory(category);
+              }
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Shop image with gradient background
+                Hero(
+                  tag: 'shop-image-${shop.id}',
+                  child: Container(
+                    height: 120,
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          AppConstants.primaryColor.withOpacity(0.8),
+                          AppConstants.primaryColor.withOpacity(0.6),
+                        ],
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Image with fallback
+                          shop.photos.isNotEmpty
+                              ? getCachedImage(
+                                imageUrl: shop.photos.first,
+                                imageType: ImageType.shop,
+                                priority: MemoryPriority.normal,
+                                fit: BoxFit.cover,
+                                errorWidget: AssetHelpers.getShopPlaceholder(
+                                  shop.name,
+                                  containerWidth: containerWidth,
+                                  containerHeight: 120,
+                                ),
+                                placeholder: Container(
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: CircularProgressIndicator(
+                                      color: AppConstants.primaryColor,
+                                    ),
                                   ),
                                 ),
-                              );
-                            },
-                          )
-                          : _buildImagePlaceholder(shop.name),
-                    ],
+                              )
+                              : AssetHelpers.getShopPlaceholder(
+                                shop.name,
+                                containerWidth: containerWidth,
+                                containerHeight: 120,
+                              ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
 
-            // Shop details
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(16),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Name and rating row
-                    Row(
+                // Shop details
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(16),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            shop.name,
-                            style: GoogleFonts.montserrat(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: AppConstants.darkColor,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+                        // Name and rating row
                         Row(
                           children: [
-                            const Icon(
-                              Icons.star,
-                              color: Colors.amber,
-                              size: 14,
+                            Expanded(
+                              child: Text(
+                                shop.name,
+                                style: GoogleFonts.montserrat(
+                                  fontSize:
+                                      ResponsiveSize.getResponsiveFontSize(
+                                        16,
+                                        containerWidth,
+                                      ),
+                                  fontWeight: FontWeight.bold,
+                                  color: AppConstants.darkColor,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            const SizedBox(width: 2),
-                            Text(
-                              shop.rating.toStringAsFixed(1),
-                              style: GoogleFonts.montserrat(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                                color: AppConstants.darkColor,
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  shop.rating.toStringAsFixed(1),
+                                  style: GoogleFonts.montserrat(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize:
+                                        ResponsiveSize.getResponsiveFontSize(
+                                          13,
+                                          containerWidth,
+                                        ),
+                                    color: AppConstants.darkColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Service information
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.build,
+                              size: 12,
+                              color: Colors.grey[600],
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                shop.subServices.isNotEmpty
+                                    ? '${shop.subServices.values.first.length} services'
+                                    : 'No subservices',
+                                style: GoogleFonts.montserrat(
+                                  fontSize:
+                                      ResponsiveSize.getResponsiveFontSize(
+                                        12,
+                                        containerWidth,
+                                      ),
+                                  color: Colors.grey[600],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
+                        const SizedBox(height: 4),
 
-                    // Service information
-                    Row(
-                      children: [
-                        Icon(Icons.build, size: 12, color: Colors.grey[600]),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            shop.subServices.isNotEmpty
-                                ? '${shop.subServices.values.first.length} services'
-                                : 'No subservices',
-                            style: GoogleFonts.montserrat(
-                              fontSize: 12,
+                        // Address
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              size: 12,
                               color: Colors.grey[600],
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-
-                    // Address
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 12,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            shop.address,
-                            style: GoogleFonts.montserrat(
-                              fontSize: 12,
-                              color: Colors.grey[600],
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                shop.address,
+                                style: GoogleFonts.montserrat(
+                                  fontSize:
+                                      ResponsiveSize.getResponsiveFontSize(
+                                        12,
+                                        containerWidth,
+                                      ),
+                                  color: Colors.grey[600],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const Spacer(),
-
-                    // View Details button
-                    Container(
-                      width: double.infinity,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        gradient: LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [
-                            AppConstants.primaryColor,
-                            AppConstants.primaryColor.withOpacity(0.8),
                           ],
                         ),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () async {
-                            final result = await context.push(
-                              '/shops/${shop.id}',
-                            );
-                            if (result is Map<String, dynamic> &&
-                                result.containsKey('filterCategory')) {
-                              final category =
-                                  result['filterCategory'] as String;
-                              _filterShopsByCategory(category);
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(8),
-                          child: Center(
-                            child: Text(
-                              'View Details',
-                              style: GoogleFonts.montserrat(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
+
+                        const Spacer(),
+
+                        // View Details button
+                        Container(
+                          width: double.infinity,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            gradient: LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                AppConstants.primaryColor,
+                                AppConstants.primaryColor.withOpacity(0.8),
+                              ],
+                            ),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () async {
+                                final result = await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) =>
+                                            ShopDetailScreen(shopId: shop.id),
+                                  ),
+                                );
+                                if (result is Map<String, dynamic> &&
+                                    result.containsKey('filterCategory')) {
+                                  final category =
+                                      result['filterCategory'] as String;
+                                  _filterShopsByCategory(category);
+                                }
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Center(
+                                child: Text(
+                                  'View Details',
+                                  style: GoogleFonts.montserrat(
+                                    fontSize:
+                                        ResponsiveSize.getResponsiveFontSize(
+                                          13,
+                                          containerWidth,
+                                        ),
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImagePlaceholder(String shopName) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppConstants.primaryColor.withOpacity(0.8),
-            AppConstants.primaryColor.withOpacity(0.6),
-          ],
-        ),
-      ),
-      child: Center(
-        child: Text(
-          shopName.isNotEmpty ? shopName[0].toUpperCase() : 'S',
-          style: GoogleFonts.montserrat(
-            fontSize: 48,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

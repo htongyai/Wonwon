@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/services/shop_service.dart';
-import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'unapproved_shop_detail_screen.dart';
 

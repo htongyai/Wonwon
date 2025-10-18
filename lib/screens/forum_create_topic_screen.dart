@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
-import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/services/forum_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:go_router/go_router.dart';
+import 'package:wonwonw2/screens/forum_screen.dart';
 
 class ForumCreateTopicScreen extends StatefulWidget {
   const ForumCreateTopicScreen({Key? key}) : super(key: key);
@@ -89,7 +87,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
         iconTheme: const IconThemeData(color: AppConstants.darkColor),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/forum'),
+          onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
           TextButton(
@@ -572,7 +570,9 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
         );
 
         // Navigate to the topic detail screen
-        context.go('/forum/topic/$topicId');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const ForumScreen()),
+        );
       }
     } catch (e) {
       if (mounted) {

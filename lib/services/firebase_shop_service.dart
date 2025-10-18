@@ -1,8 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:typed_data';
 import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/services/activity_service.dart';
 
 class FirebaseShopService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -43,7 +42,30 @@ class FirebaseShopService {
           subServices: Map<String, List<String>>.from(
             data['subServices'] ?? {},
           ),
+          phoneNumber: data['phoneNumber'],
+          facebookPage: data['facebookPage'],
+          buildingNumber: data['buildingNumber'],
+          buildingName: data['buildingName'],
+          buildingFloor: data['buildingFloor'],
+          soi: data['soi'],
+          district: data['district'],
+          province: data['province'],
+          landmark: data['landmark'],
+          lineId: data['lineId'],
           instagramPage: data['instagramPage'],
+          otherContacts: data['otherContacts'],
+          paymentMethods:
+              data['paymentMethods'] != null
+                  ? List<String>.from(data['paymentMethods'])
+                  : null,
+          tryOnAreaAvailable: data['tryOnAreaAvailable'],
+          notesOrConditions: data['notesOrConditions'],
+          usualOpeningTime: data['usualOpeningTime'],
+          usualClosingTime: data['usualClosingTime'],
+          timestamp:
+              data['timestamp'] != null
+                  ? DateTime.tryParse(data['timestamp'])
+                  : null,
         );
       }).toList();
     } catch (e) {
@@ -87,7 +109,30 @@ class FirebaseShopService {
           subServices: Map<String, List<String>>.from(
             data['subServices'] ?? {},
           ),
+          phoneNumber: data['phoneNumber'],
+          facebookPage: data['facebookPage'],
+          buildingNumber: data['buildingNumber'],
+          buildingName: data['buildingName'],
+          buildingFloor: data['buildingFloor'],
+          soi: data['soi'],
+          district: data['district'],
+          province: data['province'],
+          landmark: data['landmark'],
+          lineId: data['lineId'],
           instagramPage: data['instagramPage'],
+          otherContacts: data['otherContacts'],
+          paymentMethods:
+              data['paymentMethods'] != null
+                  ? List<String>.from(data['paymentMethods'])
+                  : null,
+          tryOnAreaAvailable: data['tryOnAreaAvailable'],
+          notesOrConditions: data['notesOrConditions'],
+          usualOpeningTime: data['usualOpeningTime'],
+          usualClosingTime: data['usualClosingTime'],
+          timestamp:
+              data['timestamp'] != null
+                  ? DateTime.tryParse(data['timestamp'])
+                  : null,
         );
       }).toList();
     } catch (e) {
@@ -99,7 +144,29 @@ class FirebaseShopService {
   // Add a new shop
   Future<bool> addShop(RepairShop shop) async {
     try {
+      // Debug logging to identify the source of empty IDs
+      appLog('Adding shop with ID: "${shop.id}" (length: ${shop.id.length})');
+      appLog('Shop name: "${shop.name}"');
+      
+      if (shop.id.isEmpty) {
+        throw Exception('Shop ID cannot be empty. Shop name: ${shop.name}');
+      }
+      
       await _firestore.collection(_collection).doc(shop.id).set(shop.toMap());
+
+      // Log shop creation activity
+      try {
+        final category =
+            shop.categories.isNotEmpty ? shop.categories.first : 'Unknown';
+        await ActivityService().logShopRegistration(
+          shop.id,
+          shop.name,
+          category,
+        );
+      } catch (e) {
+        appLog('Error logging shop creation activity: $e');
+      }
+
       return true;
     } catch (e) {
       appLog('Error adding shop: $e');
@@ -114,6 +181,24 @@ class FirebaseShopService {
           .collection(_collection)
           .doc(shop.id)
           .update(shop.toMap());
+
+      // Log shop update activity
+      try {
+        await ActivityService().logShopActivity(
+          action: ActivityService.SHOP_UPDATED,
+          title: 'Shop Updated',
+          description: 'Shop "${shop.name}" information was updated',
+          shopId: shop.id,
+          metadata: {
+            'shopName': shop.name,
+            'category':
+                shop.categories.isNotEmpty ? shop.categories.first : 'Unknown',
+          },
+        );
+      } catch (e) {
+        appLog('Error logging shop update activity: $e');
+      }
+
       return true;
     } catch (e) {
       appLog('Error updating shop: $e');
@@ -124,9 +209,23 @@ class FirebaseShopService {
   // Approve a shop
   Future<bool> approveShop(String shopId) async {
     try {
+      // Get shop details before approving
+      final shopDoc =
+          await _firestore.collection(_collection).doc(shopId).get();
+      final shopData = shopDoc.data();
+      final shopName = shopData?['name'] ?? 'Unknown Shop';
+
       await _firestore.collection(_collection).doc(shopId).update({
         'approved': true,
       });
+
+      // Log shop approval activity
+      try {
+        await ActivityService().logShopApproval(shopId, shopName, 'Admin');
+      } catch (e) {
+        appLog('Error logging shop approval activity: $e');
+      }
+
       return true;
     } catch (e) {
       appLog('Error approving shop: $e');
@@ -137,31 +236,34 @@ class FirebaseShopService {
   // Delete a shop
   Future<bool> deleteShop(String shopId) async {
     try {
+      // Get shop details before deleting
+      final shopDoc =
+          await _firestore.collection(_collection).doc(shopId).get();
+      final shopData = shopDoc.data();
+      final shopName = shopData?['name'] ?? 'Unknown Shop';
+
       await _firestore.collection(_collection).doc(shopId).delete();
+
+      // Log shop deletion activity
+      try {
+        await ActivityService().logAdminActivity(
+          action: 'shop_deleted',
+          title: 'Shop Deleted',
+          description: 'Shop "$shopName" was deleted by admin',
+          metadata: {
+            'shopName': shopName,
+            'shopId': shopId,
+            'adminAction': true,
+          },
+        );
+      } catch (e) {
+        appLog('Error logging shop deletion activity: $e');
+      }
+
       return true;
     } catch (e) {
       appLog('Error deleting shop: $e');
       return false;
-    }
-  }
-
-  Future<String?> _uploadImageToFirebase(
-    Uint8List imageBytes,
-    String shopId,
-  ) async {
-    try {
-      final storageRef = FirebaseStorage.instance.ref();
-      final shopImageRef = storageRef.child('shops/$shopId/main.jpg');
-
-      // Upload the bytes
-      await shopImageRef.putData(imageBytes);
-
-      // Get the download URL and ensure it's using the correct domain
-      String downloadUrl = await shopImageRef.getDownloadURL();
-      return downloadUrl;
-    } catch (e) {
-      appLog('Error uploading image to Firebase: $e');
-      return null;
     }
   }
 }

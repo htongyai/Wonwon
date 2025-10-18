@@ -8,10 +8,6 @@ import 'package:wonwonw2/utils/app_logger.dart';
 
 class ShopService {
   final FirebaseShopService _firebaseService = FirebaseShopService();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final CollectionReference _shopsRef = FirebaseFirestore.instance.collection(
-    'shops',
-  );
 
   // Get all approved shops
   Future<List<RepairShop>> getAllShops() async {
@@ -228,23 +224,19 @@ class ShopService {
 
   // Get shop by ID
   Future<RepairShop?> getShopById(String shopId) async {
-    final shops = await getAllShops();
-    return shops.firstWhere(
-      (shop) => shop.id == shopId,
-      orElse:
-          () => RepairShop(
-            id: 'not-found',
-            name: 'Not Found',
-            description: 'Shop not found',
-            address: '',
-            area: '',
-            categories: [],
-            rating: 0,
-            hours: {},
-            latitude: 0,
-            longitude: 0,
-          ),
-    );
+    try {
+      final shops = await getAllShops();
+      try {
+        return shops.firstWhere((shop) => shop.id == shopId);
+      } catch (e) {
+        // Shop not found, return null instead of placeholder
+        appLog('Shop with ID $shopId not found');
+        return null;
+      }
+    } catch (e) {
+      appLog('Error getting shop by ID $shopId: $e');
+      return null;
+    }
   }
 
   // Get shops by category

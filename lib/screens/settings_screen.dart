@@ -3,32 +3,25 @@ import 'package:wonwonw2/constants/app_colors.dart';
 import 'package:wonwonw2/constants/app_text_styles.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/screens/login_screen.dart';
-import 'package:wonwonw2/screens/saved_locations_screen.dart';
-import 'package:wonwonw2/screens/add_shop_screen.dart';
 import 'package:wonwonw2/screens/unapproved_shops_screen.dart';
 import 'package:wonwonw2/screens/view_reports_screen.dart';
 import 'package:wonwonw2/screens/users_list_screen.dart';
+import 'package:wonwonw2/screens/admin_dashboard_main_screen.dart';
+import 'package:wonwonw2/screens/terms_of_use_screen.dart';
+import 'package:wonwonw2/screens/privacy_policy_screen.dart';
 import 'package:wonwonw2/services/auth_service.dart';
 import 'package:wonwonw2/services/user_service.dart';
 import 'package:wonwonw2/services/app_localizations_service.dart' as service;
-import 'package:wonwonw2/services/theme_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:wonwonw2/localization/app_localizations.dart';
-import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:wonwonw2/utils/app_logger.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/widgets/section_title.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
+import 'package:wonwonw2/config/web_config.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' as excel;
-import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:uuid/uuid.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -45,7 +38,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final AuthService _authService = AuthService();
   bool _isLoggedIn = false;
   String? _userEmail;
-  bool _isLoading = true;
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
   bool _isAdmin = false;
@@ -58,6 +50,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadSelectedLanguage();
     _checkAdminStatus();
     _loadAppVersion();
+
+    // Listen for auth state changes
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      if (mounted) {
+        setState(() {
+          _isLoggedIn = user != null;
+          _userEmail = user?.email;
+        });
+
+        if (user != null) {
+          _checkAdminStatus();
+        } else {
+          setState(() {
+            _isAdmin = false;
+          });
+        }
+      }
+    });
   }
 
   Future<void> _checkLoginStatus() async {
@@ -68,7 +78,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _isLoggedIn = isLoggedIn;
         _userEmail = email;
-        _isLoading = false;
       });
     }
   }
@@ -174,7 +183,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'saved_locations'.tr(context),
                           onTap: () {},
                         ),
-                        if (_isAdmin)
+                        if (_isAdmin) ...[
+                          _buildFeatureTile(
+                            Icons.admin_panel_settings,
+                            'Admin Dashboard',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) =>
+                                          const AdminDashboardMainScreen(),
+                                ),
+                              );
+                            },
+                            color: Colors.red[600],
+                          ),
                           _buildFeatureTile(
                             Icons.access_time,
                             'unapproved_shops'.tr(context),
@@ -189,6 +213,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               );
                             },
                           ),
+                        ],
                         FutureBuilder<bool>(
                           future: _isAdminUser(),
                           builder: (context, snapshot) {
@@ -266,13 +291,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _buildLegalTile(
                         'terms_of_use'.tr(context),
                         FontAwesomeIcons.fileLines,
-                        AppConstants.primaryColor.withOpacity(0.7),
+                        AppConstants.primaryColor.withValues(alpha: 0.7),
+                        () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const TermsOfUseScreen(),
+                          ),
+                        ),
                       ),
                       const Divider(height: 1, thickness: 0.5),
                       _buildLegalTile(
                         'privacy_policy'.tr(context),
                         FontAwesomeIcons.shieldHalved,
-                        AppConstants.primaryColor.withOpacity(0.7),
+                        AppConstants.primaryColor.withValues(alpha: 0.7),
+                        () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const PrivacyPolicyScreen(),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -321,7 +356,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           border: Border.all(color: Colors.brown, width: 2),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -361,7 +396,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -380,7 +415,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 50,
         height: 50,
         decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.3),
+          color: Colors.grey.withValues(alpha: 0.3),
           shape: BoxShape.circle,
         ),
         child: const Icon(Icons.person_outline, color: Colors.white, size: 30),
@@ -414,7 +449,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 50,
         height: 50,
         decoration: BoxDecoration(
-          color: AppConstants.primaryColor.withOpacity(0.3),
+          color: AppConstants.primaryColor.withValues(alpha: 0.3),
           shape: BoxShape.circle,
         ),
         child: const Icon(Icons.person, color: Colors.white, size: 30),
@@ -445,6 +480,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildLanguageSection() {
+    // Hide language section for admin users or admin deployments
+    if (_isAdmin || WebConfig.isAdminOnlyDeployment) {
+      return const SizedBox.shrink();
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -489,7 +529,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildLegalTile(String title, IconData icon, Color iconColor) {
+  Widget _buildLegalTile(
+    String title,
+    IconData icon,
+    Color iconColor,
+    VoidCallback onTap,
+  ) {
     return ListTile(
       contentPadding: ResponsiveSize.getScaledPadding(
         const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
@@ -498,7 +543,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
+          color: iconColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Center(child: FaIcon(icon, color: iconColor, size: 16)),
@@ -512,9 +557,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         size: 14,
         color: Colors.grey,
       ),
-      onTap: () {
-        // Navigate to legal screen
-      },
+      onTap: onTap,
     );
   }
 
@@ -532,7 +575,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
+          color: iconColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Center(child: FaIcon(icon, color: iconColor, size: 16)),
@@ -553,23 +596,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
     IconData icon,
     String title, {
     required VoidCallback onTap,
+    Color? color,
   }) {
+    final tileColor = color ?? AppConstants.primaryColor;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       leading: Container(
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: AppConstants.primaryColor.withOpacity(0.1),
+          color: tileColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Center(
-          child: FaIcon(icon, color: AppConstants.primaryColor, size: 16),
-        ),
+        child: Center(child: FaIcon(icon, color: tileColor, size: 16)),
       ),
       title: Text(
         title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: color,
+        ),
       ),
       trailing: const Icon(
         Icons.arrow_forward_ios,
@@ -657,8 +704,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<bool> _isAdminUser() async {
-    final userService = UserService();
-    return await userService.isCurrentUserAdmin();
+    return await UserService.isCurrentUserAdmin();
   }
 
   Future<void> _importShopsFromExcel() async {
@@ -914,52 +960,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
 
       // Show import results
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text('Import Complete'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Successfully imported $importedCount shops.'),
-                  if (failedCount > 0) ...[
-                    const SizedBox(height: 8),
-                    Text('Failed to import $failedCount shops:'),
-                    const SizedBox(height: 4),
-                    ...failedRows.map(
-                      (error) => Text(
-                        error,
-                        style: const TextStyle(color: Colors.red),
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: const Text('Import Complete'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Successfully imported $importedCount shops.'),
+                    if (failedCount > 0) ...[
+                      const SizedBox(height: 8),
+                      Text('Failed to import $failedCount shops:'),
+                      const SizedBox(height: 4),
+                      ...failedRows.map(
+                        (error) => Text(
+                          error,
+                          style: const TextStyle(color: Colors.red),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('OK'),
+                  ),
                 ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-      );
+        );
+      }
     } catch (e) {
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text('Import Failed'),
-              content: Text('Error: ${e.toString()}'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-      );
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: const Text('Import Failed'),
+                content: Text('Error: ${e.toString()}'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+        );
+      }
     }
   }
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:visibility_detector/visibility_detector.dart';
-import 'package:wonwonw2/services/performance_monitor.dart';
 import 'package:wonwonw2/services/memory_manager.dart';
 import 'package:wonwonw2/services/widget_lifecycle_manager.dart';
 
@@ -36,7 +35,6 @@ class LazyLoadingImage extends StatefulWidget {
 }
 
 class _LazyLoadingImageState extends State<LazyLoadingImage> {
-  final _performanceMonitor = PerformanceMonitor();
   final _memoryManager = MemoryManager();
   final _lifecycleManager = WidgetLifecycleManager();
   bool _isVisible = false;

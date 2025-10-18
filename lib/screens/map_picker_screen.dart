@@ -7,7 +7,6 @@ import 'dart:ui' as ui;
 import 'dart:async';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
-import 'package:wonwonw2/utils/responsive_size.dart';
 
 class MapPickerScreen extends StatefulWidget {
   final double? initialLatitude;
@@ -602,9 +601,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               left: 0,
               right: 0,
               child: Container(
-                padding: ResponsiveSize.getScaledPadding(
-                  const EdgeInsets.all(20.0),
-                ),
+                padding: const EdgeInsets.all(20.0),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   boxShadow: [

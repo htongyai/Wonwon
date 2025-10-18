@@ -13,6 +13,11 @@ class ForumTopic {
   final int views;
   final bool isPinned;
   final bool isLocked;
+  final bool isHidden;
+  final bool isDeleted;
+  final String? moderationReason;
+  final String? moderatedBy;
+  final DateTime? moderatedAt;
   final List<String> tags;
   final Map<String, dynamic> metadata;
 
@@ -29,6 +34,11 @@ class ForumTopic {
     this.views = 0,
     this.isPinned = false,
     this.isLocked = false,
+    this.isHidden = false,
+    this.isDeleted = false,
+    this.moderationReason,
+    this.moderatedBy,
+    this.moderatedAt,
     this.tags = const [],
     this.metadata = const {},
   });
@@ -47,6 +57,14 @@ class ForumTopic {
       views: map['views'] ?? 0,
       isPinned: map['isPinned'] ?? false,
       isLocked: map['isLocked'] ?? false,
+      isHidden: map['isHidden'] ?? false,
+      isDeleted: map['isDeleted'] ?? false,
+      moderationReason: map['moderationReason'],
+      moderatedBy: map['moderatedBy'],
+      moderatedAt:
+          map['moderatedAt'] != null
+              ? (map['moderatedAt'] as Timestamp).toDate()
+              : null,
       tags: List<String>.from(map['tags'] ?? []),
       metadata: Map<String, dynamic>.from(map['metadata'] ?? {}),
     );
@@ -65,6 +83,12 @@ class ForumTopic {
       'views': views,
       'isPinned': isPinned,
       'isLocked': isLocked,
+      'isHidden': isHidden,
+      'isDeleted': isDeleted,
+      'moderationReason': moderationReason,
+      'moderatedBy': moderatedBy,
+      'moderatedAt':
+          moderatedAt != null ? Timestamp.fromDate(moderatedAt!) : null,
       'tags': tags,
       'metadata': metadata,
     };
@@ -83,6 +107,11 @@ class ForumTopic {
     int? views,
     bool? isPinned,
     bool? isLocked,
+    bool? isHidden,
+    bool? isDeleted,
+    String? moderationReason,
+    String? moderatedBy,
+    DateTime? moderatedAt,
     List<String>? tags,
     Map<String, dynamic>? metadata,
   }) {
@@ -99,6 +128,11 @@ class ForumTopic {
       views: views ?? this.views,
       isPinned: isPinned ?? this.isPinned,
       isLocked: isLocked ?? this.isLocked,
+      isHidden: isHidden ?? this.isHidden,
+      isDeleted: isDeleted ?? this.isDeleted,
+      moderationReason: moderationReason ?? this.moderationReason,
+      moderatedBy: moderatedBy ?? this.moderatedBy,
+      moderatedAt: moderatedAt ?? this.moderatedAt,
       tags: tags ?? this.tags,
       metadata: metadata ?? this.metadata,
     );
