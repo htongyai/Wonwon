@@ -45,6 +45,8 @@ class _NotificationSidebarState extends State<NotificationSidebar>
 
     if (widget.isOpen) {
       _animationController.forward();
+      // Automatically mark all notifications as read when sidebar opens initially
+      _markAllAsReadOnOpen();
     }
   }
 
@@ -54,9 +56,21 @@ class _NotificationSidebarState extends State<NotificationSidebar>
     if (widget.isOpen != oldWidget.isOpen) {
       if (widget.isOpen) {
         _animationController.forward();
+        // Automatically mark all notifications as read when sidebar opens
+        _markAllAsReadOnOpen();
       } else {
         _animationController.reverse();
       }
+    }
+  }
+
+  /// Mark all notifications as read when sidebar opens
+  Future<void> _markAllAsReadOnOpen() async {
+    try {
+      await NotificationService.markAllAsRead();
+    } catch (e) {
+      // Silently handle errors to avoid disrupting user experience
+      print('Error marking notifications as read on open: $e');
     }
   }
 

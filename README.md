@@ -627,6 +627,12 @@ import 'package:wonwonw2/services/version_service_web.dart'
 
 ## 🔒 **Security Measures**
 
+### **API Key Security**
+- **Environment Variables**: API keys stored in environment variables
+- **No Hardcoded Keys**: No API keys committed to version control
+- **Template Configuration**: Use config.template.dart for setup
+- **Production Security**: Separate keys for development/production
+
 ### **Authentication Security**
 - **Firebase Auth**: Industry-standard authentication
 - **Rate Limiting**: 5 login attempts, 15-minute lockout
@@ -678,14 +684,16 @@ cd Wonwon
 flutter pub get
 
 # 3. Configure Firebase
-# - Create Firebase project
+# - Create Firebase project at https://console.firebase.google.com
+# - Enable Firestore, Authentication, and Storage
 # - Download google-services.json and GoogleService-Info.plist
 # - Place in android/app/ and ios/Runner/ respectively
 
-# 4. Configure Google Maps
-# - Get Google Maps API key
-# - Add to android/app/src/main/AndroidManifest.xml
-# - Add to ios/Runner/AppDelegate.swift
+# 4. Configure API Keys (IMPORTANT: Security)
+# - Copy config.template.dart to config.dart
+# - Fill in your actual API keys in config.dart
+# - NEVER commit config.dart to version control
+# - Use environment variables for production deployment
 
 # 5. Run the app
    flutter run
@@ -708,24 +716,6 @@ flutter build web --release
 
 ---
 
-## 📈 **Future Roadmap**
-
-### **Planned Features**
-- [ ] **Push Notifications**: Real-time updates for users
-- [ ] **Advanced Search**: Filter by price, rating, availability
-- [ ] **Social Features**: Share shops, follow users
-- [ ] **Payment Integration**: In-app payments for services
-- [ ] **Offline Mode**: Full offline functionality
-- [ ] **Analytics Dashboard**: Detailed usage analytics
-
-### **Technical Improvements**
-- [ ] **Increase Test Coverage**: Target 80%+ coverage
-- [ ] **Performance Monitoring**: Real-time performance tracking
-- [ ] **Error Tracking**: Crash reporting and error analytics
-- [ ] **A/B Testing**: Feature flag system
-- [ ] **Microservices**: Break down monolithic services
-
----
 
 ## 🤝 **Contributing**
 

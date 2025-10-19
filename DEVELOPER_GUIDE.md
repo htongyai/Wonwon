@@ -38,12 +38,13 @@ flutter pub get
 # - Download google-services.json (Android) and GoogleService-Info.plist (iOS)
 # - Place them in android/app/ and ios/Runner/ respectively
 
-# 4. Configure Google Maps
-# - Get API key from https://console.cloud.google.com
-# - Add to android/app/src/main/AndroidManifest.xml:
-#   <meta-data android:name="com.google.android.geo.API_KEY" android:value="YOUR_API_KEY"/>
-# - Add to ios/Runner/AppDelegate.swift:
-#   GMSServices.provideAPIKey("YOUR_API_KEY")
+# 4. Configure API Keys (SECURITY CRITICAL)
+# - Copy config.template.dart to config.dart
+# - Fill in your actual API keys in config.dart
+# - NEVER commit config.dart to version control
+# - Use environment variables for production:
+#   flutter run --dart-define=FIREBASE_API_KEY=your_key
+#   flutter run --dart-define=GOOGLE_MAPS_API_KEY=your_key
 
 # 5. Run the app
 flutter run

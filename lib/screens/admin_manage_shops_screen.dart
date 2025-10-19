@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
@@ -455,7 +456,9 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
   Widget _buildShopsTable(List<RepairShop> shops) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isLargeScreen = constraints.maxWidth > 1200;
+        final isLargeScreen = ResponsiveBreakpoints.isLargeDesktop(
+          constraints.maxWidth,
+        );
         final isMediumScreen = constraints.maxWidth > 800;
 
         return SingleChildScrollView(

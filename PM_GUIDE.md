@@ -441,45 +441,6 @@ Wonwonw2 is a **repair shop discovery platform** that connects users with nearby
 
 ---
 
-## **Roadmap & Priorities**
-
-### **Short-term (Next 3 months)**
-
-#### **High Priority**
-- **Push Notifications**: Real-time updates for users
-- **Advanced Search**: More sophisticated search filters
-- **Mobile App**: Native iOS and Android apps
-- **Performance Optimization**: Improve app speed and responsiveness
-
-#### **Medium Priority**
-- **User Profiles**: Enhanced user profile pages
-- **Shop Analytics**: Analytics dashboard for shop owners
-- **Content Recommendations**: AI-powered content suggestions
-- **Social Features**: User following and social interactions
-
-### **Medium-term (3-6 months)**
-
-#### **High Priority**
-- **Payment Integration**: In-app payments for services
-- **Appointment Booking**: Schedule appointments with shops
-- **Offline Mode**: Full offline functionality
-- **Multi-language Support**: Additional language support
-
-#### **Medium Priority**
-- **Advanced Analytics**: Machine learning insights
-- **API for Partners**: Third-party integration capabilities
-- **White-label Solution**: Customizable platform for partners
-- **Mobile Admin App**: Admin tools for mobile devices
-
-### **Long-term (6+ months)**
-
-#### **Strategic Initiatives**
-- **AI-Powered Matching**: Smart shop recommendations
-- **Blockchain Reviews**: Immutable review system
-- **IoT Integration**: Smart device integration
-- **Global Expansion**: Multi-country platform
-
----
 
 ## **Technical Constraints**
 

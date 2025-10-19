@@ -7,10 +7,15 @@ import 'package:wonwonw2/screens/desktop_home_screen.dart';
 import 'package:wonwonw2/screens/desktop_map_screen.dart';
 import 'package:wonwonw2/screens/desktop_saved_locations_screen.dart';
 import 'package:wonwonw2/screens/desktop_profile_screen.dart';
+import 'package:wonwonw2/screens/tablet_home_screen.dart';
+import 'package:wonwonw2/screens/tablet_map_screen.dart';
+import 'package:wonwonw2/screens/tablet_saved_locations_screen.dart';
+import 'package:wonwonw2/screens/tablet_profile_screen.dart';
 import 'package:wonwonw2/screens/admin_dashboard_main_screen.dart';
 import 'package:wonwonw2/screens/forum_screen.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
 import 'package:wonwonw2/widgets/custom_navigation_bar.dart';
+import 'package:wonwonw2/widgets/tablet_navigation_bar.dart';
 import 'package:wonwonw2/widgets/desktop_navigation.dart';
 import 'package:wonwonw2/services/auth_manager.dart';
 import 'package:wonwonw2/mixins/auth_state_mixin.dart';
@@ -147,7 +152,21 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
       );
     }
 
-    // Use mobile navigation for mobile/tablet screens
+    // Use tablet navigation for tablet screens
+    if (ResponsiveSize.shouldShowTabletLayout(context)) {
+      return NotificationOverlay(
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          body: _buildCurrentScreen(),
+          bottomNavigationBar: TabletNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: onTap,
+          ),
+        ),
+      );
+    }
+
+    // Use mobile navigation for mobile screens
     return NotificationOverlay(
       child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
@@ -195,7 +214,25 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
       }
     }
 
-    // For mobile/tablet, use mobile-specific screens
+    // For tablet, use tablet-specific screens when available
+    if (ResponsiveSize.shouldShowTabletLayout(context)) {
+      switch (_currentIndex) {
+        case 0:
+          return const TabletHomeScreen();
+        case 1:
+          return const TabletMapScreen();
+        case 2:
+          return const TabletSavedLocationsScreen();
+        case 3:
+          return const TabletProfileScreen();
+        case 4:
+          return const ForumScreen();
+        default:
+          return const TabletHomeScreen();
+      }
+    }
+
+    // For mobile, use mobile-specific screens
     switch (_currentIndex) {
       case 0:
         return const HomeScreen();

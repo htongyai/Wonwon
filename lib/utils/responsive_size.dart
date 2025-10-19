@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
+import 'package:wonwonw2/utils/cached_responsive_size.dart';
 
 class ResponsiveSize {
   static MediaQueryData? _mediaQueryData;
@@ -14,10 +16,10 @@ class ResponsiveSize {
   static double fontSize = 14.0;
   static bool _isInitialized = false;
 
-  // Breakpoints for responsive design
-  static const double mobileBreakpoint = 600;
-  static const double tabletBreakpoint = 1024;
-  static const double desktopBreakpoint = 1440;
+  // Use standardized breakpoints
+  static const double mobileBreakpoint = ResponsiveBreakpoints.mobile;
+  static const double tabletBreakpoint = ResponsiveBreakpoints.tablet;
+  static const double desktopBreakpoint = ResponsiveBreakpoints.desktop;
 
   static void init(BuildContext context) {
     _mediaQueryData = MediaQuery.of(context);
@@ -36,6 +38,9 @@ class ResponsiveSize {
     textScaleFactor = _mediaQueryData!.textScaleFactor;
     fontSize = safeBlockHorizontal * 4; // Base font size
     _isInitialized = true;
+
+    // Initialize cached responsive size
+    CachedResponsiveSize.init(context);
   }
 
   // Ensure initialization before accessing values
@@ -85,25 +90,25 @@ class ResponsiveSize {
   // Check if device is a tablet
   static bool isTablet([BuildContext? context]) {
     _ensureInitialized(context);
-    return screenWidth > mobileBreakpoint && screenWidth <= tabletBreakpoint;
+    return ResponsiveBreakpoints.isTablet(screenWidth);
   }
 
   // Check if device is desktop
   static bool isDesktop([BuildContext? context]) {
     _ensureInitialized(context);
-    return screenWidth > tabletBreakpoint && screenWidth <= desktopBreakpoint;
+    return ResponsiveBreakpoints.isDesktop(screenWidth);
   }
 
   // Check if device is large desktop
   static bool isLargeDesktop([BuildContext? context]) {
     _ensureInitialized(context);
-    return screenWidth > desktopBreakpoint;
+    return ResponsiveBreakpoints.isLargeDesktop(screenWidth);
   }
 
   // Check if device is mobile
   static bool isMobile([BuildContext? context]) {
     _ensureInitialized(context);
-    return screenWidth <= mobileBreakpoint;
+    return ResponsiveBreakpoints.isMobile(screenWidth);
   }
 
   // Check if device is in landscape mode
@@ -135,7 +140,13 @@ class ResponsiveSize {
   // Check if should show desktop layout
   static bool shouldShowDesktopLayout([BuildContext? context]) {
     _ensureInitialized(context);
-    return screenWidth > tabletBreakpoint;
+    return ResponsiveBreakpoints.shouldShowDesktopLayout(screenWidth);
+  }
+
+  // Check if should show tablet layout
+  static bool shouldShowTabletLayout([BuildContext? context]) {
+    _ensureInitialized(context);
+    return ResponsiveBreakpoints.shouldShowTabletLayout(screenWidth);
   }
 
   // Get appropriate padding for different screen sizes

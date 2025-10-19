@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/constants/design_tokens.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
@@ -22,8 +23,9 @@ class CustomNavigationBar extends StatelessWidget {
       ResponsiveSize.init(context);
     }
 
-    // Increase height by 5% (from 6% to 11% of screen height)
-    final navBarHeight = ResponsiveSize.getHeight(7);
+    // Use responsive navigation bar height from design tokens
+    final screenHeight = MediaQuery.of(context).size.height;
+    final navBarHeight = DesignTokens.getResponsiveNavBarHeight(screenHeight);
 
     return Container(
       height: navBarHeight,

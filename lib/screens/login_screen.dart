@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 // Removed go_router import - using basic navigation
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/services/auth_service.dart';
 import 'package:wonwonw2/screens/admin_dashboard_main_screen.dart';
@@ -44,7 +45,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 768;
+    final isDesktop =
+        ResponsiveBreakpoints.isTablet(screenWidth) ||
+        ResponsiveBreakpoints.isDesktop(screenWidth);
 
     return Scaffold(
       backgroundColor: Colors.white,

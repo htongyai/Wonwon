@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/models/review.dart';
 import 'package:wonwonw2/screens/edit_shop_screen.dart';
@@ -532,8 +533,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
   Widget _buildDesktopLayout() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isLargeScreen = screenWidth > 1400;
-    final isMediumScreen = screenWidth > 1000 && screenWidth <= 1400;
+    final isLargeScreen = ResponsiveBreakpoints.isLargeDesktop(screenWidth);
+    final isMediumScreen =
+        screenWidth > 1000 && screenWidth <= ResponsiveBreakpoints.largeDesktop;
 
     // Responsive sidebar width
     double sidebarWidth;

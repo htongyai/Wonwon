@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
 import 'package:wonwonw2/models/forum_topic.dart';
 import 'package:wonwonw2/screens/forum_create_topic_screen.dart';
 import 'package:wonwonw2/screens/forum_topic_detail_screen.dart';
@@ -158,7 +159,9 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   Widget _buildDesktopLayout() {
     final screenWidth = MediaQuery.of(context).size.width;
     final sidebarWidth =
-        screenWidth < 1200 ? 280.0 : 320.0; // Responsive sidebar width
+        ResponsiveBreakpoints.isDesktop(screenWidth)
+            ? 320.0
+            : 280.0; // Responsive sidebar width
 
     return Row(
       children: [
