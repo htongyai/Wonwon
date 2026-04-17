@@ -4,6 +4,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -24,6 +25,9 @@ import 'package:wonwon_client/screens/login_screen.dart';
 import 'package:wonwon_client/widgets/shop_card.dart';
 import 'package:wonwon_client/widgets/category_chips.dart';
 import 'package:wonwon_client/widgets/notification_icon.dart';
+import 'package:wonwon_client/widgets/filter_bar.dart';
+import 'package:wonwon_client/models/shop_filter.dart';
+import 'package:wonwon_client/services/recent_searches.dart';
 import 'package:wonwon_client/localization/app_localizations_wrapper.dart';
 import 'package:shared/services/analytics_service.dart';
 
@@ -47,6 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedCategoryId = 'all';
   String? _selectedSubServiceId;
   bool _isNavigating = false;
+  ShopFilter _filter = const ShopFilter();
 
   Position? _userPosition;
   String _districtName = '';
@@ -56,6 +61,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   StreamSubscription<User?>? _authSubscription;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
+  List<String> _recentSearches = const [];
+  bool _showRecentSearches = false;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
 
@@ -70,6 +78,8 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     });
+    _searchFocus.addListener(_onSearchFocusChange);
+    _loadRecentSearches();
     _initialize();
   }
 
@@ -77,7 +87,32 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _authSubscription?.cancel();
     _searchController.dispose();
+    _searchFocus.removeListener(_onSearchFocusChange);
+    _searchFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadRecentSearches() async {
+    final recents = await RecentSearches().load();
+    if (!mounted) return;
+    setState(() => _recentSearches = recents);
+  }
+
+  void _onSearchFocusChange() {
+    if (!mounted) return;
+    setState(() {
+      _showRecentSearches =
+          _searchFocus.hasFocus && _searchController.text.trim().isEmpty;
+    });
+  }
+
+  void _applyRecentSearch(String query) {
+    _searchController.text = query;
+    _onSearchChanged(query);
+    _searchFocus.unfocus();
+    setState(() => _showRecentSearches = false);
+    RecentSearches().add(query);
+    _loadRecentSearches();
   }
 
   Future<void> _initialize() async {
@@ -135,6 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onCategorySelected(String categoryId) {
+    HapticFeedback.selectionClick();
     AnalyticsService.safeLog(() => AnalyticsService().logFilterCategory(category: categoryId));
     setState(() {
       _selectedCategoryId = categoryId;
@@ -147,6 +183,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (subServiceId != null) AnalyticsService.safeLog(() => AnalyticsService().logFilterCategory(category: _selectedCategoryId, subService: subServiceId));
     setState(() {
       _selectedSubServiceId = subServiceId;
+      _applyFilters();
+    });
+  }
+
+  void _onFilterChanged(ShopFilter next) {
+    setState(() {
+      _filter = next;
       _applyFilters();
     });
   }
@@ -172,12 +215,26 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    // Search filter
+    // Search filter (name + description + sub-service keys)
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
-      result =
-          result.where((s) => s.name.toLowerCase().contains(q)).toList();
+      result = result.where((s) {
+        if (s.name.toLowerCase().contains(q)) return true;
+        if (s.description.toLowerCase().contains(q)) return true;
+        if (s.area.toLowerCase().contains(q)) return true;
+        for (final subs in s.subServices.values) {
+          if (subs.any((x) => x.toLowerCase().contains(q))) return true;
+        }
+        return false;
+      }).toList();
     }
+
+    // User filter (open now, rating, price, distance) + sort
+    result = ShopFilterEngine.apply(
+      result,
+      _filter,
+      distanceKm: _userPosition == null ? null : _getDistanceKm,
+    );
 
     _filteredShops = result;
   }
@@ -335,15 +392,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _applySortByDistance() {
     if (_userPosition == null) return;
     _updateDistanceCache();
-    _filteredShops.sort((a, b) {
-      final da = Geolocator.distanceBetween(
-          _userPosition!.latitude, _userPosition!.longitude,
-          a.latitude, a.longitude);
-      final db = Geolocator.distanceBetween(
-          _userPosition!.latitude, _userPosition!.longitude,
-          b.latitude, b.longitude);
-      return da.compareTo(db);
-    });
+    // Re-run the combined filter so distance-based sort + filters
+    // are recomputed against the freshly-cached distances.
+    _applyFilters();
   }
 
   // ── Distance helper ─────────────────────────────────────────────────────
@@ -351,7 +402,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void _updateDistanceCache() {
     _distanceCache.clear();
     if (_userPosition == null) return;
-    for (final shop in _filteredShops) {
+    // Cache distances for ALL shops so filter/sort can look them up
+    // regardless of whether the shop is currently in _filteredShops.
+    for (final shop in _allShops) {
       final meters = Geolocator.distanceBetween(
         _userPosition!.latitude, _userPosition!.longitude,
         shop.latitude, shop.longitude,
@@ -525,6 +578,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // Search bar
         SliverToBoxAdapter(child: _buildSearchBar()),
+
+        // Recent searches (only when search is focused + empty)
+        if (_showRecentSearches && _recentSearches.isNotEmpty)
+          SliverToBoxAdapter(child: _buildRecentSearches()),
+
+        // Filter & sort bar
+        SliverToBoxAdapter(
+          child: FilterBar(filter: _filter, onChanged: _onFilterChanged),
+        ),
 
         // Category chips
         SliverToBoxAdapter(child: _buildCategorySection()),
@@ -754,7 +816,20 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: TextField(
           controller: _searchController,
-          onChanged: _onSearchChanged,
+          focusNode: _searchFocus,
+          onChanged: (q) {
+            _onSearchChanged(q);
+            setState(() {
+              _showRecentSearches =
+                  _searchFocus.hasFocus && q.trim().isEmpty;
+            });
+          },
+          onSubmitted: (q) {
+            if (q.trim().isNotEmpty) {
+              RecentSearches().add(q);
+              _loadRecentSearches();
+            }
+          },
           style: GoogleFonts.inter(fontSize: 15, color: AppConstants.darkColor),
           decoration: InputDecoration(
             hintText: 'search_shops_services'.tr(context),
@@ -773,6 +848,118 @@ class _HomeScreenState extends State<HomeScreen> {
             border: InputBorder.none,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Recent Searches ─────────────────────────────────────────────────────
+
+  Widget _buildRecentSearches() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE8E8E8)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.history_rounded,
+                    size: 15, color: Colors.grey.shade600),
+                const SizedBox(width: 6),
+                Text(
+                  'recent_searches'.tr(context),
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade700,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () async {
+                    await RecentSearches().clear();
+                    await _loadRecentSearches();
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppConstants.primaryColor,
+                    minimumSize: const Size(40, 30),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: Text(
+                    'clear_all'.tr(context),
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _recentSearches
+                  .map((q) => _recentSearchChip(q))
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _recentSearchChip(String q) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _applyRecentSearch(q),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                q,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: AppConstants.darkColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 6),
+              InkWell(
+                onTap: () async {
+                  await RecentSearches().remove(q);
+                  await _loadRecentSearches();
+                },
+                customBorder: const CircleBorder(),
+                child: Icon(Icons.close_rounded,
+                    size: 12, color: Colors.grey.shade500),
+              ),
+            ],
           ),
         ),
       ),
@@ -909,6 +1096,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _searchQuery = '';
                     _selectedCategoryId = 'all';
                     _selectedSubServiceId = null;
+                    _filter = const ShopFilter();
                     _applyFilters();
                   });
                 },
@@ -1008,8 +1196,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // ── Empty State ─────────────────────────────────────────────────────────
 
   Widget _buildEmptyState() {
-    final hasFilter =
-        _selectedCategoryId != 'all' || _searchQuery.isNotEmpty;
+    final hasFilter = _selectedCategoryId != 'all' ||
+        _searchQuery.isNotEmpty ||
+        _filter.hasActiveFilters;
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Center(
@@ -1052,6 +1241,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() {
                     _searchQuery = '';
                     _selectedCategoryId = 'all';
+                    _filter = const ShopFilter();
                     _applyFilters();
                   });
                 },

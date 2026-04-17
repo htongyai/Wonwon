@@ -14,6 +14,8 @@ import 'package:wonwon_client/localization/app_localizations_wrapper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared/services/analytics_service.dart';
+import 'package:shared/state/app_state_manager.dart';
+import 'package:provider/provider.dart';
 import 'package:wonwon_client/widgets/auth_gate.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -231,6 +233,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               // Language section
               _buildLanguageSection(),
+
+              // Appearance section (dark mode)
+              _buildAppearanceSection(),
 
               // Legal section
               _buildSectionHeader('legal'.tr(context)),
@@ -568,6 +573,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ---------------------------------------------------------------------------
   // LANGUAGE SECTION
   // ---------------------------------------------------------------------------
+
+  Widget _buildAppearanceSection() {
+    return Consumer<AppStateManager>(
+      builder: (context, appState, _) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader('appearance'.tr(context)),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200, width: 0.5),
+              ),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color:
+                            AppConstants.primaryColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        appState.isDarkMode
+                            ? Icons.dark_mode_rounded
+                            : Icons.light_mode_rounded,
+                        color: AppConstants.primaryColor,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        'dark_mode'.tr(context),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: appState.isDarkMode,
+                      activeColor: AppConstants.primaryColor,
+                      onChanged: (v) => appState.setDarkMode(v),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Widget _buildLanguageSection() {
     return Column(

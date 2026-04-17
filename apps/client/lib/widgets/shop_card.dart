@@ -22,8 +22,19 @@ class ShopCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (compact) return _buildCompactCard(context);
-    return _buildGridCard(context);
+    // Semantic label: "<shop name>, rated X of 5, <N> km away"
+    final parts = <String>[shop.name];
+    if (shop.rating > 0) {
+      parts.add('${shop.rating.toStringAsFixed(1)} out of 5 stars');
+    }
+    if (distanceKm != null) {
+      parts.add('${distanceKm!.toStringAsFixed(1)} kilometers away');
+    }
+    return Semantics(
+      label: parts.join(', '),
+      button: true,
+      child: compact ? _buildCompactCard(context) : _buildGridCard(context),
+    );
   }
 
   // ── Grid Card ─────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ import 'package:wonwon_client/widgets/notification_overlay.dart';
 import 'package:wonwon_client/localization/app_localizations_wrapper.dart';
 import 'package:wonwon_client/localization/app_localizations.dart';
 import 'package:shared/constants/app_constants.dart';
+import 'package:shared/services/saved_shop_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared/utils/app_reload.dart';
@@ -30,6 +31,8 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
   late int _currentIndex;
   final _pageStorageBucket = PageStorageBucket();
   Locale? _currentLocale;
+  int _savedCount = 0;
+  final SavedShopService _savedShopService = SavedShopService();
 
   final List<Widget> _screens = const [
     HomeScreen(),
@@ -44,6 +47,24 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
     super.initState();
     _currentIndex = widget.initialIndex;
     _loadLocale();
+    _refreshSavedCount();
+  }
+
+  @override
+  void didUpdateWidget(MainNavigation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refresh saved count when user navigates away from the Saved tab so
+    // the badge reflects fresh state.
+    _refreshSavedCount();
+  }
+
+  Future<void> _refreshSavedCount() async {
+    try {
+      final ids = await _savedShopService.getSavedShopIds();
+      if (mounted) setState(() => _savedCount = ids.length);
+    } catch (_) {
+      // Silently ignore — badge just won't appear.
+    }
   }
 
   Future<void> _loadLocale() async {
@@ -57,6 +78,9 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
     setState(() {
       _currentIndex = index;
     });
+    // Refresh the saved count whenever the user returns to a non-saved tab,
+    // so changes made on the saved screen are reflected.
+    if (index != 2) _refreshSavedCount();
   }
 
   static MainNavigationState? of(BuildContext context) {
@@ -263,7 +287,7 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
             children: [
               Expanded(child: _buildNavBarItem(FontAwesomeIcons.house, 'home'.tr(context), 0)),
               Expanded(child: _buildNavBarItem(FontAwesomeIcons.magnifyingGlass, 'search'.tr(context), 1)),
-              Expanded(child: _buildNavBarItem(FontAwesomeIcons.bookmark, 'saved'.tr(context), 2)),
+              Expanded(child: _buildNavBarItem(FontAwesomeIcons.bookmark, 'saved'.tr(context), 2, badge: _savedCount)),
               Expanded(child: _buildNavBarItem(FontAwesomeIcons.comments, 'forum'.tr(context), 4)),
               Expanded(child: _buildNavBarItem(FontAwesomeIcons.user, 'profile'.tr(context), 3)),
             ],
@@ -273,7 +297,7 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
     );
   }
 
-  Widget _buildNavBarItem(IconData icon, String label, int index) {
+  Widget _buildNavBarItem(IconData icon, String label, int index, {int badge = 0}) {
     final isSelected = _currentIndex == index;
     return GestureDetector(
       onTap: () => onTap(index),
@@ -296,10 +320,47 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            FaIcon(
-              icon,
-              size: 19,
-              color: isSelected ? AppConstants.primaryColor : const Color(0xFFC0C0C0),
+            // Icon with optional badge
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                FaIcon(
+                  icon,
+                  size: 19,
+                  color: isSelected
+                      ? AppConstants.primaryColor
+                      : const Color(0xFFC0C0C0),
+                ),
+                if (badge > 0)
+                  Positioned(
+                    top: -6,
+                    right: -10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppConstants.primaryColor,
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Center(
+                        child: Text(
+                          badge > 99 ? '99+' : '$badge',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 4),
             Text(

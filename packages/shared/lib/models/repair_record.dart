@@ -12,6 +12,7 @@ class RepairRecord {
   final int? satisfactionRating; // 1-5 rating
   final String category;
   final String subService;
+  final List<String> photos;
 
   RepairRecord({
     required this.id,
@@ -25,6 +26,7 @@ class RepairRecord {
     this.satisfactionRating,
     required this.category,
     required this.subService,
+    this.photos = const [],
   });
 
   Map<String, dynamic> toMap() {
@@ -40,6 +42,7 @@ class RepairRecord {
       'satisfactionRating': satisfactionRating,
       'category': category,
       'subService': subService,
+      'photos': photos,
     };
   }
 
@@ -57,6 +60,9 @@ class RepairRecord {
       satisfactionRating: map['satisfactionRating'] as int?,
       category: map['category']?.toString() ?? '',
       subService: map['subService']?.toString() ?? '',
+      photos: (map['photos'] is List)
+          ? (map['photos'] as List).map((e) => e.toString()).toList()
+          : const [],
     );
   }
 }

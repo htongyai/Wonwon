@@ -26,6 +26,9 @@ import 'package:shared/services/optimized_image_cache_manager.dart';
 import 'package:shared/services/unified_memory_manager.dart';
 import 'package:shared/services/analytics_service.dart';
 import 'package:shared/services/shop_analytics_service.dart';
+import 'package:wonwon_client/widgets/common/branded_snackbar.dart';
+import 'package:wonwon_client/widgets/skeletons/shop_detail_skeleton.dart';
+import 'package:wonwon_client/widgets/common/animated_bookmark.dart';
 
 /// Shop detail screen with a clean, modern card-based layout.
 /// Displays shop photos, info, services, hours, reviews, and a mini map.
@@ -197,28 +200,22 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     final shop = _shop;
     if (shop == null) return;
     final wasSaved = _isSaved;
+    HapticFeedback.lightImpact();
     setState(() {
       _isSaved = !wasSaved;
       _isLoadingSavedState = true;
     });
 
     if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            wasSaved
-                ? 'removed_from_saved'
-                    .tr(context)
-                    .replaceAll('{shop_name}', shop.name)
-                : 'saved_to_locations'
-                    .tr(context)
-                    .replaceAll('{shop_name}', shop.name),
-          ),
-          backgroundColor:
-              wasSaved ? Colors.red[400] : AppConstants.primaryColor,
-          duration: const Duration(seconds: 2),
-        ),
+      BrandedSnackBar.success(
+        context,
+        wasSaved
+            ? 'removed_from_saved'
+                .tr(context)
+                .replaceAll('{shop_name}', shop.name)
+            : 'saved_to_locations'
+                .tr(context)
+                .replaceAll('{shop_name}', shop.name),
       );
     }
 
@@ -238,23 +235,15 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
       if (!success && mounted) {
         setState(() => _isSaved = wasSaved);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('failed_to_update_saved'.tr(context)),
-            backgroundColor: Colors.red,
-          ),
-        );
+        BrandedSnackBar.error(
+            context, 'failed_to_update_saved'.tr(context));
       }
     } catch (e) {
       if (mounted) {
         appLog('Error toggling saved shop: $e');
         setState(() => _isSaved = wasSaved);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('failed_to_update_saved'.tr(context)),
-            backgroundColor: Colors.red,
-          ),
-        );
+        BrandedSnackBar.error(
+            context, 'failed_to_update_saved'.tr(context));
       }
     } finally {
       if (mounted) setState(() => _isLoadingSavedState = false);
@@ -596,20 +585,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 ),
               );
             }
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 24),
-                  TextButton.icon(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back),
-                    label: Text('back'.tr(context)),
-                  ),
-                ],
-              ),
-            );
+            return const ShopDetailSkeleton();
           },
         ),
       );
@@ -704,9 +680,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                       const SizedBox(height: 20),
                       _buildActionButtonsRow(),
                       _buildDivider(),
-                      _buildServicesSection(),
-                      _buildDivider(),
                       _buildOpeningHoursSection(),
+                      _buildDivider(),
+                      _buildServicesSection(),
                       _buildDivider(),
                       _buildContactSection(),
                       _buildDivider(),
@@ -719,7 +695,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                       _buildReviewsSection(),
                       _buildDivider(),
                       _buildLocationSection(),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 120),
                     ],
                   ),
                 ),
@@ -771,9 +747,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                       const SizedBox(height: 20),
                       _buildActionButtonsRow(),
                       _buildDivider(),
-                      _buildServicesSection(),
-                      _buildDivider(),
                       _buildOpeningHoursSection(),
+                      _buildDivider(),
+                      _buildServicesSection(),
                       _buildDivider(),
                       _buildContactSection(),
                       _buildDivider(),
@@ -931,6 +907,36 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                     ),
                   );
                 }),
+              ),
+            ),
+          // Photo count pill
+          if (photos.length > 1)
+            Positioned(
+              bottom: 12,
+              right: 12,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.photo_library_rounded,
+                        size: 12, color: Colors.white),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${_currentPhotoIndex + 1} / ${photos.length}',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
         ],
@@ -1788,16 +1794,82 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         else if (_reviews.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: AppConstants.primaryColor.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(_sectionRadius),
-            ),
-            child: Center(
-              child: Text(
-                'no_reviews_yet'.tr(context),
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+              border: Border.all(
+                color: AppConstants.primaryColor.withValues(alpha: 0.2),
               ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppConstants.primaryColor.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.rate_review_rounded,
+                    size: 24,
+                    color: AppConstants.primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'no_reviews_yet'.tr(context),
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppConstants.darkColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'be_first_to_review'.tr(context),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: _isLoggedIn
+                        ? _showAddReviewDialog
+                        : () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const LoginScreen(),
+                              ),
+                            ),
+                    icon: const Icon(Icons.edit_outlined, size: 16),
+                    label: Text(
+                      _isLoggedIn
+                          ? 'write_first_review'.tr(context)
+                          : 'login_to_review'.tr(context),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 20),
+                    ),
+                  ),
+                ),
+              ],
             ),
           )
         else
@@ -2095,10 +2167,24 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               ),
             ],
             const SizedBox(width: 8),
-            _bottomBarIcon(
-              icon: _isSaved ? Icons.bookmark : Icons.bookmark_border,
-              onTap: _toggleSaved,
-              color: _isSaved ? _starColor : null,
+            // Save button with bounce animation on toggle
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: IconButton(
+                tooltip: _isSaved
+                    ? 'saved'.tr(context)
+                    : 'save_shop'.tr(context),
+                onPressed: _toggleSaved,
+                icon: AnimatedBookmark(
+                  isActive: _isSaved,
+                  activeColor: _starColor,
+                  inactiveColor: Colors.grey.shade700,
+                  size: 22,
+                ),
+              ),
             ),
             if (_isLoggedIn) ...[
               const SizedBox(width: 8),

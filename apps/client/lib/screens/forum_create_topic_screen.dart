@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -5,6 +6,7 @@ import 'package:shared/constants/app_constants.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared/services/forum_service.dart';
 import 'package:wonwon_client/localization/app_localizations_wrapper.dart';
+import 'package:wonwon_client/services/forum_draft.dart';
 import 'package:shared/utils/app_logger.dart';
 import 'package:shared/services/analytics_service.dart';
 
@@ -59,17 +61,69 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
     },
   ];
 
+  Timer? _draftSaveDebounce;
+
   @override
   void initState() {
     super.initState();
+    _titleController.addListener(_scheduleDraftSave);
+    _contentController.addListener(_scheduleDraftSave);
+    _restoreDraftIfAny();
   }
 
   @override
   void dispose() {
+    _draftSaveDebounce?.cancel();
+    _titleController.removeListener(_scheduleDraftSave);
+    _contentController.removeListener(_scheduleDraftSave);
     _titleController.dispose();
     _contentController.dispose();
     _tagController.dispose();
     super.dispose();
+  }
+
+  Future<void> _restoreDraftIfAny() async {
+    final draft = await ForumDraftStore().load();
+    if (draft == null || !mounted) return;
+    // Delay the SnackBar until after first frame so ScaffoldMessenger is ready.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          content: Text('draft_restored'.tr(context)),
+          action: SnackBarAction(
+            label: 'draft_use'.tr(context),
+            onPressed: () {
+              if (!mounted) return;
+              setState(() {
+                _titleController.text = draft.title;
+                _contentController.text = draft.content;
+                _selectedCategory = draft.category;
+                _tags = List<String>.from(draft.tags);
+              });
+            },
+          ),
+        ),
+      );
+    });
+  }
+
+  void _scheduleDraftSave() {
+    _draftSaveDebounce?.cancel();
+    _draftSaveDebounce = Timer(const Duration(milliseconds: 600), _saveDraft);
+  }
+
+  Future<void> _saveDraft() async {
+    final draft = ForumDraft(
+      title: _titleController.text,
+      content: _contentController.text,
+      category: _selectedCategory,
+      tags: List<String>.from(_tags),
+      savedAt: DateTime.now(),
+    );
+    if (draft.isEmpty) return;
+    await ForumDraftStore().save(draft);
   }
 
   bool get _hasUnsavedChanges {
@@ -650,6 +704,8 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
 
       if (mounted) {
         _submittedSuccessfully = true;
+        // Drop the saved draft now that it's published.
+        await ForumDraftStore().clear();
         messenger.showSnackBar(
           SnackBar(
             content: Text('topic_created'.tr(context)),

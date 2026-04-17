@@ -261,7 +261,7 @@ class PermissionDeniedWidget extends StatelessWidget {
       title: 'permission_required_title'.tr(context),
       subtitle: 'grant_permission_msg'.tr(context).replaceAll('{permission}', permission),
       icon: Icons.lock_outline,
-      buttonText: 'Grant Permission',
+      buttonText: 'grant_permission'.tr(context),
       onButtonPressed: onRequestPermission,
     );
   }

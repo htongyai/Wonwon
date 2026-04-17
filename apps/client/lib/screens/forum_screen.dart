@@ -25,6 +25,7 @@ class ForumScreen extends StatefulWidget {
 
 class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   String _selectedCategory = 'all';
+  _ForumSort _sortMode = _ForumSort.newest;
   String _searchQuery = '';
   bool _isSearchVisible = false;
   final TextEditingController _searchController = TextEditingController();
@@ -187,17 +188,41 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   List<ForumTopic> get _filteredTopics => _cachedFilteredTopics;
 
   void _updateFilteredTopics() {
+    List<ForumTopic> base;
     if (_searchQuery.isEmpty) {
-      _cachedFilteredTopics = _topics;
+      base = List<ForumTopic>.from(_topics);
     } else {
       final query = _searchQuery.toLowerCase();
-      _cachedFilteredTopics = _topics.where((topic) {
+      base = _topics.where((topic) {
         return topic.title.toLowerCase().contains(query) ||
             topic.authorName.toLowerCase().contains(query) ||
             topic.content.toLowerCase().contains(query) ||
             topic.tags.any((tag) => tag.toLowerCase().contains(query));
       }).toList();
     }
+
+    switch (_sortMode) {
+      case _ForumSort.newest:
+        base.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case _ForumSort.hot:
+        // "Hot" = activity score based on replies/views with recency weight.
+        double score(ForumTopic t) {
+          final ageHours = DateTime.now().difference(t.createdAt).inHours + 1;
+          return (t.replies * 3 + t.views) / ageHours;
+        }
+        base.sort((a, b) => score(b).compareTo(score(a)));
+        break;
+      case _ForumSort.top:
+        base.sort((a, b) {
+          final rc = b.replies.compareTo(a.replies);
+          if (rc != 0) return rc;
+          return b.views.compareTo(a.views);
+        });
+        break;
+    }
+
+    _cachedFilteredTopics = base;
   }
 
   void _onSearchChanged(String query) {
@@ -422,8 +447,80 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
         _buildHeader(),
         _buildSearchField(),
         _buildCategoryTabs(),
+        _buildSortRow(),
         Expanded(child: _buildTopicsList()),
       ],
+    );
+  }
+
+  Widget _buildSortRow() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: SizedBox(
+        height: 32,
+        child: Row(
+          children: [
+            _sortChip(_ForumSort.newest, 'forum_sort_new'.tr(context),
+                Icons.new_releases_outlined),
+            const SizedBox(width: 6),
+            _sortChip(_ForumSort.hot, 'forum_sort_hot'.tr(context),
+                Icons.local_fire_department_outlined),
+            const SizedBox(width: 6),
+            _sortChip(_ForumSort.top, 'forum_sort_top'.tr(context),
+                Icons.trending_up_rounded),
+            const Spacer(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sortChip(_ForumSort mode, String label, IconData icon) {
+    final active = _sortMode == mode;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          if (_sortMode == mode) return;
+          setState(() {
+            _sortMode = mode;
+            _updateFilteredTopics();
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: active
+                ? AppConstants.primaryColor
+                : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: active
+                  ? AppConstants.primaryColor
+                  : Colors.grey.shade300,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon,
+                  size: 13,
+                  color: active ? Colors.white : Colors.grey.shade700),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: active ? Colors.white : Colors.grey.shade700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -986,3 +1083,8 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
     );
   }
 }
+
+
+/// Local sort modes for the forum topic list.
+enum _ForumSort { newest, hot, top }
+

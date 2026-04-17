@@ -15,10 +15,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:ui' as ui;
 import 'package:geolocator/geolocator.dart' show Geolocator;
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
+import 'package:shared/services/saved_shop_service.dart';
+import 'package:shared/services/shop_analytics_service.dart';
 import 'package:wonwon_client/localization/app_localizations_wrapper.dart';
 import 'package:wonwon_client/screens/shop_detail_screen.dart';
 import 'package:wonwon_client/screens/add_shop_screen.dart';
 import 'package:wonwon_client/widgets/shop_card.dart';
+import 'package:wonwon_client/widgets/common/branded_snackbar.dart';
 
 /// Full-screen map with draggable bottom sheet for shop list.
 /// Floating search bar and category filter at top.
@@ -65,6 +70,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   String _searchQuery = '';
   String _selectedCategoryId = 'all';
   bool _isNavigating = false;
+
+  // Map panning — when user pans >200m away from the last "searched" center,
+  // show a "Search this area" pill that re-filters results around the new center.
+  LatLng? _lastSearchedCenter;
+  bool _showSearchHereButton = false;
+
+  // Saved shop state for the selected shop (used by preview card save button).
+  final SavedShopService _savedShopService = SavedShopService();
+  final Set<String> _savedShopIds = <String>{};
 
   final Color _accent = AppConstants.primaryColor;
 
@@ -376,6 +390,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _selectedShop = shop;
       _isFollowingUser = false;
     });
+    _refreshSavedStateFor(shop.id);
     _mapController?.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(
@@ -495,6 +510,123 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         if (mounted) setState(() => _isFollowingUser = false);
       }
     }
+
+    // Compare to last-searched center; show "Search this area" pill when
+    // the user has panned more than ~300m.
+    final ref = _lastSearchedCenter ?? latLng;
+    if (ref != null) {
+      final meters = Geolocator.distanceBetween(
+        ref.latitude, ref.longitude,
+        _mapCenter.latitude, _mapCenter.longitude,
+      );
+      final shouldShow = meters > 300;
+      if (shouldShow != _showSearchHereButton && mounted) {
+        setState(() => _showSearchHereButton = shouldShow);
+      }
+    }
+  }
+
+  /// Trigger a re-filter around the current map center — used by the
+  /// "Search this area" pill.
+  void _searchThisArea() {
+    _lastSearchedCenter = _mapCenter;
+    // Re-sort shops by distance to the current map center so the sheet
+    // surfaces shops near the user's view.
+    _filteredShops.sort((a, b) {
+      final da = Geolocator.distanceBetween(
+        _mapCenter.latitude, _mapCenter.longitude,
+        a.latitude, a.longitude,
+      );
+      final db = Geolocator.distanceBetween(
+        _mapCenter.latitude, _mapCenter.longitude,
+        b.latitude, b.longitude,
+      );
+      return da.compareTo(db);
+    });
+    setState(() => _showSearchHereButton = false);
+    // Expand the sheet slightly so users see the results.
+    _sheetController.animateTo(
+      0.4,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  /// Open external Maps app for turn-by-turn directions to the shop.
+  Future<void> _openDirections(RepairShop shop) async {
+    final url = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=${shop.latitude},${shop.longitude}',
+    );
+    try {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+      ShopAnalyticsService().recordDirections(shop.id);
+    } catch (e) {
+      appLog('Failed to open directions: $e');
+    }
+  }
+
+  /// Toggle save state for a shop from the map preview card.
+  Future<void> _toggleSaveFromMap(RepairShop shop) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) {
+        BrandedSnackBar.info(context, 'please_login_to_save'.tr(context));
+      }
+      return;
+    }
+    HapticFeedback.lightImpact();
+    try {
+      final isCurrentlySaved = _savedShopIds.contains(shop.id);
+      if (isCurrentlySaved) {
+        await _savedShopService.removeShop(shop.id);
+        ShopAnalyticsService().recordUnsave(shop.id);
+        if (mounted) {
+          setState(() => _savedShopIds.remove(shop.id));
+          BrandedSnackBar.success(
+            context,
+            'removed_from_saved'
+                .tr(context)
+                .replaceAll('{shop_name}', shop.name),
+          );
+        }
+      } else {
+        await _savedShopService.saveShop(shop.id);
+        ShopAnalyticsService().recordSave(shop.id);
+        if (mounted) {
+          setState(() => _savedShopIds.add(shop.id));
+          BrandedSnackBar.success(
+            context,
+            'saved_to_locations'
+                .tr(context)
+                .replaceAll('{shop_name}', shop.name),
+          );
+        }
+      }
+    } catch (e) {
+      appLog('Save toggle failed: $e');
+      if (mounted) {
+        BrandedSnackBar.error(context, 'failed_to_update_saved'.tr(context));
+      }
+    }
+  }
+
+  /// Load whether the currently selected shop is saved.
+  Future<void> _refreshSavedStateFor(String shopId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final saved = await _savedShopService.isShopSaved(shopId);
+      if (!mounted) return;
+      setState(() {
+        if (saved) {
+          _savedShopIds.add(shopId);
+        } else {
+          _savedShopIds.remove(shopId);
+        }
+      });
+    } catch (e) {
+      appLog('Refresh saved state failed: $e');
+    }
   }
 
   void _onMapTap(LatLng _) => _dismissSelectedShop();
@@ -581,7 +713,165 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
           // -- FABs: My Location + Add Shop --
           if (_isMapStyleLoaded) _buildFabs(isLoggedIn),
+
+          // -- "Search this area" pill (shows after user pans >300m) --
+          if (_isMapStyleLoaded && _showSearchHereButton && _selectedShop == null)
+            _buildSearchHereButton(),
         ],
+      ),
+    );
+  }
+
+  /// Category → accent-color palette for the legend. Ids match the values
+  /// returned by `RepairCategory.getCategories()`.
+  static const Map<String, Color> _categoryColors = {
+    'clothing': Color(0xFFF472B6),
+    'footwear': Color(0xFFF59E0B),
+    'watch': Color(0xFF60A5FA),
+    'bag': Color(0xFF8B5CF6),
+    'electronics': Color(0xFF22C55E),
+    'appliance': Color(0xFFEF4444),
+  };
+
+  /// Show a bottom sheet with the category → color legend.
+  void _showCategoryLegend() {
+    final categories = RepairCategory.getCategories();
+    HapticFeedback.selectionClick();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+                child: Row(
+                  children: [
+                    Text(
+                      'map_legend_title'.tr(context),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: categories
+                      .where((c) => c.id != 'all')
+                      .map((c) => _legendChip(
+                            c.name,
+                            _categoryColors[c.id] ?? _accent,
+                          ))
+                      .toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _legendChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color.withValues(alpha: 0.95),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchHereButton() {
+    final topPadding = MediaQuery.of(context).padding.top;
+    return Positioned(
+      top: topPadding + 145,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _searchThisArea,
+            borderRadius: BorderRadius.circular(24),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              decoration: BoxDecoration(
+                color: _accent,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: _accent.withValues(alpha: 0.35),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.refresh_rounded,
+                      color: Colors.white, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    'search_this_area'.tr(context),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -853,29 +1143,58 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
+                  // Save button
+                  _previewActionButton(
+                    icon: _savedShopIds.contains(shop.id)
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    tint: _savedShopIds.contains(shop.id)
+                        ? _accent
+                        : const Color(0xFF9E9E9E),
+                    onTap: () => _toggleSaveFromMap(shop),
+                  ),
+                  const SizedBox(width: 6),
+                  // Directions button
+                  _previewActionButton(
+                    icon: Icons.directions_rounded,
+                    tint: _accent,
+                    onTap: () => _openDirections(shop),
+                  ),
+                  const SizedBox(width: 6),
                   // Dismiss button
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _dismissSelectedShop,
-                      customBorder: const CircleBorder(),
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: const Icon(Icons.close_rounded,
-                            size: 16, color: Color(0xFF9E9E9E)),
-                      ),
-                    ),
+                  _previewActionButton(
+                    icon: Icons.close_rounded,
+                    tint: const Color(0xFF9E9E9E),
+                    onTap: _dismissSelectedShop,
                   ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _previewActionButton({
+    required IconData icon,
+    required Color tint,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(17),
+          ),
+          child: Icon(icon, size: 17, color: tint),
         ),
       ),
     );
@@ -1041,6 +1360,18 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 child: const Icon(Icons.add_rounded, size: 22),
               ),
             ),
+          // Category legend
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: FloatingActionButton.small(
+              heroTag: 'category_legend',
+              onPressed: _showCategoryLegend,
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF1A1A1A),
+              elevation: 3,
+              child: const Icon(Icons.info_outline_rounded, size: 20),
+            ),
+          ),
           // My location
           FloatingActionButton(
             heroTag: 'my_location',

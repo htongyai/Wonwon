@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:shared/constants/app_constants.dart';
 import 'package:shared/constants/map_constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui' as ui;
+import 'dart:ui' show FontFeature;
 import 'dart:async';
 import 'package:shared/utils/app_logger.dart';
 import 'package:wonwon_client/localization/app_localizations_wrapper.dart';
@@ -27,6 +29,9 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   BitmapDescriptor? _customMarkerIcon;
   bool _isMapStyleLoaded = false;
   bool _showMap = false;
+  String? _selectedAddress;
+  bool _isResolvingAddress = false;
+  Timer? _geocodeDebounce;
 
   
 
@@ -59,6 +64,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   @override
   void dispose() {
     _mapController?.dispose();
+    _geocodeDebounce?.cancel();
     super.dispose();
   }
 
@@ -205,6 +211,54 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     setState(() {
       _selectedLocation = location;
     });
+    _scheduleReverseGeocode(location);
+  }
+
+  void _scheduleReverseGeocode(LatLng location) {
+    _geocodeDebounce?.cancel();
+    _geocodeDebounce = Timer(const Duration(milliseconds: 500), () {
+      _reverseGeocode(location);
+    });
+  }
+
+  Future<void> _reverseGeocode(LatLng location) async {
+    if (!mounted) return;
+    setState(() => _isResolvingAddress = true);
+    try {
+      final placemarks = await placemarkFromCoordinates(
+        location.latitude,
+        location.longitude,
+      );
+      if (!mounted) return;
+      if (placemarks.isEmpty) {
+        setState(() {
+          _selectedAddress = null;
+          _isResolvingAddress = false;
+        });
+        return;
+      }
+      final p = placemarks.first;
+      final parts = <String>[
+        if ((p.subThoroughfare ?? '').isNotEmpty) p.subThoroughfare!,
+        if ((p.thoroughfare ?? '').isNotEmpty) p.thoroughfare!,
+        if ((p.subLocality ?? '').isNotEmpty) p.subLocality!,
+        if ((p.locality ?? '').isNotEmpty) p.locality!,
+        if ((p.administrativeArea ?? '').isNotEmpty) p.administrativeArea!,
+      ];
+      final address = parts.join(', ');
+      setState(() {
+        _selectedAddress = address.isEmpty ? null : address;
+        _isResolvingAddress = false;
+      });
+    } catch (e) {
+      appLog('Reverse geocode failed: $e');
+      if (mounted) {
+        setState(() {
+          _selectedAddress = null;
+          _isResolvingAddress = false;
+        });
+      }
+    }
   }
 
   @override
@@ -259,6 +313,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                               setState(() {
                                 _selectedLocation = newPosition;
                               });
+                              _scheduleReverseGeocode(newPosition);
                             },
                           ),
                         }
@@ -487,18 +542,52 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  'Lat: ${_selectedLocation!.latitude.toStringAsFixed(6)}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[700],
+                                if (_isResolvingAddress)
+                                  Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 10,
+                                        height: 10,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 1.5,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  AppConstants.primaryColor),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'resolving_address'.tr(context),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey[500],
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                else if (_selectedAddress != null &&
+                                    _selectedAddress!.isNotEmpty)
+                                  Text(
+                                    _selectedAddress!,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey[800],
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
+                                const SizedBox(height: 4),
                                 Text(
-                                  'Lng: ${_selectedLocation!.longitude.toStringAsFixed(6)}',
+                                  '${_selectedLocation!.latitude.toStringAsFixed(5)}, '
+                                  '${_selectedLocation!.longitude.toStringAsFixed(5)}',
                                   style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[700],
+                                    fontSize: 11,
+                                    color: Colors.grey[500],
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
                                   ),
                                 ),
                               ],

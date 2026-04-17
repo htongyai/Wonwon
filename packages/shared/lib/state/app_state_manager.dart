@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared/models/user.dart' as app_user;
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:shared/models/repair_shop.dart';
@@ -66,6 +67,9 @@ class AppStateManager extends ChangeNotifier {
     try {
       setLoading(true);
 
+      // Load persisted dark mode preference before any UI builds.
+      await _loadDarkModePref();
+
       await _checkAuthState();
       await _loadInitialData();
       _setupRealtimeListeners();
@@ -76,6 +80,26 @@ class AppStateManager extends ChangeNotifier {
     } catch (e) {
       setError('Failed to initialize app: $e');
       appLog('AppStateManager: Initialization failed: $e');
+    }
+  }
+
+  static const _darkModePrefsKey = 'app_dark_mode_enabled';
+
+  Future<void> _loadDarkModePref() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _isDarkMode = prefs.getBool(_darkModePrefsKey) ?? false;
+    } catch (_) {
+      // Fall through to default
+    }
+  }
+
+  Future<void> _saveDarkModePref() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_darkModePrefsKey, _isDarkMode);
+    } catch (_) {
+      // Non-fatal
     }
   }
 
@@ -347,11 +371,20 @@ class AppStateManager extends ChangeNotifier {
     appLog('AppStateManager: Language changed to: $languageCode');
   }
 
-  /// Toggle dark mode
+  /// Toggle dark mode and persist the new value.
   void toggleDarkMode() {
     _isDarkMode = !_isDarkMode;
     notifyListeners();
+    _saveDarkModePref();
     appLog('AppStateManager: Dark mode toggled: $_isDarkMode');
+  }
+
+  /// Explicitly set dark mode on/off.
+  void setDarkMode(bool enabled) {
+    if (_isDarkMode == enabled) return;
+    _isDarkMode = enabled;
+    notifyListeners();
+    _saveDarkModePref();
   }
 
   /// Refresh data

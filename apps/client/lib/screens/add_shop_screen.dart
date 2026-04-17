@@ -17,6 +17,7 @@ import 'package:shared/utils/app_logger.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwon_client/localization/app_localizations_wrapper.dart';
 import 'package:wonwon_client/widgets/section_title.dart';
+import 'package:wonwon_client/widgets/form_progress_header.dart';
 import 'package:shared/utils/responsive_size.dart';
 import 'package:shared/services/analytics_service.dart';
 
@@ -324,6 +325,64 @@ class _AddShopScreenState extends State<AddShopScreen> {
     }
   }
 
+  /// Compute form progress grouped into 4 logical sections.
+  /// Used by [FormProgressHeader] to show completion percentage.
+  List<FormSectionProgress> _computeProgress(BuildContext context) {
+    // Section 1: Basics — name, description, photo, categories
+    int basicsDone = 0;
+    const basicsRequired = 4;
+    if (_nameController.text.trim().isNotEmpty) basicsDone++;
+    if (_descriptionController.text.trim().isNotEmpty) basicsDone++;
+    if (_selectedImageBytes != null) basicsDone++;
+    if (_selectedCategories.isNotEmpty) basicsDone++;
+
+    // Section 2: Location — lat, lng, district
+    int locationDone = 0;
+    const locationRequired = 3;
+    if (_latitudeController.text.trim().isNotEmpty) locationDone++;
+    if (_longitudeController.text.trim().isNotEmpty) locationDone++;
+    if (_districtController.text.trim().isNotEmpty) locationDone++;
+
+    // Section 3: Hours — at least one day filled
+    int hoursDone = 0;
+    const hoursRequired = 1;
+    final anyHours = _openingTimes.values.any((t) => t != null) ||
+        _closingTimes.values.any((t) => t != null);
+    if (anyHours) hoursDone = 1;
+
+    // Section 4: Contact — phone or at least one other contact
+    int contactDone = 0;
+    const contactRequired = 1;
+    final hasContact = _phoneController.text.trim().isNotEmpty ||
+        _lineIdController.text.trim().isNotEmpty ||
+        _facebookPageController.text.trim().isNotEmpty ||
+        _instagramPageController.text.trim().isNotEmpty;
+    if (hasContact) contactDone = 1;
+
+    return [
+      FormSectionProgress(
+        label: 'form_section_basics'.tr(context),
+        required: basicsRequired,
+        completed: basicsDone,
+      ),
+      FormSectionProgress(
+        label: 'form_section_location'.tr(context),
+        required: locationRequired,
+        completed: locationDone,
+      ),
+      FormSectionProgress(
+        label: 'form_section_hours'.tr(context),
+        required: hoursRequired,
+        completed: hoursDone,
+      ),
+      FormSectionProgress(
+        label: 'form_section_contact'.tr(context),
+        required: contactRequired,
+        completed: contactDone,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -364,9 +423,17 @@ class _AddShopScreenState extends State<AddShopScreen> {
                 ),
                 child: Form(
                   key: _formKey,
+                  onChanged: () {
+                    // Rebuild the progress header when any form field changes.
+                    if (mounted) setState(() {});
+                  },
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Progress header — shows % complete + section chips
+                      FormProgressHeader(
+                        sections: _computeProgress(context),
+                      ),
                       // Warning message
                       Container(
                     padding: ResponsiveSize.getScaledPadding(

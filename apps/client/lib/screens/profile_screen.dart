@@ -661,6 +661,17 @@ class _ProfileScreenState extends State<ProfileScreen>
 
               const SizedBox(height: 24),
 
+              // ---- Repair summary analytics card ----
+              FutureBuilder<List<RepairRecord>>(
+                future: _repairRecordsFuture,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return _buildRepairSummaryCard(snapshot.data!);
+                },
+              ),
+
               // ---- Recent Activity header ----
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -718,6 +729,170 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
+
+  /// Aggregated summary of the user's repair history — total spent, avg
+  /// satisfaction, top category, and a simple insight. Shown above the
+  /// repair records list when at least one record exists.
+  Widget _buildRepairSummaryCard(List<RepairRecord> records) {
+    double totalSpent = 0;
+    int totalRepairs = records.length;
+    double totalSatisfaction = 0;
+    int satisfactionCount = 0;
+    final categoryCounts = <String, int>{};
+
+    for (final r in records) {
+      totalSpent += r.price ?? 0;
+      if (r.satisfactionRating != null) {
+        totalSatisfaction += r.satisfactionRating!;
+        satisfactionCount++;
+      }
+      categoryCounts.update(r.category, (v) => v + 1, ifAbsent: () => 1);
+    }
+
+    final avgSatisfaction =
+        satisfactionCount == 0 ? 0.0 : totalSatisfaction / satisfactionCount;
+
+    String? topCategory;
+    int topCount = 0;
+    for (final e in categoryCounts.entries) {
+      if (e.value > topCount) {
+        topCount = e.value;
+        topCategory = e.key;
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppConstants.primaryColor.withValues(alpha: 0.15),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppConstants.primaryColor.withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.insights_rounded,
+                    size: 18, color: AppConstants.primaryColor),
+                const SizedBox(width: 8),
+                Text(
+                  'repair_summary_title'.tr(context),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A1A),
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _summaryStat(
+                    value: totalRepairs.toString(),
+                    label: 'summary_repairs'.tr(context),
+                  ),
+                ),
+                Container(
+                    width: 1,
+                    height: 40,
+                    color: Colors.grey.shade200),
+                Expanded(
+                  child: _summaryStat(
+                    value:
+                        '฿${totalSpent.toStringAsFixed(0)}',
+                    label: 'summary_spent'.tr(context),
+                  ),
+                ),
+                Container(
+                    width: 1,
+                    height: 40,
+                    color: Colors.grey.shade200),
+                Expanded(
+                  child: _summaryStat(
+                    value: satisfactionCount == 0
+                        ? '—'
+                        : '${avgSatisfaction.toStringAsFixed(1)}/5',
+                    label: 'summary_satisfaction'.tr(context),
+                  ),
+                ),
+              ],
+            ),
+            if (topCategory != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppConstants.primaryColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.stars_rounded,
+                        size: 12, color: AppConstants.primaryColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      'summary_top_category'
+                          .tr(context)
+                          .replaceFirst(
+                              '{category}', 'category_$topCategory'.tr(context)),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppConstants.primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryStat({required String value, required String label}) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1A1A1A),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[600],
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildAvatarFallback() {
     return Container(

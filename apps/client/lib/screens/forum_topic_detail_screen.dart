@@ -788,6 +788,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
               child: Column(
                 children: nestedReplies.map((nested) => _buildNestedReply(
                   nested,
+                  parentAuthorName: reply.authorName,
                   isTopicLocked: topic.isLocked,
                   parentReplyId: reply.id,
                 )).toList(),
@@ -802,16 +803,46 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
   // NESTED REPLY
   // ---------------------------------------------------------------------------
 
-  Widget _buildNestedReply(ForumReply reply, {bool isTopicLocked = false, String? parentReplyId}) {
+  Widget _buildNestedReply(ForumReply reply, {bool isTopicLocked = false, String? parentReplyId, String? parentAuthorName}) {
     final currentUser = FirebaseAuth.instance.currentUser;
     final isLiked = currentUser != null && reply.likedBy.contains(currentUser.uid);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 8, 0, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(
+              color: AppConstants.primaryColor.withValues(alpha: 0.35),
+              width: 2.5,
+            ),
+          ),
+        ),
+        padding: const EdgeInsets.only(left: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (parentAuthorName != null && parentAuthorName.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.subdirectory_arrow_right_rounded,
+                        size: 12, color: Colors.grey[500]),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${'replying_to'.tr(context)} @$parentAuthorName',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[500],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Row(
             children: [
               CircleAvatar(
                 radius: 11,
@@ -921,6 +952,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
