@@ -14,7 +14,6 @@ class ResponsiveSize {
   static double safeBlockVertical = 0;
   static double textScaleFactor = 1.0;
   static double fontSize = 14.0;
-  static bool _isInitialized = false;
 
   // Use standardized breakpoints
   static const double mobileBreakpoint = ResponsiveBreakpoints.mobile;
@@ -22,30 +21,34 @@ class ResponsiveSize {
   static const double desktopBreakpoint = ResponsiveBreakpoints.desktop;
 
   static void init(BuildContext context) {
-    _mediaQueryData = MediaQuery.of(context);
-    screenWidth = _mediaQueryData!.size.width;
-    screenHeight = _mediaQueryData!.size.height;
-    blockSizeHorizontal = screenWidth / 100;
-    blockSizeVertical = screenHeight / 100;
+    final data = MediaQuery.of(context);
+    final w = data.size.width;
+    final h = data.size.height;
+    // Re-init when size changes (e.g. rotation, window resize) so layout stays correct
+    if (_mediaQueryData == null || w != screenWidth || h != screenHeight) {
+      _mediaQueryData = data;
+      screenWidth = w;
+      screenHeight = h;
+      blockSizeHorizontal = screenWidth / 100;
+      blockSizeVertical = screenHeight / 100;
 
-    _safeAreaHorizontal =
-        _mediaQueryData!.padding.left + _mediaQueryData!.padding.right;
-    _safeAreaVertical =
-        _mediaQueryData!.padding.top + _mediaQueryData!.padding.bottom;
-    safeBlockHorizontal = (screenWidth - _safeAreaHorizontal) / 100;
-    safeBlockVertical = (screenHeight - _safeAreaVertical) / 100;
+      _safeAreaHorizontal =
+          _mediaQueryData!.padding.left + _mediaQueryData!.padding.right;
+      _safeAreaVertical =
+          _mediaQueryData!.padding.top + _mediaQueryData!.padding.bottom;
+      safeBlockHorizontal = (screenWidth - _safeAreaHorizontal) / 100;
+      safeBlockVertical = (screenHeight - _safeAreaVertical) / 100;
 
-    textScaleFactor = _mediaQueryData!.textScaleFactor;
-    fontSize = safeBlockHorizontal * 4; // Base font size
-    _isInitialized = true;
+      textScaleFactor = _mediaQueryData!.textScaleFactor;
+      fontSize = safeBlockHorizontal * 4; // Base font size
 
-    // Initialize cached responsive size
-    CachedResponsiveSize.init(context);
+      CachedResponsiveSize.init(context);
+    }
   }
 
   // Ensure initialization before accessing values
   static void _ensureInitialized(BuildContext? context) {
-    if (!_isInitialized && context != null) {
+    if (context != null) {
       init(context);
     }
   }

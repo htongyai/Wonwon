@@ -5,6 +5,8 @@ import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/screens/shop_detail_screen.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/widgets/optimized_image.dart';
 
 class ShopApprovalScreen extends StatefulWidget {
   const ShopApprovalScreen({Key? key}) : super(key: key);
@@ -63,7 +65,7 @@ class _ShopApprovalScreenState extends State<ShopApprovalScreen> {
             Icon(Icons.check_circle_outline, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
-              'No shops pending approval',
+              'no_shops_pending'.tr(context),
               style: GoogleFonts.montserrat(
                 fontSize: 18,
                 color: Colors.grey[600],
@@ -72,7 +74,7 @@ class _ShopApprovalScreenState extends State<ShopApprovalScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'All shops have been reviewed',
+              'all_shops_reviewed'.tr(context),
               style: GoogleFonts.montserrat(
                 fontSize: 14,
                 color: Colors.grey[500],
@@ -124,12 +126,10 @@ class _ShopApprovalScreenState extends State<ShopApprovalScreen> {
                         ),
                         child:
                             shop.photos.isNotEmpty
-                                ? Image.network(
-                                  shop.photos.first,
+                                ? OptimizedImage(
+                                  imageUrl: shop.photos.first,
                                   fit: BoxFit.cover,
-                                  errorBuilder:
-                                      (context, error, stackTrace) =>
-                                          Container(color: Colors.grey[200]),
+                                  errorWidget: Container(color: Colors.grey[200]),
                                 )
                                 : Container(color: Colors.grey[200]),
                       ),
@@ -201,7 +201,7 @@ class _ShopApprovalScreenState extends State<ShopApprovalScreen> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: AppConstants.primaryColor
-                                        .withOpacity(0.13),
+                                        .withValues(alpha: 0.13),
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                   child: Text(
@@ -242,7 +242,7 @@ class _ShopApprovalScreenState extends State<ShopApprovalScreen> {
                                                 3
                                             ? '...'
                                             : '')
-                                    : 'No subservices',
+                                    : 'no_subservices'.tr(context),
                                 style: GoogleFonts.montserrat(
                                   fontSize: 13,
                                   color: Colors.grey[800],
@@ -303,7 +303,7 @@ class _ShopApprovalScreenState extends State<ShopApprovalScreen> {
                               elevation: 0,
                             ),
                             child: Text(
-                              'View Details',
+                              'view_details'.tr(context),
                               style: GoogleFonts.montserrat(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,

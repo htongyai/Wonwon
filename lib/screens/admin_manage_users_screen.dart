@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/models/user.dart';
 import 'package:wonwonw2/services/user_service.dart';
 import 'package:intl/intl.dart';
@@ -27,16 +28,16 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Column(
+      body: SafeArea(
+        child: Column(
         children: [
-          // Header
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: const Color(0xFFF8F9FA),
               border: Border(
                 bottom: BorderSide(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
@@ -50,7 +51,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                 ),
                 const SizedBox(width: 16),
                 Text(
-                  'Manage Users',
+                  'admin_manage_users'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -66,7 +67,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                     });
                   },
                   icon: Icon(Icons.refresh, color: AppConstants.primaryColor),
-                  tooltip: 'Refresh',
+                  tooltip: 'refresh'.tr(context),
                 ),
               ],
             ),
@@ -85,7 +86,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                       });
                     },
                     decoration: InputDecoration(
-                      hintText: 'Search users...',
+                      hintText: 'admin_search_users'.tr(context),
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -98,50 +99,28 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                StreamBuilder<QuerySnapshot>(
-                  stream: _firestore.collection('users').snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData) {
-                      final users = snapshot.data!.docs;
-                      return Text(
-                        '${users.length} users',
-                        style: GoogleFonts.montserrat(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      );
-                    }
-                    return Text(
-                      'Loading...',
-                      style: GoogleFonts.montserrat(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    );
-                  },
-                ),
+                // Count is derived from the single stream below
               ],
             ),
           ),
 
-          // Table
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _firestore.collection('users').snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const PerformanceLoadingWidget(
-                    message: 'Loading users...',
+                  return PerformanceLoadingWidget(
+                    message: 'admin_loading_users'.tr(context),
                     size: 50,
                   );
                 }
 
                 if (snapshot.hasError) {
-                  return _buildErrorState();
+                  return _buildErrorState(context);
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return _buildEmptyState();
+                  return _buildEmptyState(context);
                 }
 
                 // Process users with deduplication
@@ -226,16 +205,17 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
 
                 appLog('Filtered and sorted users: ${filteredUsers.length}');
 
-                return _buildUsersTable(filteredUsers);
+                return _buildUsersTable(context, filteredUsers);
               },
             ),
           ),
         ],
       ),
+      ),
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -243,7 +223,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
           Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
           const SizedBox(height: 16),
           Text(
-            'Error loading users',
+            'admin_error_loading_users'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -257,7 +237,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                 // Force rebuild
               });
             },
-            child: const Text('Try Again'),
+            child: Text('try_again'.tr(context)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppConstants.primaryColor,
             ),
@@ -267,7 +247,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -275,7 +255,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
           Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            'No users found',
+            'admin_no_users_found'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -284,7 +264,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'No users have been registered yet',
+            'admin_no_users_registered'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 14,
               color: Colors.grey[600],
@@ -295,7 +275,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
     );
   }
 
-  Widget _buildUsersTable(List<User> users) {
+  Widget _buildUsersTable(BuildContext context, List<User> users) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isLargeScreen = constraints.maxWidth > 1200;
@@ -309,18 +289,18 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
               columnSpacing: isLargeScreen ? 32 : (isMediumScreen ? 24 : 16),
               horizontalMargin: isLargeScreen ? 24 : 16,
               columns: [
-                _buildSortableColumn('Name', 'name'),
-                _buildSortableColumn('Email', 'email'),
-                _buildSortableColumn('Role', 'role'),
-                if (isMediumScreen) _buildSortableColumn('Status', 'status'),
-                if (isLargeScreen) _buildSortableColumn('Created', 'createdAt'),
-                const DataColumn(label: Text('Actions')),
+                _buildSortableColumn(context, 'admin_label_name', 'name'),
+                _buildSortableColumn(context, 'email', 'email'),
+                _buildSortableColumn(context, 'admin_role', 'role'),
+                if (isMediumScreen) _buildSortableColumn(context, 'status_label', 'status'),
+                if (isLargeScreen) _buildSortableColumn(context, 'admin_created', 'createdAt'),
+                DataColumn(label: Text('admin_actions'.tr(context))),
               ],
               rows:
                   users
                       .map(
                         (user) =>
-                            _buildUserRow(user, isLargeScreen, isMediumScreen),
+                            _buildUserRow(context, user, isLargeScreen, isMediumScreen),
                       )
                       .toList(),
             ),
@@ -330,12 +310,12 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
     );
   }
 
-  DataColumn _buildSortableColumn(String label, String sortKey) {
+  DataColumn _buildSortableColumn(BuildContext context, String labelKey, String sortKey) {
     return DataColumn(
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label),
+          Text(labelKey.tr(context)),
           if (_sortBy == sortKey)
             Icon(
               _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
@@ -357,7 +337,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
     );
   }
 
-  DataRow _buildUserRow(User user, bool isLargeScreen, bool isMediumScreen) {
+  DataRow _buildUserRow(BuildContext context, User user, bool isLargeScreen, bool isMediumScreen) {
     final cells = <DataCell>[];
 
     // Name column
@@ -390,7 +370,7 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: _getRoleColor(user.accountType).withOpacity(0.1),
+            color: _getRoleColor(user.accountType).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
@@ -412,11 +392,11 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: _getStatusColor(user.status).withOpacity(0.1),
+              color: _getStatusColor(user.status).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              user.status.toUpperCase(),
+              _getStatusDisplayKey(user.status).tr(context),
               style: GoogleFonts.montserrat(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
@@ -447,19 +427,19 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              onPressed: () => _viewUserDetails(user),
+              onPressed: () => _viewUserDetails(context, user),
               icon: const Icon(Icons.visibility, size: 16),
-              tooltip: 'View Details',
+              tooltip: 'admin_view_details'.tr(context),
             ),
             IconButton(
-              onPressed: () => _editUser(user),
+              onPressed: () => _editUser(context, user),
               icon: const Icon(Icons.edit, size: 16),
-              tooltip: 'Edit User',
+              tooltip: 'admin_edit_user'.tr(context),
             ),
             IconButton(
-              onPressed: () => _deleteUser(user),
+              onPressed: () => _deleteUser(context, user),
               icon: const Icon(Icons.delete, size: 16, color: Colors.red),
-              tooltip: 'Delete User',
+              tooltip: 'admin_delete_user'.tr(context),
             ),
           ],
         ),
@@ -495,56 +475,82 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
     }
   }
 
-  void _viewUserDetails(User user) {
+  String _getRoleDisplayKey(String role) {
+    switch (role.toLowerCase()) {
+      case 'admin':
+        return 'admin_role_admin';
+      case 'moderator':
+        return 'admin_role_moderator';
+      case 'user':
+        return 'admin_role_user';
+      default:
+        return 'admin_role_user';
+    }
+  }
+
+  String _getStatusDisplayKey(String status) {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return 'admin_status_active';
+      case 'suspended':
+        return 'admin_status_suspended';
+      case 'pending':
+        return 'admin_status_pending';
+      default:
+        return 'admin_status_active';
+    }
+  }
+
+  void _viewUserDetails(BuildContext context, User user) {
     showDialog(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title: Text('User Details: ${user.name}'),
+          (ctx) => AlertDialog(
+            title: Text('admin_user_details_title'.tr(context).replaceAll('{name}', user.name)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Email: ${user.email}'),
-                Text('Role: ${user.accountType}'),
-                Text('Status: ${user.status}'),
+                Text('admin_email_label'.tr(context).replaceAll('{value}', user.email)),
+                Text('admin_role_label'.tr(context).replaceAll('{value}', _getRoleDisplayKey(user.accountType).tr(context))),
+                Text('admin_status_label'.tr(context).replaceAll('{value}', _getStatusDisplayKey(user.status).tr(context))),
                 Text(
-                  'Created: ${DateFormat('MMM dd, yyyy HH:mm').format(user.createdAt)}',
+                  'admin_created_label'.tr(context).replaceAll('{value}', DateFormat('MMM dd, yyyy HH:mm').format(user.createdAt)),
                 ),
-                Text('Terms Accepted: ${user.acceptedTerms ? 'Yes' : 'No'}'),
+                Text('admin_terms_accepted'.tr(context).replaceAll('{value}', (user.acceptedTerms ? 'yes_label' : 'no_label').tr(context))),
                 Text(
-                  'Privacy Accepted: ${user.acceptedPrivacy ? 'Yes' : 'No'}',
+                  'admin_privacy_accepted'.tr(context).replaceAll('{value}', (user.acceptedPrivacy ? 'yes_label' : 'no_label').tr(context)),
                 ),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
+                child: Text('admin_close'.tr(context)),
               ),
             ],
           ),
     );
   }
 
-  void _editUser(User user) {
+  void _editUser(BuildContext context, User user) {
     showDialog(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title: Text('Edit User: ${user.name}'),
+          (ctx) => AlertDialog(
+            title: Text('admin_edit_user_title'.tr(context).replaceAll('{name}', user.name)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
                   value: user.accountType,
-                  decoration: const InputDecoration(labelText: 'Role'),
+                  decoration: InputDecoration(labelText: 'admin_role'.tr(context)),
                   items:
                       ['user', 'moderator', 'admin']
                           .map(
                             (role) => DropdownMenuItem(
                               value: role,
-                              child: Text(role),
+                              child: Text(_getRoleDisplayKey(role).tr(context)),
                             ),
                           )
                           .toList(),
@@ -557,7 +563,10 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                       if (success) {
                         Navigator.of(context).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Role updated to $value')),
+                          SnackBar(
+                            content: Text('admin_role_updated'.tr(context).replaceAll('{value}', _getRoleDisplayKey(value).tr(context)),
+                            ),
+                          ),
                         );
                       }
                     }
@@ -566,13 +575,13 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: user.status,
-                  decoration: const InputDecoration(labelText: 'Status'),
+                  decoration: InputDecoration(labelText: 'admin_status'.tr(context)),
                   items:
                       ['active', 'suspended', 'pending']
                           .map(
                             (status) => DropdownMenuItem(
                               value: status,
-                              child: Text(status),
+                              child: Text(_getStatusDisplayKey(status).tr(context)),
                             ),
                           )
                           .toList(),
@@ -585,7 +594,10 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
                       if (success) {
                         Navigator.of(context).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Status updated to $value')),
+                          SnackBar(
+                            content: Text('admin_status_updated'.tr(context).replaceAll('{value}', _getStatusDisplayKey(value).tr(context)),
+                            ),
+                          ),
                         );
                       }
                     }
@@ -596,35 +608,48 @@ class _AdminManageUsersScreenState extends State<AdminManageUsersScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
             ],
           ),
     );
   }
 
-  void _deleteUser(User user) {
+  void _deleteUser(BuildContext context, User user) {
     showDialog(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title: const Text('Delete User'),
-            content: Text('Are you sure you want to delete "${user.name}"?'),
+          (ctx) => AlertDialog(
+            title: Text('admin_delete_user'.tr(context)),
+            content: Text('admin_confirm_delete_user'.tr(context).replaceAll('{name}', user.name)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               TextButton(
-                onPressed: () {
+                onPressed: () async {
                   Navigator.of(context).pop();
-                  // TODO: Implement delete user functionality
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Delete user: ${user.name}')),
-                  );
+                  try {
+                    await _firestore.collection('users').doc(user.id).delete();
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('user_deleted_success'.tr(this.context).replaceAll('{name}', user.name))),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: Text('error_deleting_user'.tr(this.context).replaceAll('{error}', e.toString())),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
                 },
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Delete'),
+                child: Text('delete'.tr(context)),
               ),
             ],
           ),

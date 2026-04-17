@@ -4,7 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/widgets/optimized_screen.dart';
 import 'package:wonwonw2/services/auth_manager.dart';
 import 'package:wonwonw2/mixins/auth_state_mixin.dart';
-import 'package:wonwonw2/screens/main_navigation.dart';
+import 'package:wonwonw2/widgets/auth_gate.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class AdminSettingsScreen extends OptimizedScreen {
   const AdminSettingsScreen({Key? key}) : super(key: key);
@@ -21,8 +22,8 @@ class _AdminSettingsScreenState
 
   @override
   void onAuthStateChanged(bool isLoggedIn) {
+    if (!mounted) return;
     if (!isLoggedIn) {
-      // User logged out, redirect to login
       Navigator.of(context).pushReplacementNamed('/');
     }
   }
@@ -119,7 +120,7 @@ class _AdminSettingsScreenState
             border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
+                color: Colors.black.withValues(alpha: 0.02),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -164,7 +165,7 @@ class _AdminSettingsScreenState
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(child: FaIcon(icon, color: color, size: 20)),
@@ -206,18 +207,18 @@ class _AdminSettingsScreenState
   }
 
   void _navigateToShopManagement() {
-    Navigator.of(context).pop(); // Close settings
-    // The parent AdminDashboardMainScreen will handle navigation to shop management
+    // AdminSettingsScreen is embedded inside AdminDashboardMainScreen as a tab panel;
+    // use the sidebar in the parent dashboard to switch to Shop Management.
   }
 
   void _navigateToUserManagement() {
-    Navigator.of(context).pop(); // Close settings
-    // The parent AdminDashboardMainScreen will handle navigation to user management
+    // AdminSettingsScreen is embedded inside AdminDashboardMainScreen as a tab panel;
+    // use the sidebar in the parent dashboard to switch to User Management.
   }
 
   void _navigateToReports() {
-    Navigator.of(context).pop(); // Close settings
-    // The parent AdminDashboardMainScreen will handle navigation to reports
+    // AdminSettingsScreen is embedded inside AdminDashboardMainScreen as a tab panel;
+    // use the sidebar in the parent dashboard to switch to Reports.
   }
 
   void _showLogoutDialog() {
@@ -233,17 +234,17 @@ class _AdminSettingsScreenState
                   size: 20,
                 ),
                 const SizedBox(width: 12),
-                const Text('Logout'),
+                Text('logout_dialog'.tr(context)),
               ],
             ),
             content: Text(
-              'Are you sure you want to logout from the admin dashboard?',
+              'confirm_logout_dialog'.tr(context),
               style: GoogleFonts.inter(fontSize: 14),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () {
@@ -253,7 +254,7 @@ class _AdminSettingsScreenState
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEF4444),
                 ),
-                child: const Text('Logout'),
+                child: Text('logout_button'.tr(context)),
               ),
             ],
           ),
@@ -263,20 +264,23 @@ class _AdminSettingsScreenState
   Future<void> _logout() async {
     try {
       await _authManager.logout();
-      // Navigate back to main navigation and clear navigation stack
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) => const MainNavigation(child: SizedBox()),
-        ),
-        (route) => false,
-      );
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => const AuthGate(),
+          ),
+          (route) => false,
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error logging out: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('error_logging_out'.tr(context).replaceAll('{error}', e.toString())),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }

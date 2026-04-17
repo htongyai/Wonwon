@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/constants/map_constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui' as ui;
 import 'dart:async';
@@ -27,190 +28,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   bool _isMapStyleLoaded = false;
   bool _showMap = false;
 
-  // Default to Bangkok if no location is provided
-  static const LatLng _defaultLocation = LatLng(13.7563, 100.5018);
-
-  // Custom map style JSON string - same as MapScreen
-  static const String _mapStyle = '''
-[
-  {
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#f5f5f5"
-      }
-    ]
-  },
-  {
-    "elementType": "labels.icon",
-    "stylers": [
-      {
-        "visibility": "off"
-      }
-    ]
-  },
-  {
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#616161"
-      }
-    ]
-  },
-  {
-    "elementType": "labels.text.stroke",
-    "stylers": [
-      {
-        "color": "#f5f5f5"
-      }
-    ]
-  },
-  {
-    "featureType": "administrative.land_parcel",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#bdbdbd"
-      }
-    ]
-  },
-  {
-    "featureType": "landscape.natural",
-    "elementType": "geometry.fill",
-    "stylers": [
-      {
-        "color": "#bac6b9"
-      }
-    ]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#eeeeee"
-      }
-    ]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#757575"
-      }
-    ]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#e5e5e5"
-      }
-    ]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#9e9e9e"
-      }
-    ]
-  },
-  {
-    "featureType": "road",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#ffffff"
-      }
-    ]
-  },
-  {
-    "featureType": "road.arterial",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#757575"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#dadada"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#616161"
-      }
-    ]
-  },
-  {
-    "featureType": "road.local",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#9e9e9e"
-      }
-    ]
-  },
-  {
-    "featureType": "transit.line",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#e5e5e5"
-      }
-    ]
-  },
-  {
-    "featureType": "transit.station",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#eeeeee"
-      }
-    ]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#c9c9c9"
-      }
-    ]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry.fill",
-    "stylers": [
-      {
-        "color": "#b7cad2"
-      }
-    ]
-  },
-  {
-    "featureType": "water",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#9e9e9e"
-      }
-    ]
-  }
-]
-  ''';
+  
 
   @override
   void initState() {
@@ -238,9 +56,15 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
+  }
+
   Future<void> _createCustomMarkerIcon() async {
-    // Create a custom marker icon that matches the app's style
     final customMarker = await _createLocationMarker();
+    if (!mounted) return;
     setState(() {
       _customMarkerIcon = customMarker;
     });
@@ -261,7 +85,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     // Green background with white border
     final bgPaint =
         Paint()
-          ..color = AppConstants.primaryColor.withOpacity(0.8)
+          ..color = AppConstants.primaryColor.withValues(alpha: 0.8)
           ..style = PaintingStyle.fill;
 
     final borderPaint =
@@ -298,27 +122,26 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
   }
 
   Future<void> _initializeLocation() async {
-    // If initial coordinates are provided, use them
     if (widget.initialLatitude != null && widget.initialLongitude != null) {
       _selectedLocation = LatLng(
         widget.initialLatitude!,
         widget.initialLongitude!,
       );
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
       return;
     }
 
-    // Otherwise try to get the user's current location
     try {
-      // Check for location permission
       LocationPermission permission = await Geolocator.checkPermission();
+      if (!mounted) return;
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
+        if (!mounted) return;
         if (permission == LocationPermission.denied) {
-          // If permission is still denied, use default location
-          _selectedLocation = _defaultLocation;
+          _selectedLocation = MapConstants.defaultLocation;
           setState(() {
             _isLoading = false;
           });
@@ -327,31 +150,33 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        // If permission is permanently denied, use default location
-        _selectedLocation = _defaultLocation;
+        _selectedLocation = MapConstants.defaultLocation;
         setState(() {
           _isLoading = false;
         });
         return;
       }
 
-      // Get current position
-      final Position position = await Geolocator.getCurrentPosition();
+      final Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      if (!mounted) return;
       _selectedLocation = LatLng(position.latitude, position.longitude);
     } catch (e) {
-      // If there's an error, use default location
-      _selectedLocation = _defaultLocation;
+      _selectedLocation = MapConstants.defaultLocation;
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   void _onMapCreated(GoogleMapController controller) {
     // Apply the map style immediately, before setting the controller
     controller
-        .setMapStyle(_mapStyle)
+        .setMapStyle(MapConstants.mapStyle)
         .then((_) {
           // Set the controller
           _mapController = controller;
@@ -387,7 +212,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Select Location',
+          'select_location'.tr(context),
           style: GoogleFonts.montserrat(
             fontWeight: FontWeight.bold,
             color: Colors.black87,
@@ -415,7 +240,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               child: GoogleMap(
                 onMapCreated: _onMapCreated,
                 initialCameraPosition: CameraPosition(
-                  target: _selectedLocation ?? _defaultLocation,
+                  target: _selectedLocation ?? MapConstants.defaultLocation,
                   zoom: 15.0,
                 ),
                 markers:
@@ -465,7 +290,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      'Getting your location...',
+                      'splash_getting_location'.tr(context),
                       style: GoogleFonts.montserrat(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
@@ -530,7 +355,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Location permission denied'),
+                              content: Text('location_permission_denied_short'.tr(context)),
                               backgroundColor: Colors.red,
                             ),
                           );
@@ -543,10 +368,10 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                       // Show error message if permission is permanently denied
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Location permission permanently denied. Please enable in settings.',
-                            ),
+                            SnackBar(
+                              content: Text(
+                                'location_permission_permanently_denied'.tr(context),
+                              ),
                             backgroundColor: Colors.red,
                           ),
                         );
@@ -554,18 +379,17 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                       return;
                     }
 
-                    // Get current position
                     final Position position =
                         await Geolocator.getCurrentPosition(
-                          desiredAccuracy: LocationAccuracy.high,
+                          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
                         );
+                    if (!mounted) return;
 
                     final newLocation = LatLng(
                       position.latitude,
                       position.longitude,
                     );
 
-                    // Update the selected location
                     setState(() {
                       _selectedLocation = newLocation;
                     });
@@ -582,7 +406,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            'Error getting location: ${e.toString()}',
+                            'error_getting_location'.tr(context).replaceAll('{error}', e.toString()),
                           ),
                           backgroundColor: Colors.red,
                         ),
@@ -601,12 +425,17 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               left: 0,
               right: 0,
               child: Container(
-                padding: const EdgeInsets.all(20.0),
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: 20 + MediaQuery.of(context).padding.bottom,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, -5),
                     ),
@@ -650,7 +479,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Selected Location',
+                                  'selected_location'.tr(context),
                                   style: GoogleFonts.montserrat(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 16,
@@ -687,10 +516,10 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.1),
+                        color: Colors.amber.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: Colors.amber.withOpacity(0.5),
+                          color: Colors.amber.withValues(alpha: 0.5),
                         ),
                       ),
                       child: Row(
@@ -703,7 +532,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Tap or drag the marker to set the shop location',
+                              'map_picker_instruction'.tr(context),
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.amber[900],

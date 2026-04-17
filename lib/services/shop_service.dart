@@ -26,9 +26,12 @@ class ShopService {
       final CollectionReference shopsCollection = FirebaseFirestore.instance
           .collection('shops');
 
-      // Query for approved shops
+      // Query for approved shops (paginated initial load)
       final QuerySnapshot snapshot =
-          await shopsCollection.where('approved', isEqualTo: true).get();
+          await shopsCollection
+              .where('approved', isEqualTo: true)
+              .limit(50)
+              .get();
 
       appLog(
         'Firestore query: shopsCollection.where("approved", isEqualTo: true)',
@@ -89,6 +92,35 @@ class ShopService {
       return uniqueShopsList;
     } catch (e) {
       appLog('Error getting all shops: $e');
+      rethrow;
+    }
+  }
+
+  /// Fetches more approved shops for pagination.
+  /// [lastDoc] must be the last DocumentSnapshot from a previous query
+  /// (e.g. from getAllShops or a prior getMoreShops call).
+  Future<List<RepairShop>> getMoreShops({
+    DocumentSnapshot? lastDoc,
+    int limit = 20,
+  }) async {
+    if (lastDoc == null) return [];
+    try {
+      final Query query = FirebaseFirestore.instance
+          .collection('shops')
+          .where('approved', isEqualTo: true);
+
+      final QuerySnapshot snapshot =
+          await query.startAfterDocument(lastDoc).limit(limit).get();
+
+      final List<RepairShop> shops = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return RepairShop.fromMap(data);
+      }).toList();
+
+      return shops;
+    } catch (e) {
+      appLog('Error getting more shops: $e');
       rethrow;
     }
   }
@@ -228,7 +260,7 @@ class ShopService {
           durationMinutes: shopMap['durationMinutes'] as int? ?? 0,
           requiresPurchase: shopMap['requiresPurchase'] as bool? ?? false,
           photos: photos,
-          priceRange: shopMap['priceRange'] as String? ?? '₿',
+          priceRange: shopMap['priceRange'] as String? ?? '฿',
           features: features,
           approved: shopMap['approved'] as bool? ?? false,
           irregularHours: shopMap['irregularHours'] as bool? ?? false,
@@ -243,17 +275,50 @@ class ShopService {
 
   // Private method to save user-submitted shops to SharedPreferences
 
-  // Get shop by ID
+  /// Fetches multiple shops by ID in batch using Firestore whereIn.
+  /// Chunks IDs in groups of 10 (Firestore limit) for efficient batched reads.
+  Future<List<RepairShop>> getShopsByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    final List<RepairShop> shops = [];
+    const int chunkSize = 10; // Firestore whereIn limit
+
+    for (int i = 0; i < ids.length; i += chunkSize) {
+      final chunk = ids
+          .skip(i)
+          .take(chunkSize)
+          .toList();
+      if (chunk.isEmpty) continue;
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('shops')
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        shops.add(RepairShop.fromMap(data));
+      }
+    }
+    return shops;
+  }
+
+  // Get shop by ID via direct document read
   Future<RepairShop?> getShopById(String shopId) async {
     try {
-      final shops = await getAllShops();
-      try {
-        return shops.firstWhere((shop) => shop.id == shopId);
-      } catch (e) {
-        // Shop not found, return null instead of placeholder
+      final doc = await FirebaseFirestore.instance
+          .collection('shops')
+          .doc(shopId)
+          .get();
+
+      if (!doc.exists) {
         appLog('Shop with ID $shopId not found');
         return null;
       }
+
+      final data = doc.data()!;
+      data['id'] = doc.id;
+      return RepairShop.fromMap(data);
     } catch (e) {
       appLog('Error getting shop by ID $shopId: $e');
       return null;

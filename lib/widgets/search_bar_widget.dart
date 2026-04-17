@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-
-// This is a placeholder file to satisfy imports
-// Implement the actual widget as needed
 
 class AnimatedSearchBar extends StatefulWidget {
   final Function(String) onSearch;
-  final String hintText;
+  final String? hintText;
   final bool showSearchSuggestions;
   final List<String>? searchSuggestions;
 
   const AnimatedSearchBar({
     Key? key,
     required this.onSearch,
-    this.hintText = 'Search shops, services, locations...',
+    this.hintText,
     this.showSearchSuggestions = false,
     this.searchSuggestions,
   }) : super(key: key);
@@ -63,7 +61,7 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -88,7 +86,7 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
               child: TextField(
                 controller: _controller,
                 decoration: InputDecoration(
-                  hintText: widget.hintText,
+                  hintText: widget.hintText ?? 'search_shops_services'.tr(context),
                   hintStyle: TextStyle(color: Colors.grey[500], fontSize: 16),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),

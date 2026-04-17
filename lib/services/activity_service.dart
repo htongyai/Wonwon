@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 class ActivityService {
   static final ActivityService _instance = ActivityService._internal();
@@ -160,7 +161,7 @@ class ActivityService {
       final currentUser = _auth.currentUser;
       final timestamp = Timestamp.now();
 
-      final activityData = {
+      final activityData = <String, dynamic>{
         'type': type,
         'action': action,
         'title': title,
@@ -172,8 +173,9 @@ class ActivityService {
       // Add user information if available
       if (currentUser != null) {
         activityData['userId'] = currentUser.uid;
-        if (currentUser.email != null) {
-          activityData['userEmail'] = currentUser.email!;
+        final email = currentUser.email;
+        if (email != null) {
+          activityData['userEmail'] = email;
         }
 
         // Get user name from Firestore
@@ -185,7 +187,7 @@ class ActivityService {
                 userDoc.data()?['name'] ?? 'Unknown User';
           }
         } catch (e) {
-          // Continue without user name if fetch fails
+          appLog('Error fetching user name for activity: $e');
         }
       }
 
@@ -200,7 +202,7 @@ class ActivityService {
                 targetUserDoc.data()?['name'] ?? 'Unknown User';
           }
         } catch (e) {
-          // Continue without target user name if fetch fails
+          appLog('Error fetching target user name for activity: $e');
         }
       }
 
@@ -210,7 +212,6 @@ class ActivityService {
         if (shopName != null) {
           activityData['shopName'] = shopName;
         } else {
-          // Try to get shop name from Firestore
           try {
             final shopDoc =
                 await _firestore.collection('shops').doc(shopId).get();
@@ -219,7 +220,7 @@ class ActivityService {
                   shopDoc.data()?['name'] ?? 'Unknown Shop';
             }
           } catch (e) {
-            // Continue without shop name if fetch fails
+            appLog('Error fetching shop name for activity: $e');
           }
         }
       }
@@ -238,7 +239,7 @@ class ActivityService {
       }
     } catch (e) {
       // Log error but don't throw to avoid disrupting main functionality
-      print('Error logging activity: $e');
+      appLog('Error logging activity: $e');
     }
   }
 
@@ -249,7 +250,7 @@ class ActivityService {
         'lastActiveAt': Timestamp.now(),
       });
     } catch (e) {
-      // Ignore errors in updating last active time
+      appLog('Error updating last active time: $e');
     }
   }
 
@@ -296,7 +297,7 @@ class ActivityService {
           .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
           .toList();
     } catch (e) {
-      print('Error getting activity logs: $e');
+      appLog('Error getting activity logs: $e');
       return [];
     }
   }
@@ -322,6 +323,7 @@ class ActivityService {
         );
       }
 
+      query = query.limit(1000);
       final snapshot = await query.get();
       final activities =
           snapshot.docs
@@ -351,7 +353,7 @@ class ActivityService {
         'dailyCount': dailyCount,
       };
     } catch (e) {
-      print('Error getting activity stats: $e');
+      appLog('Error getting activity stats: $e');
       return {
         'totalActivities': 0,
         'typeCount': <String, int>{},
@@ -370,16 +372,21 @@ class ActivityService {
           .where('timestamp', isLessThan: Timestamp.fromDate(cutoffDate));
 
       final snapshot = await query.get();
-      final batch = _firestore.batch();
+      final docs = snapshot.docs;
 
-      for (final doc in snapshot.docs) {
-        batch.delete(doc.reference);
+      // Chunk deletes to respect Firestore batch limit of 500
+      for (int i = 0; i < docs.length; i += 500) {
+        final batch = _firestore.batch();
+        final end = (i + 500 < docs.length) ? i + 500 : docs.length;
+        for (int j = i; j < end; j++) {
+          batch.delete(docs[j].reference);
+        }
+        await batch.commit();
       }
 
-      await batch.commit();
-      print('Cleaned up ${snapshot.docs.length} old activity logs');
+      appLog('Cleaned up ${docs.length} old activity logs');
     } catch (e) {
-      print('Error cleaning up old logs: $e');
+      appLog('Error cleaning up old logs: $e');
     }
   }
 }

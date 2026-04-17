@@ -1,0 +1,37 @@
+name: wonwon_client
+description: "WonWon Repair Finder - Client App"
+publish_to: 'none'
+version: 2.2.3
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+
+  # Shared package
+  shared:
+    path: ../../packages/shared
+
+  # Client-specific dependencies
+  provider: ^6.1.2
+  firebase_core: ^3.13.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/rlogo.jpg
+    - assets/images/www.png
+    - assets/images/wwg.png
+    - assets/lang/

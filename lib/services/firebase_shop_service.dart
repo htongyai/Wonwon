@@ -14,6 +14,7 @@ class FirebaseShopService {
           await _firestore
               .collection(_collection)
               .where('approved', isEqualTo: true)
+              .limit(500)
               .get();
 
       return snapshot.docs.map((doc) {
@@ -35,13 +36,15 @@ class FirebaseShopService {
           durationMinutes: data['durationMinutes'] ?? 0,
           requiresPurchase: data['requiresPurchase'] ?? false,
           photos: List<String>.from(data['photos'] ?? []),
-          priceRange: data['priceRange'] ?? '₿',
+          priceRange: data['priceRange'] ?? '฿',
           features: Map<String, bool>.from(data['features'] ?? {}),
           approved: data['approved'] ?? false,
           irregularHours: data['irregularHours'] ?? false,
-          subServices: Map<String, List<String>>.from(
-            data['subServices'] ?? {},
-          ),
+          subServices: data['subServices'] != null
+              ? (data['subServices'] as Map<String, dynamic>).map(
+                  (key, value) => MapEntry(key, (value as List<dynamic>).map((e) => e.toString()).toList()),
+                )
+              : {},
           phoneNumber: data['phoneNumber'],
           facebookPage: data['facebookPage'],
           buildingNumber: data['buildingNumber'],
@@ -81,6 +84,7 @@ class FirebaseShopService {
           await _firestore
               .collection(_collection)
               .where('approved', isEqualTo: false)
+              .limit(200)
               .get();
 
       return snapshot.docs.map((doc) {
@@ -102,13 +106,15 @@ class FirebaseShopService {
           durationMinutes: data['durationMinutes'] ?? 0,
           requiresPurchase: data['requiresPurchase'] ?? false,
           photos: List<String>.from(data['photos'] ?? []),
-          priceRange: data['priceRange'] ?? '₿',
+          priceRange: data['priceRange'] ?? '฿',
           features: Map<String, bool>.from(data['features'] ?? {}),
           approved: data['approved'] ?? false,
           irregularHours: data['irregularHours'] ?? false,
-          subServices: Map<String, List<String>>.from(
-            data['subServices'] ?? {},
-          ),
+          subServices: data['subServices'] != null
+              ? (data['subServices'] as Map<String, dynamic>).map(
+                  (key, value) => MapEntry(key, (value as List<dynamic>).map((e) => e.toString()).toList()),
+                )
+              : {},
           phoneNumber: data['phoneNumber'],
           facebookPage: data['facebookPage'],
           buildingNumber: data['buildingNumber'],

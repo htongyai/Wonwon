@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/services/performance_monitor.dart';
 import 'package:wonwonw2/services/unified_memory_manager.dart';
 import 'package:wonwonw2/widgets/error_boundary.dart';
@@ -161,7 +162,7 @@ abstract class OptimizedScreenState<T extends OptimizedScreen> extends State<T>
               const Icon(Icons.error_outline, color: Colors.red, size: 64),
               const SizedBox(height: 16),
               Text(
-                'Something went wrong',
+                'something_went_wrong'.tr(context),
                 style: Theme.of(
                   context,
                 ).textTheme.headlineSmall?.copyWith(color: Colors.red),
@@ -169,7 +170,7 @@ abstract class OptimizedScreenState<T extends OptimizedScreen> extends State<T>
               ),
               const SizedBox(height: 8),
               Text(
-                'We\'re sorry, but something went wrong. Please try again later.',
+                'something_went_wrong_message'.tr(context),
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
@@ -180,7 +181,7 @@ abstract class OptimizedScreenState<T extends OptimizedScreen> extends State<T>
                 onPressed: () {
                   setState(() {});
                 },
-                child: const Text('Try Again'),
+                child: Text('try_again'.tr(context)),
               ),
             ],
           ),
@@ -311,7 +312,7 @@ abstract class OptimizedLoadingScreen<T extends OptimizedScreen>
               const Icon(Icons.error_outline, color: Colors.red, size: 64),
               const SizedBox(height: 16),
               Text(
-                'Error',
+                'error'.tr(context),
                 style: Theme.of(
                   context,
                 ).textTheme.headlineSmall?.copyWith(color: Colors.red),
@@ -319,7 +320,7 @@ abstract class OptimizedLoadingScreen<T extends OptimizedScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                _errorMessage ?? 'An unexpected error occurred',
+                _errorMessage ?? 'an_unexpected_error'.tr(context),
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
@@ -331,7 +332,7 @@ abstract class OptimizedLoadingScreen<T extends OptimizedScreen>
                   clearError();
                   onRetry();
                 },
-                child: const Text('Try Again'),
+                child: Text('try_again'.tr(context)),
               ),
             ],
           ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:collection';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wonwonw2/models/forum_topic.dart';
@@ -6,8 +8,6 @@ import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/services/notification_service.dart';
 import 'package:wonwonw2/services/performance_monitor.dart';
 import 'package:wonwonw2/services/moderator_service.dart';
-import 'dart:async';
-import 'dart:collection';
 
 /// Optimized Forum Service with caching, performance monitoring, and better error handling
 class ForumService {
@@ -33,8 +33,6 @@ class ForumService {
   // Caching system
   static final Map<String, ForumTopic> _topicCache = HashMap();
   static final Map<String, List<ForumReply>> _repliesCache = HashMap();
-  static final Map<String, StreamSubscription> _activeSubscriptions = HashMap();
-
   // Cache configuration
   static const int _maxCacheSize = 100;
   static const Duration _cacheExpiry = Duration(minutes: 10);
@@ -75,12 +73,14 @@ class ForumService {
         'authorName':
             _currentUser!.displayName ?? _currentUser!.email ?? 'Anonymous',
         'category': category,
-        'createdAt': Timestamp.now(),
-        'lastActivity': Timestamp.now(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastActivity': FieldValue.serverTimestamp(),
         'replies': 0,
         'views': 0,
         'isPinned': false,
         'isLocked': false,
+        'isHidden': false,
+        'isDeleted': false,
         'tags': tags,
         'metadata': {
           'wordCount': content.trim().split(' ').length,
@@ -179,12 +179,6 @@ class ForumService {
             _performanceMonitor.endOperation('getTopics', stopwatch.elapsed);
 
             return topics;
-          })
-          .handleError((error) {
-            stopwatch.stop();
-            _performanceMonitor.recordError('getTopics', error);
-            appLog('Error in getTopics stream: $error');
-            return <ForumTopic>[];
           });
     } catch (e) {
       stopwatch.stop();
@@ -214,7 +208,6 @@ class ForumService {
           doc.id,
         );
 
-        // Cache the topic
         _cacheTopic(topicId, topic);
 
         stopwatch.stop();
@@ -227,7 +220,7 @@ class ForumService {
       stopwatch.stop();
       _performanceMonitor.recordError('getTopic', e);
       appLog('Error getting topic $topicId: $e');
-      return null;
+      rethrow;
     }
   }
 
@@ -256,7 +249,7 @@ class ForumService {
         'authorId': _currentUser!.uid,
         'authorName':
             _currentUser!.displayName ?? _currentUser!.email ?? 'Anonymous',
-        'createdAt': Timestamp.now(),
+        'createdAt': FieldValue.serverTimestamp(),
         'editedAt': null,
         'likes': 0,
         'likedBy': [],
@@ -296,19 +289,13 @@ class ForumService {
     }
   }
 
-  /// Get replies with optimized querying and caching
+  /// Get replies with real-time updates
   static Stream<List<ForumReply>> getReplies(String topicId) {
     final stopwatch = Stopwatch()..start();
     final cacheKey = 'replies_$topicId';
 
     try {
       _performanceMonitor.startOperation('getReplies');
-
-      // Check cache first
-      if (_repliesCache.containsKey(cacheKey) && _isCacheValid(cacheKey)) {
-        appLog('Replies retrieved from cache for topic: $topicId');
-        return Stream.value(_repliesCache[cacheKey]!);
-      }
 
       return _getRepliesCollection(topicId)
           .orderBy('createdAt', descending: false)
@@ -345,12 +332,6 @@ class ForumService {
             _performanceMonitor.endOperation('getReplies', stopwatch.elapsed);
 
             return replies;
-          })
-          .handleError((error) {
-            stopwatch.stop();
-            _performanceMonitor.recordError('getReplies', error);
-            appLog('Error in getReplies stream: $error');
-            return <ForumReply>[];
           });
     } catch (e) {
       stopwatch.stop();
@@ -384,6 +365,7 @@ class ForumService {
                   doc.data() as Map<String, dynamic>,
                   doc.id,
                 );
+                if (reply.isHidden || reply.isDeleted) continue;
                 replies.add(reply);
               } catch (e) {
                 appLog('Error parsing nested reply ${doc.id}: $e');
@@ -398,12 +380,14 @@ class ForumService {
 
             return replies;
           })
-          .handleError((error) {
-            stopwatch.stop();
-            _performanceMonitor.recordError('getNestedReplies', error);
-            appLog('Error in getNestedReplies stream: $error');
-            return <ForumReply>[];
-          });
+          .transform(StreamTransformer.fromHandlers(
+            handleError: (error, stackTrace, sink) {
+              stopwatch.stop();
+              _performanceMonitor.recordError('getNestedReplies', error);
+              appLog('Error in getNestedReplies stream: $error');
+              sink.add(<ForumReply>[]);
+            },
+          ));
     } catch (e) {
       stopwatch.stop();
       _performanceMonitor.recordError('getNestedReplies', e);
@@ -523,18 +507,25 @@ class ForumService {
         throw Exception('Only the author can delete this topic');
       }
 
-      // Delete all replies first
+      // Delete all replies in chunks (Firestore batch limit is 500)
       final repliesSnapshot = await _getRepliesCollection(topicId).get();
-      final batch = _firestore.batch();
+      final docs = repliesSnapshot.docs;
 
-      for (var doc in repliesSnapshot.docs) {
-        batch.delete(doc.reference);
+      for (int i = 0; i < docs.length; i += 499) {
+        final batch = _firestore.batch();
+        final end = (i + 499 < docs.length) ? i + 499 : docs.length;
+        for (int j = i; j < end; j++) {
+          batch.delete(docs[j].reference);
+        }
+        if (end == docs.length) {
+          batch.delete(_topicsCollection.doc(topicId));
+        }
+        await batch.commit();
       }
 
-      // Delete the topic
-      batch.delete(_topicsCollection.doc(topicId));
-
-      await batch.commit();
+      if (docs.isEmpty) {
+        await _topicsCollection.doc(topicId).delete();
+      }
 
       // Clear caches
       _clearTopicCache();
@@ -579,8 +570,8 @@ class ForumService {
       // Delete the reply
       await _getRepliesCollection(topicId).doc(replyId).delete();
 
-      // Update topic activity
-      await _updateTopicActivity(topicId);
+      // Update topic activity (decrement reply count)
+      await _updateTopicActivity(topicId, replyDelta: -1);
 
       // Clear cache
       _clearRepliesCache(topicId);
@@ -709,8 +700,11 @@ class ForumService {
 
   /// Clear topic cache
   static void _clearTopicCache() {
+    for (final key in _topicCache.keys.toList()) {
+      _cacheTimestamps.remove(key);
+    }
     _topicCache.clear();
-    _cacheTimestamps.removeWhere((key, _) => key.startsWith('topic_'));
+    _cacheTimestamps.removeWhere((key, _) => key.startsWith('topics_'));
   }
 
   /// Clear replies cache for a topic
@@ -721,10 +715,10 @@ class ForumService {
   }
 
   /// Update topic activity
-  static Future<void> _updateTopicActivity(String topicId) async {
+  static Future<void> _updateTopicActivity(String topicId, {int replyDelta = 1}) async {
     await _topicsCollection.doc(topicId).update({
-      'replies': FieldValue.increment(1),
-      'lastActivity': Timestamp.now(),
+      'replies': FieldValue.increment(replyDelta),
+      'lastActivity': FieldValue.serverTimestamp(),
     });
   }
 
@@ -887,10 +881,6 @@ class ForumService {
 
   /// Dispose resources
   static void dispose() {
-    for (final subscription in _activeSubscriptions.values) {
-      subscription.cancel();
-    }
-    _activeSubscriptions.clear();
     _topicCache.clear();
     _repliesCache.clear();
     _cacheTimestamps.clear();

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -21,9 +21,14 @@ import 'package:wonwonw2/services/cache_service.dart';
 import 'package:wonwonw2/services/version_service.dart';
 import 'package:wonwonw2/services/auth_manager.dart';
 
+// Analytics
+import 'package:wonwonw2/services/analytics_service.dart';
+
 // Screens
 import 'package:wonwonw2/widgets/auth_gate.dart';
 import 'package:wonwonw2/services/service_providers.dart';
+import 'package:wonwonw2/utils/remove_loading_stub.dart'
+    if (dart.library.html) 'package:wonwonw2/utils/remove_loading_web.dart';
 
 /// Optimized entry point for the WonWon Repair Finder application
 void main() async {
@@ -39,45 +44,45 @@ void main() async {
       WebPerformance.startMeasurement('web_init');
     }
 
-    // Initialize Firebase
-    await PerformanceUtils.measureAsync(
-      'firebase_init',
-      () => Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
+    // Initialize Firebase + locale in parallel (both required before first paint)
+    late final Locale initialLocale;
+    await Future.wait([
+      PerformanceUtils.measureAsync(
+        'firebase_init',
+        () => Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        ),
       ),
-    );
+      (() async {
+        try {
+          if (WebConfig.isAdminOnlyDeployment) {
+            initialLocale = const Locale('en');
+          } else {
+            initialLocale = await AppLocalizationsService.getLocale();
+          }
+        } catch (e) {
+          debugPrint('Failed to load locale, using default: $e');
+          initialLocale = const Locale('th');
+        }
+      })(),
+    ]);
 
-    // Check for version updates and clear cache if needed
-    await PerformanceUtils.measureAsync(
-      'version_check',
-      () => VersionService().checkAndHandleVersionUpdate(),
-    );
-
-    // Initialize core services
-    await PerformanceUtils.measureAsync(
-      'services_init',
-      () => _initializeServices(),
-    );
-
-    // Get initial locale with fallback
-    Locale initialLocale;
-    try {
-      // Force English for admin deployments
-      if (WebConfig.isAdminOnlyDeployment) {
-        initialLocale = const Locale('en');
-      } else {
-        initialLocale = await AppLocalizationsService.getLocale();
-      }
-    } catch (e) {
-      debugPrint('Failed to load locale, using default: $e');
-      initialLocale = const Locale('en'); // Fallback to English
-    }
+    // Only AuthManager is critical before first paint
+    await AuthManager().initialize();
 
     // End startup measurement
     PerformanceUtils.endMeasurement('app_startup');
 
-    // Launch app
+    // Launch app immediately - show UI as fast as possible
     runApp(OptimizedWonWonApp(initialLocale: initialLocale));
+
+    // Remove HTML loading splash after first frame renders
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      removeHtmlLoadingElement();
+    });
+
+    // Defer non-critical initialization to after first paint
+    _deferredInitialization();
   } catch (e) {
     // Handle initialization errors gracefully
     if (kIsWeb) {
@@ -93,97 +98,94 @@ void main() async {
               children: [
                 Icon(Icons.error_outline, size: 64, color: Colors.red),
                 SizedBox(height: 16),
-                Text(
+                const Text(
                   'App initialization failed',
                   style: TextStyle(fontSize: 18),
                 ),
-                SizedBox(height: 8),
-                Text('Please refresh the page', style: TextStyle(fontSize: 14)),
+                const SizedBox(height: 8),
+                const Text('Please refresh the page', style: TextStyle(fontSize: 14)),
               ],
             ),
           ),
         ),
       ),
     );
+    // Must remove the HTML loading overlay even on failure, otherwise it
+    // covers the error UI and the app appears permanently stuck.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      removeHtmlLoadingElement();
+    });
   }
 }
 
-/// Initialize all core services
-Future<void> _initializeServices() async {
-  final serviceManager = ServiceManager();
-  final cacheService = CacheService();
-  final appStateManager = AppStateManager();
-  final authManager = AuthManager();
+/// Deferred initialization for non-critical services.
+/// Runs after first paint so the app appears instantly.
+Future<void> _deferredInitialization() async {
+  try {
+    // These can all run in parallel after the UI is visible
+    await Future.wait([
+      ServiceManager().initialize(),
+      CacheService().initialize(),
+      VersionService().checkAndHandleVersionUpdate(),
+      authStateService.initialize(),
+    ]);
 
-  // Initialize services in parallel where possible
-  await Future.wait([
-    serviceManager.initialize(),
-    cacheService.initialize(),
-    authManager.initialize(),
-  ]);
-
-  // Initialize app state (depends on services)
-  await appStateManager.initialize();
+    // AppStateManager depends on ServiceManager being ready
+    await AppStateManager().initialize();
+  } catch (e) {
+    debugPrint('Deferred initialization error: $e');
+  }
 }
 
 /// Optimized main application widget
 class OptimizedWonWonApp extends StatelessWidget {
   final Locale initialLocale;
 
-  const OptimizedWonWonApp({Key? key, required this.initialLocale})
-    : super(key: key);
+  const OptimizedWonWonApp({super.key, required this.initialLocale});
 
   @override
   Widget build(BuildContext context) {
+    // All singletons are already initialized in _initializeServices;
+    // .value exposes the existing instances without creating new ones.
     return ServiceProvider(
       locationService: locationService,
       authStateService: authStateService,
       child: MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => AppStateManager()),
-          Provider(create: (_) => ServiceManager()),
-          Provider(create: (_) => CacheService()),
-          Provider(create: (_) => AuthManager()),
+          ChangeNotifierProvider.value(value: AppStateManager()),
+          Provider.value(value: ServiceManager()),
+          Provider.value(value: CacheService()),
+          Provider.value(value: AuthManager()),
         ],
         child: Consumer<AppStateManager>(
           builder: (context, appState, child) {
-            return PerformanceMonitorWidget(
-              showOverlay: kDebugMode && !kIsWeb, // Hide overlay on web
-              child: MaterialApp(
-                title: WebConfig.getAppTitle(),
-                debugShowCheckedModeBanner: false,
+            return MaterialApp(
+              title: WebConfig.getAppTitle(),
+              debugShowCheckedModeBanner: false,
 
-                // Theme configuration
-                theme: _buildTheme(false),
-                darkTheme: _buildTheme(true),
-                themeMode:
-                    appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+              // Analytics - automatic screen tracking
+              navigatorObservers: [AnalyticsService().observer],
 
-                // Localization
-                locale: initialLocale,
-                localizationsDelegates: const [
-                  AppLocalizations.delegate,
-                  GlobalMaterialLocalizations.delegate,
-                  GlobalWidgetsLocalizations.delegate,
-                  GlobalCupertinoLocalizations.delegate,
-                ],
-                supportedLocales: const [Locale('en', ''), Locale('th', '')],
+              // Theme configuration
+              theme: _buildTheme(false),
+              darkTheme: _buildTheme(true),
+              themeMode:
+                  appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
 
-                // Basic routing with authentication check
-                home: const AuthGate(),
+              // Localization
+              locale: initialLocale,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: const [Locale('th', ''), Locale('en', '')],
+              localeResolutionCallback: (locale, supportedLocales) {
+                return initialLocale;
+              },
 
-                // Performance optimizations
-                builder: (context, child) {
-                  return MediaQuery(
-                    data: MediaQuery.of(context).copyWith(
-                      textScaler: TextScaler.linear(
-                        kIsWeb ? 1.0 : 1.0, // Consistent scaling for web
-                      ),
-                    ),
-                    child: child ?? const SizedBox.shrink(),
-                  );
-                },
-              ),
+              home: const AuthGate(),
             );
           },
         ),
@@ -200,25 +202,19 @@ class OptimizedWonWonApp extends StatelessWidget {
               primary: AppConstants.primaryColor, // Green accent
               secondary: AppConstants.primaryColor, // Green accent
               surface: const Color(0xFF1E1E1E), // Dark surface for dark mode
-              background: const Color(
-                0xFF121212,
-              ), // Dark background for dark mode
               onPrimary: Colors.white,
               onSecondary: Colors.white,
               onSurface: Colors.white,
-              onBackground: Colors.white,
             )
             : ColorScheme.light(
               primary: AppConstants.primaryColor, // Green accent only
               secondary: AppConstants.primaryColor, // Green accent only
               surface: Colors.white, // Pure white surface
-              background: Colors.white, // Pure white background
               onPrimary: Colors.white, // White text on green
               onSecondary: Colors.white, // White text on green
               onSurface: Colors.black87, // Dark text on white
-              onBackground: Colors.black87, // Dark text on white
               outline: Colors.grey.shade300, // Light grey borders
-              surfaceVariant: Colors.grey.shade50, // Very light grey for cards
+              surfaceContainerHighest: Colors.grey.shade50, // Very light grey for cards
             );
 
     return ThemeData(
@@ -314,25 +310,23 @@ class OptimizedWonWonApp extends StatelessWidget {
         elevation: 4,
       ),
 
-      // Chip theme
       chipTheme: ChipThemeData(
         backgroundColor: Colors.grey.shade100,
-        selectedColor: AppConstants.primaryColor.withOpacity(0.1),
+        selectedColor: AppConstants.primaryColor.withAlpha(25),
         labelStyle: const TextStyle(color: Colors.black87),
         side: BorderSide(color: Colors.grey.shade300),
       ),
 
-      // Switch theme
       switchTheme: SwitchThemeData(
-        thumbColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
-            return AppConstants.primaryColor; // Green accent
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppConstants.primaryColor;
           }
           return Colors.grey.shade400;
         }),
-        trackColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) {
-            return AppConstants.primaryColor.withOpacity(0.3);
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppConstants.primaryColor.withAlpha(76);
           }
           return Colors.grey.shade300;
         }),
@@ -345,48 +339,4 @@ class OptimizedWonWonApp extends StatelessWidget {
     );
   }
 
-  // Removed GoRouter configuration - using basic navigation
-}
-
-/// Error app for initialization failures
-class ErrorApp extends StatelessWidget {
-  const ErrorApp({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'WonWon - Error',
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.red),
-              const SizedBox(height: 16),
-              const Text(
-                'Failed to initialize app',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text('Please refresh the page'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  if (kIsWeb) {
-                    // For web, reload the page
-                    // In a real implementation, you'd use dart:html
-                    // html.window.location.reload();
-                  } else {
-                    SystemNavigator.pop();
-                  }
-                },
-                child: Text(kIsWeb ? 'Refresh' : 'Restart'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

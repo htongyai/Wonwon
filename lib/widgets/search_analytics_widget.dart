@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/services/advanced_search_service.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class SearchAnalyticsWidget extends StatelessWidget {
   final AdvancedSearchService searchService;
@@ -10,14 +11,15 @@ class SearchAnalyticsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    try {
+      return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -36,7 +38,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'Search Analytics',
+                'search_analytics'.tr(context),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -46,17 +48,23 @@ class SearchAnalyticsWidget extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          _buildAnalyticsContent(),
+          _buildAnalyticsContent(context),
         ],
       ),
     );
+    } catch (e) {
+      debugPrint('SearchAnalyticsWidget build error: $e');
+      return const SizedBox.shrink();
+    }
   }
 
-  Widget _buildAnalyticsContent() {
+  Widget _buildAnalyticsContent(BuildContext context) {
     final analytics = searchService.getSearchAnalytics();
-    final totalSearches = analytics['totalSearches'] as int;
-    final uniqueSearches = analytics['uniqueSearches'] as int;
-    final topSearches = analytics['topSearches'] as List<Map<String, dynamic>>;
+    final totalSearches = (analytics['totalSearches'] as int?) ?? 0;
+    final uniqueSearches = (analytics['uniqueSearches'] as int?) ?? 0;
+    final topSearches = (analytics['topSearches'] as List<dynamic>?)
+        ?.map((e) => Map<String, dynamic>.from(e as Map))
+        .toList() ?? [];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -66,7 +74,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
           children: [
             Expanded(
               child: _buildStatCard(
-                'Total Searches',
+                'total_searches'.tr(context),
                 totalSearches.toString(),
                 Icons.search,
               ),
@@ -74,7 +82,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
-                'Unique Terms',
+                'unique_terms'.tr(context),
                 uniqueSearches.toString(),
                 Icons.tag,
               ),
@@ -85,7 +93,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
         if (topSearches.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text(
-            'Popular Searches',
+            'popular_searches'.tr(context),
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -111,7 +119,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
                 Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
                 const SizedBox(height: 8),
                 Text(
-                  'No search data yet',
+                  'no_search_data'.tr(context),
                   style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                 ),
               ],
@@ -125,7 +133,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppConstants.primaryColor.withOpacity(0.1),
+        color: AppConstants.primaryColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -183,4 +191,5 @@ class SearchAnalyticsWidget extends StatelessWidget {
     );
   }
 }
+
 

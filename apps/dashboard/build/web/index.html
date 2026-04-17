@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#C3C130">
+  <meta name="description" content="WonWon Admin Dashboard - Manage repair shops and users">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="WonWon Admin">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <!-- Preconnect to critical origins -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+  <link rel="dns-prefetch" href="https://maps.googleapis.com">
+
+  <!-- Preload critical fonts -->
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700&display=swap"></noscript>
+
+  <!-- Facebook Meta Tags -->
+  <meta property="og:url" content="https://wonwonrepair.com">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="WonWon Admin Dashboard">
+  <meta property="og:description" content="Manage repair shops and users">
+  <meta property="og:image" content="https://iili.io/3PiMVus.webp">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="WonWon Admin Dashboard">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter Card Meta Tags -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@wonwonrepair">
+  <meta name="twitter:title" content="WonWon Admin Dashboard">
+  <meta name="twitter:description" content="Manage repair shops and users">
+  <meta name="twitter:image" content="https://iili.io/3PiMVus.webp">
+  <meta name="twitter:image:alt" content="WonWon Admin Dashboard Logo">
+
+  <title>WonWon Admin Dashboard</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Google Maps API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBJE-vqPz0YakKEmj1qi14tk1LUTGBFFPA&loading=async" defer></script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background-color: #c3c130; min-height: 100vh; overflow: hidden; }
+
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #c3c130;
+      z-index: 9999;
+      transition: opacity 0.3s ease-out;
+    }
+    #loading .logo {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 24px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #loading .logo img {
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
+    }
+    #loading .brand {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    #loading .sub {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 32px;
+    }
+    #loading .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+
+  <script src="flutter_bootstrap.js" async></script>
+</head>
+<body>
+  <div id="loading">
+    <div class="logo">
+      <img src="assets/images/wwg.png" alt="WonWon" width="52" height="52">
+    </div>
+    <div class="brand">WonWon</div>
+    <div class="sub">Admin Dashboard</div>
+    <div class="spinner"></div>
+  </div>
+</body>
+</html>

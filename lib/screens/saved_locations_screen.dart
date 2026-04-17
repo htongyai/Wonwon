@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -17,6 +19,8 @@ import 'package:wonwonw2/models/repair_category.dart';
 import 'package:wonwonw2/widgets/search_bar_widget.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/utils/asset_helpers.dart';
+import 'package:wonwonw2/widgets/optimized_image.dart';
+import 'package:wonwonw2/widgets/common/shimmer_loading.dart';
 
 class SavedLocationsScreen extends StatefulWidget {
   const SavedLocationsScreen({Key? key}) : super(key: key);
@@ -37,14 +41,14 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
   bool _isLoading = true;
   bool _hasError = false;
   bool _isLoggedIn = false;
+  StreamSubscription<User?>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _checkLoginStatus();
 
-    // Listen for auth state changes
-    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) {
       if (mounted) {
         setState(() {
           _isLoggedIn = user != null;
@@ -61,6 +65,12 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
         }
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _checkLoginStatus() async {
@@ -91,17 +101,15 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
       // Get IDs of saved shops
       final savedShopIds = await _savedShopService.getSavedShopIds();
 
-      // Load details for each saved shop and clean up orphaned IDs
-      final shops = <RepairShop>[];
-      final orphanedIds = <String>[];
+      // Batch load shop details (uses Firestore whereIn, chunked to 10 per query)
+      final shops = await _shopService.getShopsByIds(savedShopIds);
 
-      for (String id in savedShopIds) {
-        final shop = await _shopService.getShopById(id);
-        if (shop != null) {
-          shops.add(shop);
-        } else {
-          // Track orphaned IDs (shops that no longer exist)
-          orphanedIds.add(id);
+      // Find orphaned IDs (shops that no longer exist)
+      final loadedIds = shops.map((s) => s.id).toSet();
+      final orphanedIds =
+          savedShopIds.where((id) => !loadedIds.contains(id)).toList();
+      if (orphanedIds.isNotEmpty) {
+        for (final id in orphanedIds) {
           appLog('Found orphaned saved shop ID: $id');
         }
       }
@@ -245,33 +253,39 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
           ),
     );
 
-    if (confirmed == true) {
-      try {
-        final success = await _savedShopService.removeShop(shop.id);
-        if (success) {
-          setState(() {
-            _savedShops.removeWhere((s) => s.id == shop.id);
-          });
+    if (confirmed != true || !mounted) return;
+    await _performRemoveShop(shop);
+  }
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'removed_from_saved'
-                    .tr(context)
-                    .replaceAll('{shop_name}', shop.name),
-              ),
-              backgroundColor: Colors.red[400],
-            ),
-          );
-        }
-      } catch (e) {
+  Future<void> _performRemoveShop(RepairShop shop) async {
+    try {
+      final success = await _savedShopService.removeShop(shop.id);
+      if (!mounted) return;
+      if (success) {
+        setState(() {
+          _savedShops.removeWhere((s) => s.id == shop.id);
+          _applyFilters();
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('failed_to_remove'.tr(context)),
-            backgroundColor: Colors.red,
+            content: Text(
+              'removed_from_saved'
+                  .tr(context)
+                  .replaceAll('{shop_name}', shop.name),
+            ),
+            backgroundColor: Colors.red[400],
           ),
         );
       }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('failed_to_remove'.tr(context)),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -281,7 +295,7 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
       MaterialPageRoute(builder: (context) => const LoginScreen()),
     );
 
-    if (result == true) {
+    if (result == true && mounted) {
       _checkLoginStatus();
     }
   }
@@ -328,39 +342,25 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
                 ),
               ),
 
-            // Categories heading and list
+            // Categories chips row
             if (_isLoggedIn &&
                 !_isLoading &&
                 !_hasError &&
                 _savedShops.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'categories'.tr(context),
-                      style: GoogleFonts.montserrat(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppConstants.darkColor,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCategoriesSection(),
-                    const SizedBox(height: 16),
-                  ],
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: _buildCategoriesSection(),
               ),
 
             // Main content
             Expanded(
               child:
                   _isLoading
-                      ? const Center(
-                        child: CircularProgressIndicator(
-                          color: AppConstants.primaryColor,
-                        ),
+                      ? ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: 4,
+                        itemBuilder: (context, index) =>
+                            const ShimmerShopCard(),
                       )
                       : _hasError
                       ? Center(
@@ -448,92 +448,132 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(FontAwesomeIcons.bookmark, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'no_saved_locations'.tr(context),
-            style: GoogleFonts.montserrat(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppConstants.darkColor,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(FontAwesomeIcons.bookmark, size: 40, color: Colors.grey[400]),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'locations_will_appear'.tr(context),
-            style: GoogleFonts.montserrat(
-              fontSize: 14,
-              color: Colors.grey[600],
+            const SizedBox(height: 24),
+            Text(
+              'no_saved_locations'.tr(context),
+              style: GoogleFonts.montserrat(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppConstants.darkColor,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {
-              // Update the navigation index to 0 (home)
-              if (context.mounted) {
-                final mainNav = MainNavigationState.of(context);
-                if (mainNav != null) {
-                  mainNav.onTap(0);
+            const SizedBox(height: 8),
+            Text(
+              'locations_will_appear'.tr(context),
+              style: GoogleFonts.montserrat(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (context.mounted) {
+                  final mainNav = MainNavigationState.of(context);
+                  if (mainNav != null) {
+                    mainNav.onTap(0);
+                  }
                 }
-              }
-            },
-            icon: const Icon(Icons.search),
-            label: Text('find_repair_shops'.tr(context)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              },
+              icon: const Icon(Icons.search),
+              label: Text(
+                'find_repair_shops'.tr(context),
+                style: GoogleFonts.montserrat(fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildNoMatchingCategory() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(FontAwesomeIcons.bookmark, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'no_matching_category'.tr(context),
-            style: GoogleFonts.montserrat(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppConstants.darkColor,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.filter_list_off, size: 40, color: Colors.grey[400]),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'try_different_category'.tr(context),
-            style: GoogleFonts.montserrat(
-              fontSize: 14,
-              color: Colors.grey[600],
+            const SizedBox(height: 24),
+            Text(
+              'no_matching_category'.tr(context),
+              style: GoogleFonts.montserrat(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppConstants.darkColor,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {
-              // Update the navigation index to 0 (home)
-              if (context.mounted) {
-                final mainNav = MainNavigationState.of(context);
-                if (mainNav != null) {
-                  mainNav.onTap(0);
+            const SizedBox(height: 8),
+            Text(
+              'try_different_category'.tr(context),
+              style: GoogleFonts.montserrat(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (context.mounted) {
+                  final mainNav = MainNavigationState.of(context);
+                  if (mainNav != null) {
+                    mainNav.onTap(0);
+                  }
                 }
-              }
-            },
-            icon: const Icon(Icons.search),
-            label: Text('find_repair_shops'.tr(context)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              },
+              icon: const Icon(Icons.search),
+              label: Text(
+                'find_repair_shops'.tr(context),
+                style: GoogleFonts.montserrat(fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 0,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -543,209 +583,193 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
       onRefresh: _loadSavedShops,
       color: AppConstants.primaryColor,
       child: ListView.builder(
+        key: const PageStorageKey<String>('saved_locations_list'),
         padding: const EdgeInsets.all(16),
         itemCount: _filteredShops.length,
         itemBuilder: (context, index) {
           final shop = _filteredShops[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+          return Dismissible(
+            key: Key(shop.id),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 24),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.delete, color: Colors.white, size: 28),
             ),
-            child: InkWell(
-              onTap: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => ShopDetailScreen(shopId: shop.id),
-                  ),
-                );
-
-                // Refresh the list when returning from details
-                _loadSavedShops();
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Shop image
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(12),
-                    ),
-                    child: SizedBox(
-                      height: 120,
-                      width: double.infinity,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // Shop image with fallback
-                          shop.photos.isNotEmpty
-                              ? Image.network(
-                                shop.photos.first,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return AssetHelpers.getShopPlaceholder(
+            onDismissed: (_) => _performRemoveShop(shop),
+            child: RepaintBoundary(
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                  onTap: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => ShopDetailScreen(shopId: shop.id),
+                      ),
+                    );
+                    if (!mounted) return;
+                    _loadSavedShops();
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                        child: SizedBox(
+                          height: 160,
+                          width: double.infinity,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              shop.photos.isNotEmpty
+                                  ? OptimizedImage(
+                                    imageUrl: shop.photos.first,
+                                    fit: BoxFit.cover,
+                                    width: MediaQuery.of(context).size.width - 32,
+                                    height: 160,
+                                    errorWidget: AssetHelpers.getShopPlaceholder(
+                                      shop.name,
+                                      containerWidth: 300,
+                                      containerHeight: 200,
+                                    ),
+                                  )
+                                  : AssetHelpers.getShopPlaceholder(
                                     shop.name,
                                     containerWidth: 300,
                                     containerHeight: 200,
-                                  );
-                                },
-                              )
-                              : AssetHelpers.getShopPlaceholder(
-                                shop.name,
-                                containerWidth: 300,
-                                containerHeight: 200,
-                              ),
-
-                          // Gradient overlay
-                          Positioned.fill(
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Colors.black.withOpacity(0.6),
-                                  ],
-                                  stops: const [0.6, 1.0],
+                                  ),
+                              Positioned(
+                                top: 10,
+                                right: 10,
+                                child: GestureDetector(
+                                  onTap: () => _removeShop(shop),
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.4),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-
-                          // Shop name on image
-                          Positioned(
-                            left: 12,
-                            right: 12,
-                            bottom: 12,
-                            child: Text(
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
                               shop.name,
                               style: GoogleFonts.montserrat(
-                                color: Colors.white,
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                shadows: const [
-                                  Shadow(color: Colors.black45, blurRadius: 4),
-                                ],
+                                color: AppConstants.darkColor,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-
-                          // Remove button
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: InkWell(
-                              onTap: () => _removeShop(shop),
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.3),
-                                  shape: BoxShape.circle,
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                  size: 16,
                                 ),
-                                child: const Icon(
-                                  FontAwesomeIcons.xmark,
-                                  size: 14,
-                                  color: Colors.white,
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${shop.rating.toStringAsFixed(1)} (${shop.reviewCount})',
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey[700],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.location_on_outlined,
+                                  color: Colors.grey[500],
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    shop.address,
+                                    style: GoogleFonts.montserrat(
+                                      fontSize: 13,
+                                      color: Colors.grey[500],
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children:
+                                  shop.categories
+                                      .take(3)
+                                      .map((category) {
+                                        return Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppConstants.primaryColor.withValues(alpha: 0.08),
+                                            borderRadius: BorderRadius.circular(14),
+                                          ),
+                                          child: Text(
+                                            'category_$category'.tr(context),
+                                            style: GoogleFonts.montserrat(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppConstants.primaryColor,
+                                            ),
+                                          ),
+                                        );
+                                      })
+                                      .toList(),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-
-                  // Shop details
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Rating
-                        Row(
-                          children: [
-                            const FaIcon(
-                              FontAwesomeIcons.solidStar,
-                              color: Colors.amber,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${shop.rating.toStringAsFixed(1)} (${shop.reviewCount})',
-                              style: GoogleFonts.montserrat(
-                                fontSize: 14,
-                                color: Colors.grey[700],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Address
-                        Row(
-                          children: [
-                            FaIcon(
-                              FontAwesomeIcons.locationDot,
-                              color: AppConstants.tertiaryColor,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                shop.address,
-                                style: GoogleFonts.montserrat(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Categories
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children:
-                              shop.categories
-                                  .take(3) // Show only first 3 categories
-                                  .map((category) {
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppConstants.primaryColor
-                                            .withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        category,
-                                        style: GoogleFonts.montserrat(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: AppConstants.primaryColor,
-                                        ),
-                                      ),
-                                    );
-                                  })
-                                  .toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
+            ),
             ),
           );
         },
@@ -757,69 +781,51 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
     final categories = RepairCategory.getCategories();
 
     return SizedBox(
-      height: 100,
+      height: 36,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
         itemBuilder: (context, index) {
           final category = categories[index];
-          return _buildCategoryCard(category);
+          return Padding(
+            padding: EdgeInsets.only(
+              right: index == categories.length - 1 ? 0 : 8,
+            ),
+            child: _buildCategoryChip(category),
+          );
         },
       ),
     );
   }
 
-  Widget _buildCategoryCard(RepairCategory category) {
-    // Check if this category is currently selected
+  Widget _buildCategoryChip(RepairCategory category) {
     final isSelected = _selectedCategoryId == category.id;
 
     return GestureDetector(
       onTap: () => _filterShopsByCategory(category.id),
-      child: Container(
-        width: 80,
-        margin: const EdgeInsets.only(right: 12),
-        child: Column(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? AppConstants.primaryColor : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: isSelected ? AppConstants.primaryColor : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    spreadRadius: 0,
-                  ),
-                ],
-                border: Border.all(
-                  color:
-                      isSelected
-                          ? AppConstants.primaryColor
-                          : AppConstants.primaryColor.withOpacity(0.3),
-                ),
-              ),
-              child: Icon(
-                _getCategoryIcon(category.id),
-                color: isSelected ? Colors.white : AppConstants.primaryColor,
-                size: 28,
-              ),
+            Icon(
+              _getCategoryIcon(category.id),
+              color: isSelected ? Colors.white : AppConstants.darkColor,
+              size: 16,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(width: 6),
             Text(
               category.getLocalizedName(context),
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
               style: GoogleFonts.montserrat(
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color:
-                    isSelected
-                        ? AppConstants.primaryColor
-                        : AppConstants.darkColor,
+                color: isSelected ? Colors.white : AppConstants.darkColor,
               ),
             ),
           ],

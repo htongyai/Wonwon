@@ -3,37 +3,32 @@ import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/models/repair_category.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
-import 'package:wonwonw2/screens/settings_screen.dart';
 import 'package:wonwonw2/screens/add_shop_screen.dart';
+import 'package:wonwonw2/screens/login_screen.dart';
 import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/utils/asset_helpers.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
-import 'package:wonwonw2/utils/icon_helper.dart';
 import 'package:wonwonw2/widgets/advanced_search_bar.dart';
 import 'package:wonwonw2/services/service_manager.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/utils/error_handler.dart';
 import 'package:wonwonw2/models/repair_sub_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:async';
 import 'package:wonwonw2/widgets/performance_loading_widget.dart';
 import 'package:wonwonw2/services/auth_service.dart';
-import 'package:wonwonw2/config/web_config.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wonwonw2/mixins/widget_disposal_mixin.dart';
 import 'package:wonwonw2/services/optimized_image_cache_manager.dart';
 import 'package:wonwonw2/services/unified_memory_manager.dart';
-// Conditional import for web
-// ignore: uri_does_not_exist
-import 'dart:html' as html;
+import 'package:wonwonw2/widgets/notification_icon.dart';
+import 'package:wonwonw2/services/notification_controller.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -58,13 +53,12 @@ class _HomeScreenState extends State<HomeScreen>
   String _selectedCategoryId = 'all';
   String? _selectedSubServiceId;
 
-  // Current language code (en or th)
-  String _currentLanguage = 'en';
-
   // Controller and variables for pull to refresh
   late ScrollController _scrollController;
   bool _isRefreshing = false;
   double _refreshIndicatorExtent = 0;
+  double? _lastScrollPixels;
+  int _lastScrollDirection = 0; // -1 = pulling down, 1 = releasing
 
   bool _showLoadingOverlay = false;
 
@@ -86,12 +80,11 @@ class _HomeScreenState extends State<HomeScreen>
     // Initialize app with auth check and data loading
     _initializeApp();
 
-    // Listen for language changes
-    AppLocalizationsService().localeStream.listen((locale) async {
+    // Listen for language changes (auto-cancelled by WidgetDisposalMixin)
+    listenToStream(AppLocalizationsService().localeStream, (locale) async {
       if (mounted) {
         setState(() {
           _showLoadingOverlay = true;
-          _currentLanguage = locale.languageCode;
         });
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) {
@@ -102,8 +95,8 @@ class _HomeScreenState extends State<HomeScreen>
       }
     });
 
-    // Listen for auth state changes
-    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    // Listen for auth state changes (auto-cancelled by WidgetDisposalMixin)
+    listenToStream(FirebaseAuth.instance.authStateChanges(), (User? user) {
       if (mounted) {
         setState(() {
           _currentUser = user;
@@ -130,12 +123,7 @@ class _HomeScreenState extends State<HomeScreen>
       // Add location with 10-second timeout
       futures.add(_getUserLocationWithTimeout());
 
-      // Wait for all tasks to complete
       await Future.wait(futures);
-
-      // Small delay for smooth transition
-      await Future.delayed(const Duration(milliseconds: 500));
-
       _animationController.forward();
     } catch (e) {
       appLog('Error during app initialization: $e');
@@ -187,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen>
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: AppConstants.primaryColor.withOpacity(0.2),
+                    color: AppConstants.primaryColor.withValues(alpha: 0.2),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -199,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen>
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     decoration: BoxDecoration(
-                      color: AppConstants.primaryColor.withOpacity(0.1),
+                      color: AppConstants.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Center(
@@ -256,14 +244,14 @@ class _HomeScreenState extends State<HomeScreen>
               decoration: BoxDecoration(
                 color:
                     _isAuthenticated
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.grey.withOpacity(0.1),
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color:
                       _isAuthenticated
-                          ? Colors.green.withOpacity(0.3)
-                          : Colors.grey.withOpacity(0.3),
+                          ? Colors.green.withValues(alpha: 0.3)
+                          : Colors.grey.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -294,34 +282,42 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // Load the current language from SharedPreferences
   Future<void> _loadCurrentLanguage() async {
-    final locale = await AppLocalizationsService.getLocale();
-    if (mounted) {
-      setState(() {
-        _currentLanguage = locale.languageCode;
-      });
-    }
+    await AppLocalizationsService.getLocale();
   }
 
   void _scrollListener() {
-    if (_scrollController.position.pixels < -60 && !_isRefreshing) {
-      setState(() {
-        _isRefreshing = true;
-      });
-    } else if (_scrollController.position.pixels >= 0 && _isRefreshing) {
-      setState(() {
-        _isRefreshing = false;
-      });
+    final pixels = _scrollController.position.pixels;
+    int direction = 0;
+    if (_lastScrollPixels != null) {
+      direction =
+          pixels < _lastScrollPixels!
+              ? -1
+              : (pixels > _lastScrollPixels! ? 1 : _lastScrollDirection);
     }
+    _lastScrollPixels = pixels;
 
-    // Update pull extent for animation
-    if (_scrollController.position.pixels < 0) {
+    final newRefreshing =
+        pixels < -60 ? true : (pixels >= 0 ? false : _isRefreshing);
+    final newExtent = pixels < 0 ? pixels.abs().clamp(0.0, 60.0) : 0.0;
+    final directionChanged = direction != _lastScrollDirection;
+    _lastScrollDirection = direction;
+
+    // Throttle: only call setState when scroll direction changes, refresh threshold crosses,
+    // or extent changes by at least 10 pixels (quantization for smoother pull feedback)
+    const extentStep = 10.0;
+    final extentStepChanged =
+        ((newExtent / extentStep).floor() !=
+            (_refreshIndicatorExtent / extentStep).floor());
+    final shouldUpdate =
+        directionChanged ||
+        newRefreshing != _isRefreshing ||
+        (pixels >= 0 && _refreshIndicatorExtent > 0) ||
+        extentStepChanged;
+    if (shouldUpdate) {
       setState(() {
-        _refreshIndicatorExtent = _scrollController.position.pixels.abs().clamp(
-          0.0,
-          60.0,
-        );
+        _isRefreshing = newRefreshing;
+        _refreshIndicatorExtent = newExtent;
       });
     }
   }
@@ -335,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     try {
       final shops = await _shopService.getAllShops();
-      await Future.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
       setState(() {
         _shops = shops;
         if (_searchQuery.isEmpty && !_isFiltered()) {
@@ -353,16 +349,17 @@ class _HomeScreenState extends State<HomeScreen>
           _sortShopsByDistance();
         }
       });
-      ErrorHandler.showSuccess(context, 'Shop list refreshed');
+      ErrorHandler.showSuccess(context, 'shop_list_refreshed'.tr(context));
     } catch (e) {
       appLog('Error loading shops: $e');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
       ErrorHandler.handleError(
         context,
         e,
-        customMessage: 'Failed to refresh. Please try again.',
+        customMessage: 'failed_to_refresh'.tr(context),
         onRetry: _loadShops,
       );
     }
@@ -379,8 +376,7 @@ class _HomeScreenState extends State<HomeScreen>
       } else {
         // Apply search on current filtered list if we have a filter,
         // otherwise search the entire list
-        final baseList =
-            _isFiltered() && _searchQuery.isEmpty ? _filteredShops : _shops;
+        final baseList = _isFiltered() ? _filteredShops : _shops;
 
         // Use advanced search service for fuzzy search
         _filteredShops = ServiceManager().advancedSearchService.fuzzySearch(
@@ -412,8 +408,8 @@ class _HomeScreenState extends State<HomeScreen>
               child: Stack(
                 children: [
                   if (_isLoading)
-                    const PerformanceLoadingWidget(
-                      message: 'Loading shops and services...',
+                    PerformanceLoadingWidget(
+                      message: 'loading_shops_services'.tr(context),
                       size: 60,
                     )
                   else
@@ -452,16 +448,16 @@ class _HomeScreenState extends State<HomeScreen>
                   } else {
                     // Show login prompt
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please login to add a shop'),
-                        duration: Duration(seconds: 2),
+                      SnackBar(
+                        content: Text('please_login_to_add_shop'.tr(context)),
+                        duration: const Duration(seconds: 2),
                       ),
                     );
                   }
                 },
                 backgroundColor: AppConstants.primaryColor,
                 child: const Icon(Icons.add, color: Colors.white),
-                tooltip: 'Add New Shop',
+                tooltip: 'add_new_shop_tooltip'.tr(context),
               );
             },
           ),
@@ -486,6 +482,7 @@ class _HomeScreenState extends State<HomeScreen>
       children: [
         // Main content
         CustomScrollView(
+          key: const PageStorageKey<String>('home_screen_scroll'),
           controller: _scrollController,
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
@@ -510,8 +507,8 @@ class _HomeScreenState extends State<HomeScreen>
                       if (_refreshIndicatorExtent > 20)
                         Text(
                           _refreshIndicatorExtent > 50
-                              ? 'Release to refresh'
-                              : 'Pull to refresh',
+                              ? 'release_to_refresh'.tr(context)
+                              : 'pull_to_refresh'.tr(context),
                           style: TextStyle(
                             color: AppConstants.primaryColor,
                             fontSize: 14,
@@ -525,101 +522,89 @@ class _HomeScreenState extends State<HomeScreen>
 
             SliverToBoxAdapter(
               child: Padding(
-                padding: ResponsiveSize.getScaledPadding(
-                  const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Logo and settings row
+                    // Clean header: logo + notification bell
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Logo on the left
                         SizedBox(
-                          height: ResponsiveSize.getHeight(5),
+                          height: 32,
                           child: Image.asset(
                             'assets/images/wwg.png',
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) {
                               return Container(
-                                height: ResponsiveSize.getHeight(5),
-                                width: ResponsiveSize.getHeight(5),
+                                height: 32,
+                                width: 32,
                                 decoration: BoxDecoration(
-                                  color: AppConstants.primaryColor.withOpacity(
-                                    0.2,
+                                  color: AppConstants.primaryColor.withValues(
+                                    alpha: 0.1,
                                   ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Center(
                                   child: FaIcon(
                                     FontAwesomeIcons.screwdriverWrench,
-                                    size: 20,
-                                    color: Colors.grey,
+                                    size: 16,
+                                    color: AppConstants.primaryColor,
                                   ),
                                 ),
                               );
                             },
                           ),
                         ),
-
-                        // Language dropdown and icons
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Language selector
-                            _buildSimpleLanguageSelector(),
-                            SizedBox(width: ResponsiveSize.getWidth(1)),
-                            // Feedback icon
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 32,
-                                minHeight: 32,
+                            GestureDetector(
+                              onTap: _isAuthenticated
+                                  ? null
+                                  : () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const LoginScreen(),
+                                        ),
+                                      ).then((_) {
+                                        if (mounted) _loadShops();
+                                      });
+                                    },
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: _isAuthenticated
+                                      ? AppConstants.primaryColor.withValues(alpha: 0.1)
+                                      : Colors.grey.shade100,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  _isAuthenticated ? Icons.person : Icons.person_outline,
+                                  size: 20,
+                                  color: _isAuthenticated
+                                      ? AppConstants.primaryColor
+                                      : Colors.grey.shade600,
+                                ),
                               ),
-                              icon: IconHelper.getSafeIcon(
-                                FontAwesomeIcons.comment,
-                                Icons.comment,
-                                color: AppConstants.primaryColor,
-                                size: 16,
-                              ),
-                              onPressed: () {
-                                _launchFeedbackForm();
-                              },
                             ),
-                            // Settings icon
-                            IconButton(
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 32,
-                                minHeight: 32,
-                              ),
-                              icon: IconHelper.getSafeIcon(
-                                FontAwesomeIcons.gear,
-                                Icons.settings,
-                                color: AppConstants.darkColor,
-                                size: 16,
-                              ),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => const SettingsScreen(),
-                                  ),
-                                );
+                            const SizedBox(width: 8),
+                            NotificationIcon(
+                              onTap: () {
+                                NotificationController().openSidebar();
                               },
+                              size: 18,
                             ),
                           ],
                         ),
                       ],
                     ),
-                    SizedBox(height: ResponsiveSize.getHeight(0.5)),
+                    const SizedBox(height: 24),
 
-                    // Add spacing above the homepage title
-                    SizedBox(height: ResponsiveSize.getHeight(4)),
+                    // Title
                     FadeTransition(
                       opacity: Tween<double>(begin: 0, end: 1).animate(
                         CurvedAnimation(
@@ -629,7 +614,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       child: SlideTransition(
                         position: Tween<Offset>(
-                          begin: const Offset(0, 0.2),
+                          begin: const Offset(0, 0.15),
                           end: Offset.zero,
                         ).animate(
                           CurvedAnimation(
@@ -643,17 +628,19 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                         child: Text(
                           'Find repair services nearby'.tr(context),
-                          style: TextStyle(
-                            fontSize: ResponsiveSize.getFontSize(24),
-                            fontWeight: FontWeight.bold,
+                          style: GoogleFonts.inter(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
                             color: AppConstants.darkColor,
+                            height: 1.15,
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(height: ResponsiveSize.getHeight(0.5)),
+                    const SizedBox(height: 32),
 
-                    // Subtitle with animations
+                    // Search bar
                     FadeTransition(
                       opacity: Tween<double>(begin: 0, end: 1).animate(
                         CurvedAnimation(
@@ -667,7 +654,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       child: SlideTransition(
                         position: Tween<Offset>(
-                          begin: const Offset(0, 0.2),
+                          begin: const Offset(0, 0.15),
                           end: Offset.zero,
                         ).animate(
                           CurvedAnimation(
@@ -679,20 +666,18 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                           ),
                         ),
-                        child: Text(
-                          'Expert repair services for all your needs'.tr(
-                            context,
-                          ),
-                          style: TextStyle(
-                            fontSize: ResponsiveSize.getFontSize(14),
-                            color: Colors.grey[700],
-                          ),
+                        child: AdvancedSearchBar(
+                          onSearch: _handleSearch,
+                          onSuggestionSelected: _handleSearch,
+                          searchService: ServiceManager().advancedSearchService,
+                          shops: _shops,
+                          hintText: 'search_shops_services'.tr(context),
                         ),
                       ),
                     ),
-                    SizedBox(height: ResponsiveSize.getHeight(2)),
+                    const SizedBox(height: 32),
 
-                    // Search bar with animations
+                    // Categories heading
                     FadeTransition(
                       opacity: Tween<double>(begin: 0, end: 1).animate(
                         CurvedAnimation(
@@ -704,55 +689,17 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ),
                       ),
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, 0.2),
-                          end: Offset.zero,
-                        ).animate(
-                          CurvedAnimation(
-                            parent: _animationController,
-                            curve: const Interval(
-                              0.3,
-                              0.8,
-                              curve: Curves.easeOut,
-                            ),
-                          ),
-                        ),
-                        child: AdvancedSearchBar(
-                          onSearch: _handleSearch,
-                          onSuggestionSelected: _handleSearch,
-                          searchService: ServiceManager().advancedSearchService,
-                          shops: _shops,
-                          hintText: 'Search shops, services, locations...'.tr(
-                            context,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: ResponsiveSize.getHeight(1)),
-
-                    // Categories heading
-                    FadeTransition(
-                      opacity: Tween<double>(begin: 0, end: 1).animate(
-                        CurvedAnimation(
-                          parent: _animationController,
-                          curve: const Interval(
-                            0.4,
-                            0.9,
-                            curve: Curves.easeOut,
-                          ),
-                        ),
-                      ),
                       child: Text(
                         'categories'.tr(context),
-                        style: GoogleFonts.montserrat(
-                          fontSize: ResponsiveSize.getFontSize(20),
-                          fontWeight: FontWeight.bold,
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
                           color: AppConstants.darkColor,
                         ),
                       ),
                     ),
-                    SizedBox(height: ResponsiveSize.getHeight(2)),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -767,12 +714,7 @@ class _HomeScreenState extends State<HomeScreen>
                     curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
                   ),
                 ),
-                child: SizedBox(
-                  height: ResponsiveSize.getHeight(
-                    10,
-                  ), // Reduced height for the categories section
-                  child: _buildCategoriesSection(),
-                ),
+                child: SizedBox(height: 48, child: _buildCategoriesSection()),
               ),
             ),
 
@@ -781,51 +723,43 @@ class _HomeScreenState extends State<HomeScreen>
 
             SliverToBoxAdapter(
               child: Padding(
-                padding: ResponsiveSize.getScaledPadding(
-                  const EdgeInsets.symmetric(horizontal: 16.0),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                padding: const EdgeInsets.fromLTRB(20, 32, 20, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Recommended shops heading with clear filter button
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _isFiltered()
-                              ? 'filtered_results'.tr(context)
-                              : (_searchQuery.isEmpty
-                                  ? (_userPosition != null
-                                      ? 'Shops near you'
-                                      : 'recommended_shops'.tr(context))
-                                  : 'search_results'.tr(context)),
-                          style: GoogleFonts.montserrat(
-                            fontSize: ResponsiveSize.getFontSize(20),
-                            fontWeight: FontWeight.bold,
-                            color: AppConstants.darkColor,
-                          ),
+                    Expanded(
+                      child: Text(
+                        _isFiltered()
+                            ? 'filtered_results'.tr(context)
+                            : (_searchQuery.isEmpty
+                                ? (_userPosition != null
+                                    ? 'shops_near_you'.tr(context)
+                                    : 'recommended_shops'.tr(context))
+                                : 'search_results'.tr(context)),
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: AppConstants.darkColor,
                         ),
-                        if (_isFiltered())
-                          TextButton.icon(
-                            onPressed: _clearFilters,
-                            icon: const Icon(Icons.clear, size: 16),
-                            label: Text('clear'.tr(context)),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppConstants.primaryColor,
-                              padding: ResponsiveSize.getScaledPadding(
-                                const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                              ),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
-                      ],
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
                     ),
-                    SizedBox(
-                      height: ResponsiveSize.getHeight(2),
-                    ), // Add spacing under heading
+                    if (_isFiltered())
+                      TextButton.icon(
+                        onPressed: _clearFilters,
+                        icon: const Icon(Icons.clear, size: 16),
+                        label: Text('clear'.tr(context)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppConstants.primaryColor,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -878,54 +812,49 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                   ),
                 )
-                : SliverGrid(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: _getMobileGridCrossAxisCount(),
-                    childAspectRatio: _getMobileGridAspectRatio(),
-                    crossAxisSpacing: 8, // Reduced spacing to prevent overflow
-                    mainAxisSpacing: 8, // Reduced spacing to prevent overflow
-                  ),
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final shop = _filteredShops[index];
-                    // Staggered animation for shop cards
-                    return AnimatedBuilder(
-                      animation: _animationController,
-                      builder: (context, child) {
-                        final delay = 0.6 + (index * 0.05);
-                        final animation = CurvedAnimation(
-                          parent: _animationController,
-                          curve: Interval(
-                            delay.clamp(0.0, 1.0),
-                            (delay + 0.4).clamp(0.0, 1.0),
-                            curve: Curves.easeOut,
-                          ),
-                        );
-
-                        return FadeTransition(
-                          opacity: Tween<double>(
-                            begin: 0,
-                            end: 1,
-                          ).animate(animation),
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 0.2),
-                              end: Offset.zero,
+                : SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final shop = _filteredShops[index];
+                      return AnimatedBuilder(
+                        animation: _animationController,
+                        builder: (context, child) {
+                          final delay = 0.5 + (index * 0.05);
+                          final animation = CurvedAnimation(
+                            parent: _animationController,
+                            curve: Interval(
+                              delay.clamp(0.0, 1.0),
+                              (delay + 0.4).clamp(0.0, 1.0),
+                              curve: Curves.easeOut,
+                            ),
+                          );
+                          return FadeTransition(
+                            opacity: Tween<double>(
+                              begin: 0,
+                              end: 1,
                             ).animate(animation),
-                            child: child,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, 0.1),
+                                end: Offset.zero,
+                              ).animate(animation),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: RepaintBoundary(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              bottom:
+                                  index < _filteredShops.length - 1 ? 16 : 0,
+                            ),
+                            child: _buildShopCard(shop),
                           ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          4,
-                          0,
-                          4,
-                          8,
-                        ), // Reduced padding for mobile
-                        child: _buildShopCard(shop),
-                      ),
-                    );
-                  }, childCount: _filteredShops.length),
+                        ),
+                      );
+                    }, childCount: _filteredShops.length),
+                  ),
                 ),
 
             // Add extra bottom padding for the navigation bar (increased to match new height)
@@ -936,33 +865,31 @@ class _HomeScreenState extends State<HomeScreen>
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
+                  horizontal: 20,
                   vertical: 8,
                 ),
-                child: Row(
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     ElevatedButton.icon(
                       onPressed: _getUserLocation,
-                      icon: Icon(Icons.my_location),
-                      label: Text('Find Nearby Shops'),
+                      icon: const Icon(Icons.my_location),
+                      label: Text('my_location'.tr(context)),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppConstants.primaryColor,
                       ),
                     ),
-                    if (_userDistrict != null) ...[
-                      SizedBox(width: 12),
+                    if (_userDistrict != null)
                       Text(
-                        'District: ${_userDistrict!}',
-                        style: TextStyle(fontWeight: FontWeight.w500),
+                        '${_userDistrict!}',
+                        style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
-                    ],
                     if (_locationPermissionDenied)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 12),
-                        child: Text(
-                          'Location permission denied',
-                          style: TextStyle(color: Colors.red),
-                        ),
+                      Text(
+                        'location_permission_required'.tr(context),
+                        style: const TextStyle(color: Colors.red, fontSize: 13),
                       ),
                   ],
                 ),
@@ -979,14 +906,13 @@ class _HomeScreenState extends State<HomeScreen>
 
     return ListView.builder(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       itemCount: categories.length,
       itemBuilder: (context, index) {
         final category = categories[index];
         return Padding(
           padding: EdgeInsets.only(
-            right: index == categories.length - 1 ? 16 : 12,
-            left: index == 0 ? 0 : 0,
+            right: index == categories.length - 1 ? 20 : 8,
           ),
           child: _buildCategoryCard(category),
         );
@@ -996,78 +922,60 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildCategoryCard(RepairCategory category) {
     final isSelected = _selectedCategoryId == category.id;
-    return GestureDetector(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+      borderRadius: BorderRadius.circular(20),
       onTap: () async {
         _showTemporaryLoadingOverlay();
         await Future.delayed(const Duration(milliseconds: 200));
+        if (!mounted) return;
         if (category.id == 'all') {
           _clearFilters();
           setState(() {
             _selectedCategoryId = 'all';
           });
         } else if (isSelected) {
-          // If already selected, deselect and show all
           _clearFilters();
           setState(() {
             _selectedCategoryId = 'all';
           });
         } else {
-          // Select the new category
           _filterShopsByCategory(category.id);
           setState(() {
             _selectedCategoryId = category.id;
           });
         }
       },
-      child: Container(
-        width: 64, // Fixed width to prevent overflow
-        child: Column(
-          mainAxisSize: MainAxisSize.min, // Add this to ensure minimum height
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? AppConstants.primaryColor : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 52, // Fixed width
-              height: 52, // Fixed height
-              decoration: BoxDecoration(
-                color: isSelected ? AppConstants.primaryColor : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    spreadRadius: 0,
-                  ),
-                ],
-                border: Border.all(
-                  color:
-                      isSelected
-                          ? AppConstants.primaryColor
-                          : AppConstants.primaryColor.withOpacity(0.3),
-                ),
-              ),
-              child: Icon(
-                _getCategoryIcon(category.id),
-                color: isSelected ? Colors.white : AppConstants.primaryColor,
-                size: 24, // Fixed size
-              ),
+            Icon(
+              _getCategoryIcon(category.id),
+              color: isSelected ? Colors.white : AppConstants.darkColor,
+              size: 16,
             ),
-            SizedBox(height: ResponsiveSize.getHeight(1)),
+            const SizedBox(width: 6),
             Text(
               category.getLocalizedName(context),
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-              style: GoogleFonts.montserrat(
-                fontSize: 12, // Fixed font size
+              style: TextStyle(
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color:
-                    isSelected
-                        ? AppConstants.primaryColor
-                        : AppConstants.darkColor,
+                color: isSelected ? Colors.white : AppConstants.darkColor,
               ),
             ),
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -1095,57 +1003,19 @@ class _HomeScreenState extends State<HomeScreen>
     return _selectedCategoryId != 'all' ? _selectedCategoryId : null;
   }
 
-  int _getMobileGridCrossAxisCount() {
-    // Always use single column for mobile to display one shop at a time
-    return 1;
-  }
-
-  double _getMobileGridAspectRatio() {
-    final crossAxisCount = _getMobileGridCrossAxisCount();
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    // Calculate available width
-    const double padding =
-        24; // Match the reduced padding from _getMobileGridCrossAxisCount
-    const double spacing = 8; // Match the reduced spacing from SliverGrid
-    double availableWidth = screenWidth - padding;
-    double cardWidth =
-        (availableWidth - (spacing * (crossAxisCount - 1))) / crossAxisCount;
-
-    // Increase target height to accommodate all content without overflow
-    double targetHeight;
-    if (screenWidth < 400) {
-      // Very small screens: Increase height significantly to prevent overflow
-      targetHeight = 320; // Image (120px) + Content (~180px) + Padding (~20px)
-    } else {
-      // Normal mobile screens: Generous height for all content
-      targetHeight = 380; // Image (150px) + Content (~210px) + Padding (~20px)
-    }
-
-    double aspectRatio = cardWidth / targetHeight;
-
-    // Since we're always using single column now, ensure reasonable aspect ratio
-    aspectRatio = aspectRatio.clamp(0.8, 1.2);
-
-    return aspectRatio;
-  }
-
   Widget _buildShopCard(RepairShop shop) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final containerWidth = constraints.maxWidth;
 
-        return Card(
-          margin: EdgeInsets.zero,
-          elevation: 2,
+        return Material(
+          color: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           child: InkWell(
             onTap: () async {
-              // Get the currently selected category
               final selectedCategory = _getSelectedCategory();
-
               final result = await Navigator.of(context).push(
                 MaterialPageRoute(
                   builder:
@@ -1155,8 +1025,7 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                 ),
               );
-
-              // Handle returning with category filter
+              if (!mounted) return;
               if (result is Map<String, dynamic> &&
                   result.containsKey('filterCategory')) {
                 final category = result['filterCategory'] as String;
@@ -1166,337 +1035,186 @@ class _HomeScreenState extends State<HomeScreen>
                 });
               }
             },
+            splashColor: AppConstants.primaryColor.withValues(alpha: 0.08),
+            highlightColor: AppConstants.primaryColor.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min, // Prevent overflow
-              children: [
-                // Shop image
-                Hero(
-                  tag: 'shop-image-${shop.id}',
-                  child: Container(
-                    height:
-                        containerWidth < 200
-                            ? 120
-                            : 150, // Smaller image on very small cards
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(16),
-                      ),
-                    ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Large image area
+                  Hero(
+                    tag: 'shop-image-${shop.id}',
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(16),
                       ),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // Image with fallback
-                          shop.photos.isNotEmpty
-                              ? getCachedImage(
-                                imageUrl: shop.photos.first,
-                                imageType: ImageType.shop,
-                                priority: MemoryPriority.normal,
-                                fit: BoxFit.cover,
-                                errorWidget: AssetHelpers.getShopPlaceholder(
-                                  shop.name,
-                                  containerWidth: containerWidth,
-                                  containerHeight: 150,
-                                ),
-                                placeholder: Container(
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      color: AppConstants.primaryColor,
+                      child: SizedBox(
+                        height: 180,
+                        width: double.infinity,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            shop.photos.isNotEmpty
+                                ? getCachedImage(
+                                  imageUrl: shop.photos.first,
+                                  imageType: ImageType.shop,
+                                  priority: MemoryPriority.normal,
+                                  fit: BoxFit.cover,
+                                  width: containerWidth,
+                                  height: 180,
+                                  errorWidget: AssetHelpers.getShopPlaceholder(
+                                    shop.name,
+                                    containerWidth: containerWidth,
+                                    containerHeight: 180,
+                                  ),
+                                  placeholder: Container(
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: CircularProgressIndicator(
+                                        color: AppConstants.primaryColor,
+                                        strokeWidth: 2,
+                                      ),
                                     ),
                                   ),
+                                )
+                                : AssetHelpers.getShopPlaceholder(
+                                  shop.name,
+                                  containerWidth: containerWidth,
+                                  containerHeight: 180,
                                 ),
-                              )
-                              : AssetHelpers.getShopPlaceholder(
-                                shop.name,
-                                containerWidth: containerWidth,
-                                containerHeight: 150,
-                              ),
-
-                          // Gradient overlay for better visibility
-                          Positioned(
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            height: 50,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Colors.black.withOpacity(0.3),
-                                  ],
+                            Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              height: 60,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withValues(alpha: 0.35),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                // Shop details
-                Flexible(
-                  // Make this section flexible
-                  child: Padding(
-                    padding: EdgeInsets.all(
-                      containerWidth < 200
-                          ? 8
-                          : (containerWidth < 300 ? 10 : 16),
-                    ), // More responsive padding
+                  // Content area
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min, // Prevent overflow
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Name and rating row
+                        // Name + inline rating
                         Row(
                           children: [
                             Expanded(
-                              flex: 3, // Give more space to the name
                               child: Text(
                                 shop.name,
-                                style: GoogleFonts.montserrat(
-                                  fontSize:
-                                      ResponsiveSize.getResponsiveFontSize(
-                                        18,
-                                        containerWidth,
-                                      ),
-                                  fontWeight: FontWeight.bold,
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.3,
                                   color: AppConstants.darkColor,
-                                  letterSpacing: 0.1,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            Flexible(
-                              // Make rating section flexible
-                              flex: 1,
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.star,
-                                    color: Colors.amber,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    shop.rating.toStringAsFixed(1),
-                                    style: GoogleFonts.montserrat(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize:
-                                          ResponsiveSize.getResponsiveFontSize(
-                                            14,
-                                            containerWidth,
-                                          ),
-                                      color: AppConstants.darkColor,
-                                    ),
-                                  ),
-                                  if (shop.reviewCount > 0) ...[
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '(${shop.reviewCount})',
-                                      style: GoogleFonts.montserrat(
-                                        fontSize:
-                                            ResponsiveSize.getResponsiveFontSize(
-                                              13,
-                                              containerWidth,
-                                            ),
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                  ],
-                                ],
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.star_rounded,
+                              color: AppConstants.primaryColor,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              shop.rating.toStringAsFixed(1),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppConstants.primaryColor,
                               ),
                             ),
+                            if (shop.reviewCount > 0) ...[
+                              const SizedBox(width: 3),
+                              Text(
+                                '(${shop.reviewCount})',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                        SizedBox(
-                          height: containerWidth < 200 ? 4 : 6,
-                        ), // Responsive spacing
-                        // Categories under name
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children:
-                              shop.categories.map((category) {
-                                return Container(
-                                  padding: ResponsiveSize.getScaledPadding(
-                                    const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppConstants.primaryColor
-                                        .withOpacity(0.13),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Text(
-                                    'category_${category.toLowerCase()}'.tr(
-                                      context,
-                                    ),
-                                    style: GoogleFonts.montserrat(
-                                      fontSize:
-                                          ResponsiveSize.getResponsiveFontSize(
-                                            12,
-                                            containerWidth,
-                                          ),
-                                      fontWeight: FontWeight.w500,
-                                      color: AppConstants.primaryColor,
-                                      letterSpacing: 0.1,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                        ),
-                        SizedBox(
-                          height: containerWidth < 200 ? 6 : 10,
-                        ), // Responsive spacing
-                        // Subservices available
-                        Builder(
-                          builder: (context) {
-                            final subServiceNames = <String>[];
-                            shop.subServices.forEach((cat, subs) {
-                              subServiceNames.addAll(
-                                subs.map(
-                                  (id) => RepairSubService(
-                                    categoryId: cat,
-                                    id: id,
-                                    name: '',
-                                    description: '',
-                                  ).getLocalizedName(context),
-                                ),
-                              );
-                            });
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(
-                                  Icons.build,
-                                  color: Colors.grey,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    subServiceNames.isNotEmpty
-                                        ? subServiceNames.take(3).join(', ') +
-                                            (subServiceNames.length > 3
-                                                ? '...'
-                                                : '')
-                                        : 'no_subservices'.tr(context),
-                                    style: GoogleFonts.montserrat(
-                                      fontSize:
-                                          ResponsiveSize.getResponsiveFontSize(
-                                            13,
-                                            containerWidth,
-                                          ),
-                                      color: Colors.grey[800],
-                                      fontWeight: FontWeight.w500,
-                                      letterSpacing: 0.1,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        SizedBox(
-                          height: containerWidth < 200 ? 4 : 8,
-                        ), // Responsive spacing
-                        // Address
+                        const SizedBox(height: 4),
+
+                        // Category as subtle grey text
+                        if (shop.categories.isNotEmpty)
+                          Text(
+                            shop.categories
+                                .map(
+                                  (c) =>
+                                      'category_${c.toLowerCase()}'.tr(context),
+                                )
+                                .join(' · '),
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: Colors.grey[500],
+                              fontWeight: FontWeight.w400,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        const SizedBox(height: 6),
+
+                        // Address with pin icon
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(
-                              Icons.location_on,
-                              color: Colors.grey,
-                              size: 16,
+                            Icon(
+                              Icons.location_on_outlined,
+                              color: Colors.grey[400],
+                              size: 15,
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 3),
                             Expanded(
                               child: Text(
                                 shop.address,
-                                style: GoogleFonts.montserrat(
-                                  fontSize:
-                                      ResponsiveSize.getResponsiveFontSize(
-                                        14,
-                                        containerWidth,
-                                      ),
-                                  color: Colors.grey[700],
-                                  letterSpacing: 0.1,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: Colors.grey[500],
+                                  height: 1.3,
                                 ),
-                                maxLines: 2,
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(
-                          height: containerWidth < 200 ? 8 : 16,
-                        ), // Responsive spacing
-                        // View Details button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              final selectedCategory = _getSelectedCategory();
-                              final result = await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) => ShopDetailScreen(
-                                        shopId: shop.id,
-                                        selectedCategory: selectedCategory,
-                                      ),
-                                ),
-                              );
-                              if (result is Map<String, dynamic> &&
-                                  result.containsKey('filterCategory')) {
-                                final category =
-                                    result['filterCategory'] as String;
-                                _filterShopsByCategory(category);
-                                setState(() {
-                                  _selectedCategoryId = category;
-                                });
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppConstants.primaryColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              elevation: 0,
-                            ),
-                            child: Text(
-                              'view_details'.tr(context),
-                              style: GoogleFonts.montserrat(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                fontSize: ResponsiveSize.getResponsiveFontSize(
-                                  15,
-                                  containerWidth,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -1527,9 +1245,9 @@ class _HomeScreenState extends State<HomeScreen>
           }).toList();
     });
 
-    // Scroll to the top to show filtered results
     if (_filteredShops.isNotEmpty) {
       Future.delayed(const Duration(milliseconds: 100), () {
+        if (!mounted) return;
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
             0,
@@ -1555,112 +1273,7 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  Widget _buildSimpleLanguageSelector() {
-    // Hide language selector for admin deployments
-    if (WebConfig.isAdminOnlyDeployment) {
-      return const SizedBox.shrink();
-    }
-
-    return InkWell(
-      onTap: () {
-        // Toggle between languages
-        final newLang = _currentLanguage == 'en' ? 'th' : 'en';
-        _changeLanguage(newLang);
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade300, width: 1),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _currentLanguage == 'en' ? 'English' : 'ไทย',
-              style: GoogleFonts.montserrat(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppConstants.primaryColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _changeLanguage(String languageCode) async {
-    // Set the new language
-    await AppLocalizationsService.setLocale(languageCode);
-
-    setState(() {
-      _currentLanguage = languageCode;
-    });
-
-    // Show a short confirmation message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            languageCode == 'en'
-                ? 'Language changed to English'
-                : 'เปลี่ยนภาษาเป็นภาษาไทย',
-          ),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppConstants.primaryColor,
-        ),
-      );
-    }
-
-    // Refresh the page if running on web
-    if (kIsWeb) {
-      html.window.location.reload();
-    }
-  }
-
-  void _launchFeedbackForm() async {
-    final Uri url = Uri.parse(
-      'https://docs.google.com/forms/d/e/1FAIpQLScIEoSedtD3w-cvMDp6U4h_pe2aIUpWaE4tpf14maPhZUTlRQ/viewform?usp=pp_url',
-    );
-
-    try {
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        // If unable to launch URL, show error message
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Could not open feedback form. Please try again later.',
-              ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      // Handle any exceptions
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
-  // Add this new method to build sub-services section
+  // Sub-services section
   Widget _buildSubServicesSection() {
     if (_selectedCategoryId == 'all') return const SizedBox.shrink();
 
@@ -1672,86 +1285,75 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (selectedCategory.subServices.isEmpty) return const SizedBox.shrink();
 
-    return Stack(
-      children: [
-        Container(
-          margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'available_subservices_label'.tr(context),
-                style: GoogleFonts.montserrat(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppConstants.darkColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children:
-                    selectedCategory.subServices.map((subService) {
-                      final isSelected = _selectedSubServiceId == subService.id;
-                      return InkWell(
-                        onTap: () async {
-                          _showTemporaryLoadingOverlay();
-                          await Future.delayed(
-                            const Duration(milliseconds: 200),
-                          );
-                          setState(() {
-                            _selectedSubServiceId =
-                                isSelected ? null : subService.id;
-                          });
-                          _filterShopsBySubService(subService.id);
-                        },
-                        child: Container(
-                          padding: ResponsiveSize.getScaledPadding(
-                            const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                isSelected
-                                    ? AppConstants.primaryColor
-                                    : Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color:
-                                  isSelected
-                                      ? AppConstants.primaryColor
-                                      : AppConstants.primaryColor.withOpacity(
-                                        0.3,
-                                      ),
-                            ),
-                          ),
-                          child: Text(
-                            RepairSubService(
-                              categoryId: selectedCategory.id,
-                              id: subService.id,
-                              name: '',
-                              description: '',
-                            ).getLocalizedName(context),
-                            style: GoogleFonts.montserrat(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color:
-                                  isSelected
-                                      ? Colors.white
-                                      : AppConstants.darkColor,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-              ),
-            ],
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'available_subservices_label'.tr(context),
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppConstants.darkColor,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children:
+                selectedCategory.subServices.map((subService) {
+                  final isSelected = _selectedSubServiceId == subService.id;
+                  return Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () async {
+                      _showTemporaryLoadingOverlay();
+                      await Future.delayed(const Duration(milliseconds: 200));
+                      if (!mounted) return;
+                      setState(() {
+                        _selectedSubServiceId =
+                            isSelected ? null : subService.id;
+                      });
+                      _filterShopsBySubService(subService.id);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color:
+                            isSelected
+                                ? AppConstants.primaryColor
+                                : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        RepairSubService(
+                          categoryId: selectedCategory.id,
+                          id: subService.id,
+                          name: '',
+                          description: '',
+                        ).getLocalizedName(context),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color:
+                              isSelected
+                                  ? Colors.white
+                                  : AppConstants.darkColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                  );
+                }).toList(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1765,9 +1367,9 @@ class _HomeScreenState extends State<HomeScreen>
           }).toList();
     });
 
-    // Scroll to the top to show filtered results
     if (_filteredShops.isNotEmpty) {
       Future.delayed(const Duration(milliseconds: 100), () {
+        if (!mounted) return;
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
             0,
@@ -1800,15 +1402,17 @@ class _HomeScreenState extends State<HomeScreen>
       appLog(
         'Location request timed out after 10 seconds - showing shop list anyway',
       );
+      if (!mounted) return;
       setState(() {
         _locationPermissionDenied = true;
-        _userDistrict = 'Location timeout - showing all shops';
+        _userDistrict = 'location_timeout_showing_all'.tr(context);
       });
     } catch (e) {
       appLog('Error getting location: $e');
+      if (!mounted) return;
       setState(() {
         _locationPermissionDenied = true;
-        _userDistrict = 'Location unavailable - showing all shops';
+        _userDistrict = 'location_unavailable_showing_all'.tr(context);
       });
     }
   }
@@ -1817,6 +1421,7 @@ class _HomeScreenState extends State<HomeScreen>
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
+        if (!mounted) return;
         setState(() {
           _locationPermissionDenied = true;
         });
@@ -1826,6 +1431,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
+          if (!mounted) return;
           setState(() {
             _locationPermissionDenied = true;
           });
@@ -1833,12 +1439,14 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
       if (permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
         setState(() {
           _locationPermissionDenied = true;
         });
         return;
       }
       final position = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
       setState(() {
         _userPosition = position;
       });
@@ -1848,12 +1456,14 @@ class _HomeScreenState extends State<HomeScreen>
         position.longitude,
       );
       if (placemarks.isNotEmpty) {
+        if (!mounted) return;
         setState(() {
           _userDistrict = placemarks.first.subAdministrativeArea;
         });
       }
       _sortShopsByDistance();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _locationPermissionDenied = true;
       });

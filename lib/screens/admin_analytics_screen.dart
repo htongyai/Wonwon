@@ -1,3 +1,4 @@
+import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -5,7 +6,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/widgets/optimized_screen.dart';
 import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:wonwonw2/screens/activity_log_screen.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/widgets/admin/analytics/registration_trend_chart.dart';
+import 'package:wonwonw2/widgets/admin/analytics/category_chart.dart';
+import 'package:wonwonw2/widgets/admin/analytics/approval_status_chart.dart';
+import 'package:wonwonw2/widgets/admin/analytics/engagement_chart.dart';
+import 'package:wonwonw2/widgets/admin/analytics/rating_distribution_chart.dart';
+import 'package:wonwonw2/widgets/admin/analytics/area_distribution_chart.dart';
+import 'package:wonwonw2/widgets/admin/analytics/metric_card.dart';
+import 'package:wonwonw2/widgets/admin/analytics/top_shops_section.dart';
+import 'package:wonwonw2/widgets/admin/analytics/category_performance_section.dart';
 
 class AdminAnalyticsScreen extends OptimizedScreen {
   const AdminAnalyticsScreen({Key? key}) : super(key: key);
@@ -29,7 +40,7 @@ class _AdminAnalyticsScreenState
   }
 
   Future<void> _loadAnalyticsData() async {
-    setLoading(true, message: 'Loading analytics data...');
+    setLoading(true, message: 'loading_analytics'.tr(context));
 
     try {
       final data = await _fetchAnalyticsData();
@@ -440,33 +451,33 @@ class _AdminAnalyticsScreenState
   Widget _buildKeyMetrics() {
     final metrics = [
       AnalyticsMetric(
-        title: 'Total Shops',
+        title: 'total_shops'.tr(context),
         value: _analyticsData['totalShops']?.toString() ?? '0',
-        subtitle: '${_analyticsData['approvedShops'] ?? 0} approved',
+        subtitle: 'n_approved'.tr(context).replaceAll('{count}', '${_analyticsData['approvedShops'] ?? 0}'),
         icon: FontAwesomeIcons.store,
         color: const Color(0xFF3B82F6),
         trend: _calculateShopGrowthTrend(),
       ),
       AnalyticsMetric(
-        title: 'Active Users',
+        title: 'active_users'.tr(context),
         value: _analyticsData['activeUsers']?.toString() ?? '0',
-        subtitle: 'of ${_analyticsData['totalUsers'] ?? 0} total',
+        subtitle: 'of_n_total'.tr(context).replaceAll('{count}', '${_analyticsData['totalUsers'] ?? 0}'),
         icon: FontAwesomeIcons.users,
         color: const Color(0xFF10B981),
         trend: _calculateUserGrowthTrend(),
       ),
       AnalyticsMetric(
-        title: 'Average Rating',
+        title: 'average_rating'.tr(context),
         value: (_analyticsData['averageRating'] ?? 0.0).toStringAsFixed(1),
-        subtitle: '${_analyticsData['totalReviews'] ?? 0} reviews',
+        subtitle: 'from_n_reviews'.tr(context).replaceAll('{count}', '${_analyticsData['totalReviews'] ?? 0}'),
         icon: FontAwesomeIcons.star,
         color: const Color(0xFFF59E0B),
         trend: 0.0,
       ),
       AnalyticsMetric(
-        title: 'Pending Shops',
+        title: 'pending_shops'.tr(context),
         value: _analyticsData['pendingShops']?.toString() ?? '0',
-        subtitle: 'awaiting approval',
+        subtitle: 'awaiting_approval'.tr(context),
         icon: FontAwesomeIcons.clock,
         color: const Color(0xFFEF4444),
         trend: 0.0,
@@ -486,7 +497,7 @@ class _AdminAnalyticsScreenState
           ),
           itemCount: metrics.length,
           itemBuilder:
-              (context, index) => _buildEnhancedMetricCard(metrics[index]),
+              (context, index) => MetricCard(metric: metrics[index]),
         ),
         const SizedBox(height: 32),
         _buildPerformanceInsights(),
@@ -528,1444 +539,88 @@ class _AdminAnalyticsScreenState
     return ((recent - older) / older * 100);
   }
 
-  Widget _buildEnhancedMetricCard(AnalyticsMetric metric) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: metric.color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Center(
-                  child: FaIcon(metric.icon, color: metric.color, size: 20),
-                ),
-              ),
-              const Spacer(),
-              if (metric.trend != null && metric.trend != 0.0)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color:
-                        metric.trend! > 0
-                            ? const Color(0xFF10B981).withOpacity(0.1)
-                            : const Color(0xFFEF4444).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      FaIcon(
-                        metric.trend! > 0
-                            ? FontAwesomeIcons.arrowTrendUp
-                            : FontAwesomeIcons.arrowTrendDown,
-                        size: 12,
-                        color:
-                            metric.trend! > 0
-                                ? const Color(0xFF10B981)
-                                : const Color(0xFFEF4444),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${metric.trend!.abs().toStringAsFixed(1)}%',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color:
-                              metric.trend! > 0
-                                  ? const Color(0xFF10B981)
-                                  : const Color(0xFFEF4444),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            metric.value,
-            style: GoogleFonts.inter(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            metric.title,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF475569),
-            ),
-          ),
-          if (metric.subtitle != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              metric.subtitle!,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: const Color(0xFF64748B),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildPerformanceInsights() {
-    return Row(
-      children: [
-        Expanded(child: _buildTopPerformingShops()),
-        const SizedBox(width: 16),
-        Expanded(child: _buildCategoryPerformance()),
-      ],
-    );
-  }
-
-  Widget _buildTopPerformingShops() {
     final topShops = _analyticsData['topPerformingShops'] as List? ?? [];
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              FaIcon(
-                FontAwesomeIcons.trophy,
-                color: const Color(0xFFF59E0B),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Top Performing Shops',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          if (topShops.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(20),
-                child: Text('No performance data available'),
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: topShops.length > 5 ? 5 : topShops.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final shop = topShops[index].value as Map<String, dynamic>;
-                final shopId = topShops[index].key;
-                return InkWell(
-                  onTap: () => _showShopDetails(shopId, shop),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF3B82F6).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${index + 1}',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF3B82F6),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                shop['name'] ?? 'Unknown',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF1E293B),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                shop['category'] ?? 'Unknown',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const FaIcon(
-                                  FontAwesomeIcons.star,
-                                  size: 12,
-                                  color: Color(0xFFF59E0B),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  (shop['rating'] as double).toStringAsFixed(1),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1E293B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${shop['reviewCount']} reviews',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: const Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.arrow_forward_ios,
-                          size: 12,
-                          color: Color(0xFF64748B),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryPerformance() {
     final categoryPerformance =
         _analyticsData['categoryPerformance']
             as Map<String, Map<String, dynamic>>? ??
         {};
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return Row(
+      children: [
+        Expanded(
+          child: TopShopsSection(
+            topShops: topShops,
+            onShopTap: _showShopDetails,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              FaIcon(
-                FontAwesomeIcons.chartBar,
-                color: const Color(0xFF10B981),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Category Performance',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-            ],
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: CategoryPerformanceSection(
+            categoryPerformance: categoryPerformance,
+            onCategoryTap: _showCategoryPerformanceDetails,
           ),
-          const SizedBox(height: 20),
-          if (categoryPerformance.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(20),
-                child: Text('No category data available'),
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: categoryPerformance.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                final entry = categoryPerformance.entries.elementAt(index);
-                final category = entry.key;
-                final data = entry.value;
-                final avgRating = data['averageRating'] as double;
-                final totalReviews = data['totalReviews'] as int;
-                final shopCount = data['shopCount'] as int;
-
-                return InkWell(
-                  onTap: () => _showCategoryPerformanceDetails(category, data),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                category,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF1E293B),
-                                ),
-                              ),
-                            ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const FaIcon(
-                                  FontAwesomeIcons.star,
-                                  size: 12,
-                                  color: Color(0xFFF59E0B),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  avgRating.toStringAsFixed(1),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1E293B),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 12,
-                                  color: Color(0xFF64748B),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Text(
-                              '$shopCount shops',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: const Color(0xFF64748B),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Text(
-                              '$totalReviews reviews',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: const Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
   Widget _buildChartsSection() {
     return Column(
       children: [
-        // Enhanced trend chart
-        _buildEnhancedRegistrationTrendChart(),
+        RegistrationTrendChart(
+          shopTrend: _analyticsData['shopRegistrationTrend'] as Map<DateTime, int>? ?? {},
+          userTrend: _analyticsData['userRegistrationTrend'] as Map<DateTime, int>? ?? {},
+        ),
         const SizedBox(height: 24),
 
-        // Shop analytics row
         Row(
           children: [
-            Expanded(child: _buildEnhancedShopCategoryChart()),
+            Expanded(
+              child: ShopCategoryChart(
+                data: _analyticsData['shopsByCategory'] as Map<String, int>? ?? {},
+                onCategoryTap: _showCategoryDetails,
+              ),
+            ),
             const SizedBox(width: 16),
-            Expanded(child: _buildShopApprovalStatusChart()),
+            Expanded(
+              child: ApprovalStatusChart(
+                approvedShops: _analyticsData['approvedShops'] ?? 0,
+                pendingShops: _analyticsData['pendingShops'] ?? 0,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 24),
 
-        // User and review analytics row
         Row(
           children: [
-            Expanded(child: _buildUserEngagementChart()),
+            Expanded(
+              child: UserEngagementChart(
+                activeUsers: _analyticsData['activeUsers'] ?? 0,
+                totalUsers: _analyticsData['totalUsers'] ?? 0,
+              ),
+            ),
             const SizedBox(width: 16),
-            Expanded(child: _buildEnhancedRatingDistributionChart()),
+            Expanded(
+              child: RatingDistributionChart(
+                data: _analyticsData['ratingDistribution'] as Map<int, int>? ?? {},
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 24),
 
-        // Area distribution chart
-        _buildShopAreaDistributionChart(),
+        AreaDistributionChart(
+          data: _analyticsData['shopsByArea'] as Map<String, int>? ?? {},
+        ),
         const SizedBox(height: 24),
 
-        // User activity section
         _buildUserActivitySection(),
         const SizedBox(height: 24),
 
-        // Top engaged shops section
         _buildTopEngagedShopsSection(),
       ],
-    );
-  }
-
-  Widget _buildEnhancedRegistrationTrendChart() {
-    final shopTrend =
-        _analyticsData['shopRegistrationTrend'] as Map<DateTime, int>? ?? {};
-    final userTrend =
-        _analyticsData['userRegistrationTrend'] as Map<DateTime, int>? ?? {};
-
-    return Container(
-      height: 400,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              FaIcon(
-                FontAwesomeIcons.chartLine,
-                color: const Color(0xFF3B82F6),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Growth Trends',
-                style: GoogleFonts.inter(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-              const Spacer(),
-              Row(
-                children: [
-                  _buildLegendItem('Shops', const Color(0xFF3B82F6)),
-                  const SizedBox(width: 16),
-                  _buildLegendItem('Users', const Color(0xFF10B981)),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child:
-                shopTrend.isEmpty && userTrend.isEmpty
-                    ? const Center(child: Text('No trend data available'))
-                    : LineChart(
-                      LineChartData(
-                        gridData: FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
-                          horizontalInterval: 1,
-                          getDrawingHorizontalLine: (value) {
-                            return FlLine(
-                              color: const Color(0xFFE2E8F0),
-                              strokeWidth: 1,
-                            );
-                          },
-                        ),
-                        titlesData: FlTitlesData(
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 32,
-                              getTitlesWidget: (value, meta) {
-                                final date =
-                                    DateTime.fromMillisecondsSinceEpoch(
-                                      value.toInt(),
-                                    );
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Text(
-                                    DateFormat('MM/dd').format(date),
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              reservedSize: 40,
-                              getTitlesWidget: (value, meta) {
-                                return Text(
-                                  value.toInt().toString(),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    color: const Color(0xFF64748B),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          topTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          rightTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                        ),
-                        borderData: FlBorderData(show: false),
-                        lineBarsData: [
-                          if (shopTrend.isNotEmpty)
-                            LineChartBarData(
-                              spots:
-                                  shopTrend.entries.map((entry) {
-                                    return FlSpot(
-                                      entry.key.millisecondsSinceEpoch
-                                          .toDouble(),
-                                      entry.value.toDouble(),
-                                    );
-                                  }).toList(),
-                              isCurved: true,
-                              color: const Color(0xFF3B82F6),
-                              barWidth: 3,
-                              dotData: FlDotData(
-                                show: true,
-                                getDotPainter: (spot, percent, barData, index) {
-                                  return FlDotCirclePainter(
-                                    radius: 4,
-                                    color: const Color(0xFF3B82F6),
-                                    strokeWidth: 2,
-                                    strokeColor: Colors.white,
-                                  );
-                                },
-                              ),
-                              belowBarData: BarAreaData(
-                                show: true,
-                                color: const Color(0xFF3B82F6).withOpacity(0.1),
-                              ),
-                            ),
-                          if (userTrend.isNotEmpty)
-                            LineChartBarData(
-                              spots:
-                                  userTrend.entries.map((entry) {
-                                    return FlSpot(
-                                      entry.key.millisecondsSinceEpoch
-                                          .toDouble(),
-                                      entry.value.toDouble(),
-                                    );
-                                  }).toList(),
-                              isCurved: true,
-                              color: const Color(0xFF10B981),
-                              barWidth: 3,
-                              dotData: FlDotData(
-                                show: true,
-                                getDotPainter: (spot, percent, barData, index) {
-                                  return FlDotCirclePainter(
-                                    radius: 4,
-                                    color: const Color(0xFF10B981),
-                                    strokeWidth: 2,
-                                    strokeColor: Colors.white,
-                                  );
-                                },
-                              ),
-                              belowBarData: BarAreaData(
-                                show: true,
-                                color: const Color(0xFF10B981).withOpacity(0.1),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLegendItem(String label, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            color: const Color(0xFF64748B),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEnhancedShopCategoryChart() {
-    final data = _analyticsData['shopsByCategory'] as Map<String, int>? ?? {};
-
-    return Container(
-      height: 350,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              FaIcon(
-                FontAwesomeIcons.tags,
-                color: const Color(0xFF8B5CF6),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Shop Categories',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child:
-                data.isEmpty
-                    ? const Center(child: Text('No category data available'))
-                    : Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: PieChart(
-                            PieChartData(
-                              sectionsSpace: 2,
-                              centerSpaceRadius: 40,
-                              sections:
-                                  data.entries.map((entry) {
-                                    final index = data.keys.toList().indexOf(
-                                      entry.key,
-                                    );
-                                    final colors = [
-                                      const Color(0xFF3B82F6),
-                                      const Color(0xFF10B981),
-                                      const Color(0xFFF59E0B),
-                                      const Color(0xFFEF4444),
-                                      const Color(0xFF8B5CF6),
-                                      const Color(0xFF06B6D4),
-                                    ];
-                                    final total = data.values.fold(
-                                      0,
-                                      (a, b) => a + b,
-                                    );
-                                    final percentage =
-                                        (entry.value / total * 100);
-
-                                    return PieChartSectionData(
-                                      value: entry.value.toDouble(),
-                                      title:
-                                          '${percentage.toStringAsFixed(1)}%',
-                                      color: colors[index % colors.length],
-                                      radius: 60,
-                                      titleStyle: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    );
-                                  }).toList(),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          flex: 1,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children:
-                                data.entries.map((entry) {
-                                  final index = data.keys.toList().indexOf(
-                                    entry.key,
-                                  );
-                                  final colors = [
-                                    const Color(0xFF3B82F6),
-                                    const Color(0xFF10B981),
-                                    const Color(0xFFF59E0B),
-                                    const Color(0xFFEF4444),
-                                    const Color(0xFF8B5CF6),
-                                    const Color(0xFF06B6D4),
-                                  ];
-
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: InkWell(
-                                      onTap:
-                                          () => _showCategoryDetails(
-                                            entry.key,
-                                            entry.value,
-                                          ),
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.transparent,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              width: 12,
-                                              height: 12,
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    colors[index %
-                                                        colors.length],
-                                                borderRadius:
-                                                    BorderRadius.circular(2),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    entry.key,
-                                                    style: GoogleFonts.inter(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                      color: const Color(
-                                                        0xFF1E293B,
-                                                      ),
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                  Text(
-                                                    '${entry.value} shops',
-                                                    style: GoogleFonts.inter(
-                                                      fontSize: 11,
-                                                      color: const Color(
-                                                        0xFF64748B,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            const Icon(
-                                              Icons.arrow_forward_ios,
-                                              size: 12,
-                                              color: Color(0xFF64748B),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                          ),
-                        ),
-                      ],
-                    ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShopApprovalStatusChart() {
-    final approvedShops = _analyticsData['approvedShops'] ?? 0;
-    final pendingShops = _analyticsData['pendingShops'] ?? 0;
-    final total = approvedShops + pendingShops;
-
-    return Container(
-      height: 350,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              FaIcon(
-                FontAwesomeIcons.checkCircle,
-                color: const Color(0xFF10B981),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Shop Approval Status',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child:
-                total == 0
-                    ? const Center(child: Text('No shop data available'))
-                    : Column(
-                      children: [
-                        Expanded(
-                          child: PieChart(
-                            PieChartData(
-                              sectionsSpace: 4,
-                              centerSpaceRadius: 50,
-                              sections: [
-                                PieChartSectionData(
-                                  value: approvedShops.toDouble(),
-                                  title:
-                                      '${(approvedShops / total * 100).toStringAsFixed(1)}%',
-                                  color: const Color(0xFF10B981),
-                                  radius: 80,
-                                  titleStyle: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                PieChartSectionData(
-                                  value: pendingShops.toDouble(),
-                                  title:
-                                      '${(pendingShops / total * 100).toStringAsFixed(1)}%',
-                                  color: const Color(0xFFF59E0B),
-                                  radius: 80,
-                                  titleStyle: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _buildStatusLegend(
-                              'Approved',
-                              approvedShops,
-                              const Color(0xFF10B981),
-                            ),
-                            _buildStatusLegend(
-                              'Pending',
-                              pendingShops,
-                              const Color(0xFFF59E0B),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusLegend(String label, int count, Color color) {
-    return Column(
-      children: [
-        Container(
-          width: 16,
-          height: 16,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: const Color(0xFF475569),
-          ),
-        ),
-        Text(
-          count.toString(),
-          style: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF1E293B),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUserEngagementChart() {
-    final activeUsers = _analyticsData['activeUsers'] ?? 0;
-    final totalUsers = _analyticsData['totalUsers'] ?? 0;
-    final inactiveUsers = totalUsers - activeUsers;
-
-    return Container(
-      height: 350,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              FaIcon(
-                FontAwesomeIcons.userCheck,
-                color: const Color(0xFF10B981),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'User Engagement',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child:
-                totalUsers == 0
-                    ? const Center(child: Text('No user data available'))
-                    : Column(
-                      children: [
-                        // Engagement rate display
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Engagement Rate: ',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  color: const Color(0xFF475569),
-                                ),
-                              ),
-                              Text(
-                                '${(activeUsers / totalUsers * 100).toStringAsFixed(1)}%',
-                                style: GoogleFonts.inter(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF10B981),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: _buildEngagementBar(
-                                  'Active',
-                                  activeUsers,
-                                  totalUsers,
-                                  const Color(0xFF10B981),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: _buildEngagementBar(
-                                  'Inactive',
-                                  inactiveUsers,
-                                  totalUsers,
-                                  const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEngagementBar(String label, int count, int total, Color color) {
-    final percentage = total > 0 ? count / total : 0.0;
-
-    return Column(
-      children: [
-        Expanded(
-          child: Container(
-            width: 40,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 800),
-                  width: 40,
-                  height: 120 * percentage,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: const Color(0xFF475569),
-          ),
-        ),
-        Text(
-          count.toString(),
-          style: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF1E293B),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildEnhancedRatingDistributionChart() {
-    final data = _analyticsData['ratingDistribution'] as Map<int, int>? ?? {};
-
-    return Container(
-      height: 350,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              FaIcon(
-                FontAwesomeIcons.star,
-                color: const Color(0xFFF59E0B),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Rating Distribution',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child:
-                data.isEmpty
-                    ? const Center(child: Text('No rating data available'))
-                    : BarChart(
-                      BarChartData(
-                        alignment: BarChartAlignment.spaceAround,
-                        maxY:
-                            data.values.isEmpty
-                                ? 10
-                                : data.values
-                                        .reduce((a, b) => a > b ? a : b)
-                                        .toDouble() *
-                                    1.2,
-                        barTouchData: BarTouchData(
-                          enabled: true,
-                          touchTooltipData: BarTouchTooltipData(
-                            getTooltipColor: (group) => const Color(0xFF1E293B),
-                            tooltipRoundedRadius: 8,
-                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                              return BarTooltipItem(
-                                '${rod.toY.toInt()} reviews',
-                                GoogleFonts.inter(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        titlesData: FlTitlesData(
-                          show: true,
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              getTitlesWidget: (value, meta) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: List.generate(value.toInt(), (
-                                      index,
-                                    ) {
-                                      return const FaIcon(
-                                        FontAwesomeIcons.star,
-                                        size: 8,
-                                        color: Color(0xFFF59E0B),
-                                      );
-                                    }),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          topTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          rightTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                        ),
-                        borderData: FlBorderData(show: false),
-                        barGroups:
-                            data.entries.map((entry) {
-                              return BarChartGroupData(
-                                x: entry.key,
-                                barRods: [
-                                  BarChartRodData(
-                                    toY: entry.value.toDouble(),
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        const Color(0xFFF59E0B),
-                                        const Color(
-                                          0xFFF59E0B,
-                                        ).withOpacity(0.7),
-                                      ],
-                                      begin: Alignment.bottomCenter,
-                                      end: Alignment.topCenter,
-                                    ),
-                                    width: 24,
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(4),
-                                      topRight: Radius.circular(4),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
-                      ),
-                    ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShopAreaDistributionChart() {
-    final data = _analyticsData['shopsByArea'] as Map<String, int>? ?? {};
-
-    return Container(
-      height: 300,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              FaIcon(
-                FontAwesomeIcons.mapLocationDot,
-                color: const Color(0xFF06B6D4),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Geographic Distribution',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1E293B),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child:
-                data.isEmpty
-                    ? const Center(child: Text('No area data available'))
-                    : BarChart(
-                      BarChartData(
-                        alignment: BarChartAlignment.spaceAround,
-                        maxY:
-                            data.values.isEmpty
-                                ? 10
-                                : data.values
-                                        .reduce((a, b) => a > b ? a : b)
-                                        .toDouble() *
-                                    1.2,
-                        barTouchData: BarTouchData(
-                          enabled: true,
-                          touchTooltipData: BarTouchTooltipData(
-                            getTooltipColor: (group) => const Color(0xFF1E293B),
-                            tooltipRoundedRadius: 8,
-                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                              final area = data.keys.elementAt(groupIndex);
-                              return BarTooltipItem(
-                                '$area\n${rod.toY.toInt()} shops',
-                                GoogleFonts.inter(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        titlesData: FlTitlesData(
-                          show: true,
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              getTitlesWidget: (value, meta) {
-                                final index = value.toInt();
-                                if (index >= 0 && index < data.keys.length) {
-                                  final area = data.keys.elementAt(index);
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Text(
-                                      area.length > 8
-                                          ? '${area.substring(0, 8)}...'
-                                          : area,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 10,
-                                        color: const Color(0xFF64748B),
-                                      ),
-                                    ),
-                                  );
-                                }
-                                return const SizedBox();
-                              },
-                            ),
-                          ),
-                          leftTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          topTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          rightTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                        ),
-                        borderData: FlBorderData(show: false),
-                        barGroups:
-                            data.entries.toList().asMap().entries.map((entry) {
-                              final index = entry.key;
-                              final dataEntry = entry.value;
-                              return BarChartGroupData(
-                                x: index,
-                                barRods: [
-                                  BarChartRodData(
-                                    toY: dataEntry.value.toDouble(),
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        const Color(0xFF06B6D4),
-                                        const Color(
-                                          0xFF06B6D4,
-                                        ).withOpacity(0.7),
-                                      ],
-                                      begin: Alignment.bottomCenter,
-                                      end: Alignment.topCenter,
-                                    ),
-                                    width: 20,
-                                    borderRadius: const BorderRadius.only(
-                                      topLeft: Radius.circular(4),
-                                      topRight: Radius.circular(4),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
-                      ),
-                    ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -2009,7 +664,7 @@ class _AdminAnalyticsScreenState
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -2044,14 +699,14 @@ class _AdminAnalyticsScreenState
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF06B6D4).withOpacity(0.1),
+                    color: const Color(0xFF06B6D4).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'View All',
+                        'view_all'.tr(context),
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -2072,10 +727,10 @@ class _AdminAnalyticsScreenState
           ),
           const SizedBox(height: 20),
           if (recentUsers.isEmpty)
-            const Center(
+            Center(
               child: Padding(
-                padding: EdgeInsets.all(40),
-                child: Text('No recent user activity'),
+                padding: const EdgeInsets.all(40),
+                child: Text('no_data_available'.tr(context)),
               ),
             )
           else
@@ -2106,7 +761,7 @@ class _AdminAnalyticsScreenState
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: _getUserStatusColor(user).withOpacity(0.1),
+                            color: _getUserStatusColor(user).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Center(
@@ -2161,10 +816,10 @@ class _AdminAnalyticsScreenState
                                     user['isActive']
                                         ? const Color(
                                           0xFF10B981,
-                                        ).withOpacity(0.1)
+                                        ).withValues(alpha: 0.1)
                                         : const Color(
                                           0xFF64748B,
-                                        ).withOpacity(0.1),
+                                        ).withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
@@ -2258,7 +913,7 @@ class _AdminAnalyticsScreenState
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -2311,10 +966,10 @@ class _AdminAnalyticsScreenState
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B).withOpacity(0.1),
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: const Color(0xFFF59E0B).withOpacity(0.3),
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -2327,7 +982,7 @@ class _AdminAnalyticsScreenState
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'View Activity Log',
+                      'view_activity_log'.tr(context),
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -2353,7 +1008,7 @@ class _AdminAnalyticsScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -2362,7 +1017,7 @@ class _AdminAnalyticsScreenState
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
@@ -2459,7 +1114,7 @@ class _AdminAnalyticsScreenState
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'All User Activity',
+                        'all_user_activity'.tr(context),
                         style: GoogleFonts.inter(
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
@@ -2524,7 +1179,7 @@ class _AdminAnalyticsScreenState
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: _getUserStatusColor(user).withOpacity(0.1),
+                    color: _getUserStatusColor(user).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Center(
@@ -2555,7 +1210,7 @@ class _AdminAnalyticsScreenState
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        user['email'] ?? 'No email',
+                        user['email'] ?? 'no_email'.tr(context),
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           color: const Color(0xFF64748B),
@@ -2570,7 +1225,7 @@ class _AdminAnalyticsScreenState
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: _getUserStatusColor(user).withOpacity(0.1),
+                              color: _getUserStatusColor(user).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -2591,10 +1246,10 @@ class _AdminAnalyticsScreenState
                             decoration: BoxDecoration(
                               color:
                                   user['isActive']
-                                      ? const Color(0xFF10B981).withOpacity(0.1)
+                                      ? const Color(0xFF10B981).withValues(alpha: 0.1)
                                       : const Color(
                                         0xFF64748B,
-                                      ).withOpacity(0.1),
+                                      ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -2679,7 +1334,7 @@ class _AdminAnalyticsScreenState
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: _getUserStatusColor(user).withOpacity(0.1),
+                        color: _getUserStatusColor(user).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: Center(
@@ -2709,7 +1364,7 @@ class _AdminAnalyticsScreenState
                             ),
                           ),
                           Text(
-                            user['email'] ?? 'No email',
+                            user['email'] ?? 'no_email'.tr(context),
                             style: GoogleFonts.inter(
                               fontSize: 14,
                               color: const Color(0xFF64748B),
@@ -2752,8 +1407,8 @@ class _AdminAnalyticsScreenState
                   decoration: BoxDecoration(
                     color:
                         user['isActive']
-                            ? const Color(0xFF10B981).withOpacity(0.1)
-                            : const Color(0xFF64748B).withOpacity(0.1),
+                            ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                            : const Color(0xFF64748B).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -2786,7 +1441,7 @@ class _AdminAnalyticsScreenState
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: _getUserStatusColor(user).withOpacity(0.1),
+                    color: _getUserStatusColor(user).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -2869,7 +1524,7 @@ class _AdminAnalyticsScreenState
 
   void _showActivityLogPage() {
     // Import will be added at the top of the file
-    Navigator.of(context).pushNamed('/activity-log');
+    Navigator.of(context).push(MaterialPageRoute(builder: (context) => const ActivityLogScreen()));
   }
 
   void _showCategoryDetails(String category, int shopCount) {
@@ -2897,7 +1552,7 @@ class _AdminAnalyticsScreenState
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        '$category Category Details',
+                        'category_details'.tr(context).replaceAll('{category}', category),
                         style: GoogleFonts.inter(
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
@@ -2943,7 +1598,7 @@ class _AdminAnalyticsScreenState
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -3042,10 +1697,10 @@ class _AdminAnalyticsScreenState
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF3B82F6).withOpacity(0.1),
+                            color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: const Color(0xFF3B82F6).withOpacity(0.3),
+                              color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
                             ),
                           ),
                           child: Row(
@@ -3085,10 +1740,10 @@ class _AdminAnalyticsScreenState
             ),
             const SizedBox(height: 12),
             if (categoryShops.isEmpty)
-              const Center(
+              Center(
                 child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Text('No shops found in this category'),
+                  padding: const EdgeInsets.all(40),
+                  child: Text('no_shops_in_category'.tr(context)),
                 ),
               )
             else
@@ -3218,7 +1873,7 @@ class _AdminAnalyticsScreenState
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        '$category Performance',
+                        'category_performance'.tr(context).replaceAll('{category}', category),
                         style: GoogleFonts.inter(
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
@@ -3256,7 +1911,7 @@ class _AdminAnalyticsScreenState
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -3297,7 +1952,7 @@ class _AdminAnalyticsScreenState
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6).withOpacity(0.1),
+                  color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -3327,7 +1982,7 @@ class _AdminAnalyticsScreenState
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -3456,7 +2111,7 @@ class _AdminAnalyticsScreenState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -3515,7 +2170,7 @@ class _AdminAnalyticsScreenState
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        shop['name'] ?? 'Unknown Shop',
+                        shop['name'] ?? 'unknown_shop'.tr(context),
                         style: GoogleFonts.inter(
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
@@ -3551,7 +2206,7 @@ class _AdminAnalyticsScreenState
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B).withOpacity(0.1),
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -3592,7 +2247,7 @@ class _AdminAnalyticsScreenState
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF3B82F6).withOpacity(0.1),
+                    color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -3641,11 +2296,11 @@ class _AdminAnalyticsScreenState
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildDetailRow('Category', shop['category'] ?? 'Unknown'),
-                _buildDetailRow('Area', shop['area'] ?? 'Unknown'),
+                _buildDetailRow('category_form_label'.tr(context), shop['category'] ?? 'unknown'.tr(context)),
+                _buildDetailRow('area_label'.tr(context), shop['area'] ?? 'unknown'.tr(context)),
                 _buildDetailRow(
-                  'Status',
-                  shop['approved'] ? 'Approved' : 'Pending',
+                  'status_label'.tr(context),
+                  shop['approved'] ? 'approved'.tr(context) : 'admin_pending'.tr(context),
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -3657,7 +2312,7 @@ class _AdminAnalyticsScreenState
                           // Navigate to shop management or edit
                         },
                         icon: const Icon(Icons.edit),
-                        label: const Text('Edit Shop'),
+                        label: Text('edit_shop_label'.tr(context)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF3B82F6),
                           foregroundColor: Colors.white,
@@ -3676,7 +2331,7 @@ class _AdminAnalyticsScreenState
                           // Navigate to shop detail screen
                         },
                         icon: const Icon(Icons.visibility),
-                        label: const Text('View Details'),
+                        label: Text('view_details'.tr(context)),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF3B82F6),
                           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -3775,7 +2430,7 @@ class _AdminAnalyticsScreenState
                         FaIcon(
                           FontAwesomeIcons.wrench,
                           size: 64,
-                          color: const Color(0xFF64748B).withOpacity(0.5),
+                          color: const Color(0xFF64748B).withValues(alpha: 0.5),
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -3809,7 +2464,7 @@ class _AdminAnalyticsScreenState
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          child: const Text('Close'),
+                          child: Text('close_button'.tr(context)),
                         ),
                       ],
                     ),
@@ -3865,7 +2520,7 @@ class _AdminAnalyticsScreenState
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -3879,7 +2534,7 @@ class _AdminAnalyticsScreenState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const FaIcon(
@@ -3904,10 +2559,10 @@ class _AdminAnalyticsScreenState
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withOpacity(0.3),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.3),
                   ),
                 ),
                 child: Text(
@@ -3941,7 +2596,7 @@ class _AdminAnalyticsScreenState
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'No engagement data available',
+                      'no_data_available'.tr(context),
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
@@ -4037,9 +2692,9 @@ class _AdminAnalyticsScreenState
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: getRankColor().withOpacity(0.1),
+                  color: getRankColor().withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: getRankColor().withOpacity(0.3)),
+                  border: Border.all(color: getRankColor().withValues(alpha: 0.3)),
                 ),
                 child: Center(
                   child: FaIcon(getRankIcon(), color: getRankColor(), size: 20),
@@ -4071,7 +2726,7 @@ class _AdminAnalyticsScreenState
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B).withOpacity(0.1),
+                              color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -4127,7 +2782,7 @@ class _AdminAnalyticsScreenState
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '$reviewCount reviews',
+                              'n_reviews_count'.tr(context).replaceAll('{count}', '$reviewCount'),
                               style: GoogleFonts.inter(
                                 fontSize: 14,
                                 color: const Color(0xFF64748B),
@@ -4148,7 +2803,7 @@ class _AdminAnalyticsScreenState
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '$recentReviews recent',
+                                'n_recent'.tr(context).replaceAll('{count}', '$recentReviews'),
                                 style: GoogleFonts.inter(
                                   fontSize: 14,
                                   color: const Color(0xFF10B981),
@@ -4169,7 +2824,7 @@ class _AdminAnalyticsScreenState
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -4183,7 +2838,7 @@ class _AdminAnalyticsScreenState
                       ),
                     ),
                     Text(
-                      'Score',
+                      'score'.tr(context),
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: const Color(0xFF10B981),
@@ -4208,7 +2863,7 @@ class _AdminAnalyticsScreenState
             borderRadius: BorderRadius.circular(16),
           ),
           child: Container(
-            width: 600,
+            width: min(600, MediaQuery.of(context).size.width - 32),
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -4219,7 +2874,7 @@ class _AdminAnalyticsScreenState
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.1),
+                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const FaIcon(
@@ -4290,8 +2945,8 @@ class _AdminAnalyticsScreenState
                 const SizedBox(height: 12),
 
                 _buildEngagementMetric(
-                  'Total Reviews',
-                  '${shopData['reviewCount']} reviews',
+                  'total_reviews_label'.tr(context),
+                  'n_reviews_count'.tr(context).replaceAll('{count}', '${shopData['reviewCount']}'),
                   Icons.reviews,
                   const Color(0xFF3B82F6),
                 ),
@@ -4321,7 +2976,7 @@ class _AdminAnalyticsScreenState
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
                       child: Text(
-                        'Close',
+                        'close'.tr(context),
                         style: GoogleFonts.inter(fontWeight: FontWeight.w500),
                       ),
                     ),
@@ -4345,9 +3000,9 @@ class _AdminAnalyticsScreenState
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -4375,22 +3030,4 @@ class _AdminAnalyticsScreenState
       ),
     );
   }
-}
-
-class AnalyticsMetric {
-  final String title;
-  final String value;
-  final String? subtitle;
-  final IconData icon;
-  final Color color;
-  final double? trend;
-
-  AnalyticsMetric({
-    required this.title,
-    required this.value,
-    this.subtitle,
-    required this.icon,
-    required this.color,
-    this.trend,
-  });
 }

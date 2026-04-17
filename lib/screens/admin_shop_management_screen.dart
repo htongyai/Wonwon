@@ -1,3 +1,4 @@
+import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:typed_data';
@@ -15,6 +16,8 @@ import 'package:intl/intl.dart';
 import 'package:wonwonw2/screens/map_picker_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:wonwonw2/widgets/admin/shop_form_widgets.dart';
 
 class AdminShopManagementScreen extends OptimizedScreen {
   const AdminShopManagementScreen({Key? key}) : super(key: key);
@@ -68,7 +71,7 @@ class _AdminShopManagementScreenState
           child: Row(
             children: [
               Text(
-                'Shop Management',
+                'admin_shop_management'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
@@ -81,7 +84,7 @@ class _AdminShopManagementScreenState
                   ElevatedButton.icon(
                     onPressed: _showBulkActionsDialog,
                     icon: const FaIcon(FontAwesomeIcons.tasks, size: 16),
-                    label: const Text('Bulk Actions'),
+                    label: Text('admin_bulk_actions'.tr(context)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey[600],
                       foregroundColor: Colors.white,
@@ -98,7 +101,7 @@ class _AdminShopManagementScreenState
                   ElevatedButton.icon(
                     onPressed: _showAddShopDialog,
                     icon: const FaIcon(FontAwesomeIcons.plus, size: 16),
-                    label: const Text('Add Shop'),
+                    label: Text('add_shop'.tr(context)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppConstants.primaryColor,
                       foregroundColor: Colors.white,
@@ -138,7 +141,7 @@ class _AdminShopManagementScreenState
                     });
                   },
                   decoration: InputDecoration(
-                    hintText: 'Search shops...',
+                    hintText: 'admin_search_shops'.tr(context),
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -164,20 +167,20 @@ class _AdminShopManagementScreenState
                 child: DropdownButtonFormField<String>(
                   value: _statusFilter,
                   decoration: InputDecoration(
-                    labelText: 'Status',
+                    labelText: 'status_label'.tr(context),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     filled: true,
                     fillColor: Colors.white,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Status')),
+                    items: [
+                    DropdownMenuItem(value: 'all', child: Text('admin_all_status'.tr(context))),
                     DropdownMenuItem(
                       value: 'approved',
-                      child: Text('Approved'),
+                      child: Text('approved'.tr(context)),
                     ),
-                    DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                    DropdownMenuItem(value: 'pending', child: Text('admin_filter_pending'.tr(context))),
                   ],
                   onChanged: (value) {
                     safeSetState(() {
@@ -193,7 +196,7 @@ class _AdminShopManagementScreenState
                 child: DropdownButtonFormField<String>(
                   value: _categoryFilter,
                   decoration: InputDecoration(
-                    labelText: 'Category',
+                    labelText: 'category_form_label'.tr(context),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -201,9 +204,9 @@ class _AdminShopManagementScreenState
                     fillColor: Colors.white,
                   ),
                   items: [
-                    const DropdownMenuItem(
+                    DropdownMenuItem(
                       value: 'all',
-                      child: Text('All Categories'),
+                      child: Text('admin_all_categories'.tr(context)),
                     ),
                     ..._categories.map(
                       (category) => DropdownMenuItem(
@@ -228,20 +231,20 @@ class _AdminShopManagementScreenState
                 child: DropdownButtonFormField<String>(
                   value: _sortBy,
                   decoration: InputDecoration(
-                    labelText: 'Sort By',
+                    labelText: 'admin_sort_by'.tr(context),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     filled: true,
                     fillColor: Colors.white,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'name', child: Text('Name')),
-                    DropdownMenuItem(value: 'rating', child: Text('Rating')),
-                    DropdownMenuItem(value: 'area', child: Text('Area')),
+                  items: [
+                    DropdownMenuItem(value: 'name', child: Text('admin_sort_name'.tr(context))),
+                    DropdownMenuItem(value: 'rating', child: Text('rating'.tr(context))),
+                    DropdownMenuItem(value: 'area', child: Text('area_label'.tr(context))),
                     DropdownMenuItem(
                       value: 'lastViewed',
-                      child: Text('Last Viewed'),
+                      child: Text('admin_last_viewed'.tr(context)),
                     ),
                   ],
                   onChanged: (value) {
@@ -264,7 +267,7 @@ class _AdminShopManagementScreenState
                   _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
                   color: const Color(0xFF64748B),
                 ),
-                tooltip: _sortAscending ? 'Sort Ascending' : 'Sort Descending',
+                tooltip: _sortAscending ? 'admin_sort_ascending'.tr(context) : 'admin_sort_descending'.tr(context),
                 style: IconButton.styleFrom(
                   backgroundColor: Colors.white,
                   side: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -284,7 +287,7 @@ class _AdminShopManagementScreenState
               }
 
               if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
+                return Center(child: Text('${'admin_error_loading_shops'.tr(context)}: ${snapshot.error}'));
               }
 
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -395,7 +398,7 @@ class _AdminShopManagementScreenState
           FaIcon(FontAwesomeIcons.store, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            'No shops found',
+            'no_shops_found'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -404,7 +407,7 @@ class _AdminShopManagementScreenState
           ),
           const SizedBox(height: 8),
           Text(
-            'No shops match your current filters',
+            'admin_no_shops_match_filters'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 14,
               color: const Color(0xFF64748B),
@@ -432,7 +435,7 @@ class _AdminShopManagementScreenState
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -482,14 +485,14 @@ class _AdminShopManagementScreenState
                             decoration: BoxDecoration(
                               color:
                                   shop.approved
-                                      ? const Color(0xFF10B981).withOpacity(0.1)
+                                      ? const Color(0xFF10B981).withValues(alpha: 0.1)
                                       : const Color(
                                         0xFFF59E0B,
-                                      ).withOpacity(0.1),
+                                      ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              shop.approved ? 'APPROVED' : 'PENDING',
+                              shop.approved ? 'admin_status_approved'.tr(context) : 'admin_status_pending'.tr(context),
                               style: GoogleFonts.inter(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
@@ -525,7 +528,7 @@ class _AdminShopManagementScreenState
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Last viewed ${_formatLastViewedTime(_shopLastViewedMap[shop.id]!)}',
+                              'admin_last_viewed_time'.tr(context).replaceAll('{time}', _formatLastViewedTime(context, _shopLastViewedMap[shop.id]!)),
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -580,11 +583,11 @@ class _AdminShopManagementScreenState
                         IconButton(
                           onPressed: () => _viewShopDetails(shop),
                           icon: const FaIcon(FontAwesomeIcons.eye, size: 16),
-                          tooltip: 'View Details',
+                          tooltip: 'admin_view_details'.tr(context),
                           style: IconButton.styleFrom(
                             backgroundColor: const Color(
                               0xFF3B82F6,
-                            ).withOpacity(0.1),
+                            ).withValues(alpha: 0.1),
                             foregroundColor: const Color(0xFF3B82F6),
                           ),
                         ),
@@ -592,11 +595,11 @@ class _AdminShopManagementScreenState
                         IconButton(
                           onPressed: () => _editShop(shop),
                           icon: const FaIcon(FontAwesomeIcons.edit, size: 16),
-                          tooltip: 'Edit Shop',
+                          tooltip: 'admin_edit_shop'.tr(context),
                           style: IconButton.styleFrom(
                             backgroundColor: const Color(
                               0xFFF59E0B,
-                            ).withOpacity(0.1),
+                            ).withValues(alpha: 0.1),
                             foregroundColor: const Color(0xFFF59E0B),
                           ),
                         ),
@@ -608,11 +611,11 @@ class _AdminShopManagementScreenState
                               FontAwesomeIcons.check,
                               size: 16,
                             ),
-                            tooltip: 'Approve Shop',
+                            tooltip: 'admin_approve_shop'.tr(context),
                             style: IconButton.styleFrom(
                               backgroundColor: const Color(
                                 0xFF10B981,
-                              ).withOpacity(0.1),
+                              ).withValues(alpha: 0.1),
                               foregroundColor: const Color(0xFF10B981),
                             ),
                           ),
@@ -620,11 +623,11 @@ class _AdminShopManagementScreenState
                         IconButton(
                           onPressed: () => _deleteShop(shop),
                           icon: const FaIcon(FontAwesomeIcons.trash, size: 16),
-                          tooltip: 'Delete Shop',
+                          tooltip: 'admin_delete_shop'.tr(context),
                           style: IconButton.styleFrom(
                             backgroundColor: const Color(
                               0xFFEF4444,
-                            ).withOpacity(0.1),
+                            ).withValues(alpha: 0.1),
                             foregroundColor: const Color(0xFFEF4444),
                           ),
                         ),
@@ -647,7 +650,7 @@ class _AdminShopManagementScreenState
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF64748B).withOpacity(0.1),
+                            color: const Color(0xFF64748B).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -674,7 +677,7 @@ class _AdminShopManagementScreenState
       builder:
           (context) => Dialog(
             child: Container(
-              width: 600,
+              width: min(600, MediaQuery.of(context).size.width - 32),
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -683,7 +686,7 @@ class _AdminShopManagementScreenState
                   Row(
                     children: [
                       Text(
-                        'Shop Details',
+                        'admin_shop_details'.tr(context),
                         style: GoogleFonts.inter(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
@@ -697,19 +700,19 @@ class _AdminShopManagementScreenState
                     ],
                   ),
                   const SizedBox(height: 20),
-                  _buildDetailRow('Name', shop.name),
-                  _buildDetailRow('Description', shop.description),
-                  _buildDetailRow('Area', shop.area),
-                  _buildDetailRow('Address', shop.address),
+                  _buildDetailRow('admin_label_name'.tr(context), shop.name),
+                  _buildDetailRow('description'.tr(context), shop.description),
+                  _buildDetailRow('area_label'.tr(context), shop.area),
+                  _buildDetailRow('address_label'.tr(context), shop.address),
                   _buildDetailRow(
-                    'Rating',
+                    'rating'.tr(context),
                     '${shop.rating.toStringAsFixed(1)} (${shop.reviewCount} reviews)',
                   ),
-                  _buildDetailRow('Categories', shop.categories.join(', ')),
-                  _buildDetailRow('Price Range', shop.priceRange),
+                  _buildDetailRow('categories'.tr(context), shop.categories.join(', ')),
+                  _buildDetailRow('price_range'.tr(context), shop.priceRange),
                   _buildDetailRow(
-                    'Status',
-                    shop.approved ? 'Approved' : 'Pending',
+                    'status_label'.tr(context),
+                    shop.approved ? 'approved'.tr(context) : 'admin_filter_pending'.tr(context),
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -717,7 +720,7 @@ class _AdminShopManagementScreenState
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Close'),
+                        child: Text('ok_label'.tr(context)),
                       ),
                     ],
                   ),
@@ -766,13 +769,13 @@ class _AdminShopManagementScreenState
           (context) => _EditShopDialog(
             shop: shop,
             onSave: (updatedShop) async {
-              setLoading(true, message: 'Updating shop...');
+              setLoading(true, message: 'admin_updating_shop'.tr(context));
               try {
                 final success = await _shopService.updateShop(updatedShop);
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('${updatedShop.name} has been updated'),
+                      content: Text('admin_shop_updated'.tr(context).replaceAll('{shop_name}', updatedShop.name)),
                       backgroundColor: AppConstants.primaryColor,
                     ),
                   );
@@ -782,7 +785,7 @@ class _AdminShopManagementScreenState
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Error updating shop: $e'),
+                    content: Text('${'admin_error_updating_shop'.tr(context)}: $e'),
                     backgroundColor: Colors.red,
                   ),
                 );
@@ -799,26 +802,26 @@ class _AdminShopManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Approve Shop'),
-            content: Text('Are you sure you want to approve "${shop.name}"?'),
+            title: Text('admin_approve_shop'.tr(context)),
+            content: Text('admin_confirm_approve_shop'.tr(context).replaceAll('{shop_name}', shop.name)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppConstants.primaryColor,
                 ),
-                child: const Text('Approve'),
+                child: Text('admin_approve'.tr(context)),
               ),
             ],
           ),
     );
 
     if (confirmed == true) {
-      setLoading(true, message: 'Approving shop...');
+      setLoading(true, message: 'admin_approving_shop'.tr(context));
 
       try {
         final success = await _shopService.approveShop(shop.id);
@@ -826,7 +829,7 @@ class _AdminShopManagementScreenState
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${shop.name} has been approved'),
+              content: Text('admin_shop_approved'.tr(context).replaceAll('{shop_name}', shop.name)),
               backgroundColor: AppConstants.primaryColor,
             ),
           );
@@ -836,7 +839,7 @@ class _AdminShopManagementScreenState
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error approving shop: $e'),
+            content: Text('${'admin_error_approving_shop'.tr(context)}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -851,26 +854,26 @@ class _AdminShopManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Delete Shop'),
+            title: Text('admin_delete_shop'.tr(context)),
             content: Text(
-              'Are you sure you want to delete "${shop.name}"? This action cannot be undone.',
+              'admin_confirm_delete_shop'.tr(context).replaceAll('{shop_name}', shop.name),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Delete'),
+                child: Text('delete'.tr(context)),
               ),
             ],
           ),
     );
 
     if (confirmed == true) {
-      setLoading(true, message: 'Deleting shop...');
+      setLoading(true, message: 'admin_deleting_shop'.tr(context));
 
       try {
         final success = await _shopService.deleteShop(shop.id);
@@ -878,7 +881,7 @@ class _AdminShopManagementScreenState
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${shop.name} has been deleted'),
+              content: Text('admin_shop_deleted'.tr(context).replaceAll('{shop_name}', shop.name)),
               backgroundColor: Colors.red,
             ),
           );
@@ -888,7 +891,7 @@ class _AdminShopManagementScreenState
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error deleting shop: $e'),
+            content: Text('${'admin_error_deleting_shop'.tr(context)}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -904,13 +907,13 @@ class _AdminShopManagementScreenState
       builder:
           (context) => _AddShopDialog(
             onSave: (newShop) async {
-              setLoading(true, message: 'Adding shop...');
+              setLoading(true, message: 'admin_adding_shop'.tr(context));
               try {
                 final success = await _shopService.addShop(newShop);
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('${newShop.name} has been added'),
+                      content: Text('admin_shop_added'.tr(context).replaceAll('{shop_name}', newShop.name)),
                       backgroundColor: AppConstants.primaryColor,
                     ),
                   );
@@ -920,7 +923,7 @@ class _AdminShopManagementScreenState
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Error adding shop: $e'),
+                    content: Text('${'admin_error_adding_shop'.tr(context)}: $e'),
                     backgroundColor: Colors.red,
                   ),
                 );
@@ -935,8 +938,8 @@ class _AdminShopManagementScreenState
   void _showBulkActionsDialog() {
     if (_selectedShopIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select shops to perform bulk actions'),
+        SnackBar(
+          content: Text('admin_select_shops_for_bulk'.tr(context)),
           backgroundColor: Colors.orange,
         ),
       );
@@ -948,14 +951,14 @@ class _AdminShopManagementScreenState
       builder:
           (context) => AlertDialog(
             title: Text(
-              'Bulk Actions (${_selectedShopIds.length} shops selected)',
+              'admin_bulk_actions_selected'.tr(context).replaceAll('{count}', '${_selectedShopIds.length}'),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
                   leading: const Icon(Icons.check_circle, color: Colors.green),
-                  title: const Text('Approve All Selected'),
+                  title: Text('admin_approve_all_selected'.tr(context)),
                   onTap: () {
                     Navigator.of(context).pop();
                     _bulkApproveShops();
@@ -963,7 +966,7 @@ class _AdminShopManagementScreenState
                 ),
                 ListTile(
                   leading: const Icon(Icons.cancel, color: Colors.orange),
-                  title: const Text('Unapprove All Selected'),
+                  title: Text('admin_unapprove_all_selected'.tr(context)),
                   onTap: () {
                     Navigator.of(context).pop();
                     _bulkUnapproveShops();
@@ -971,7 +974,7 @@ class _AdminShopManagementScreenState
                 ),
                 ListTile(
                   leading: const Icon(Icons.delete, color: Colors.red),
-                  title: const Text('Delete All Selected'),
+                  title: Text('admin_delete_all_selected'.tr(context)),
                   onTap: () {
                     Navigator.of(context).pop();
                     _bulkDeleteShops();
@@ -982,7 +985,7 @@ class _AdminShopManagementScreenState
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
             ],
           ),
@@ -994,26 +997,26 @@ class _AdminShopManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Bulk Approve Shops'),
+            title: Text('admin_bulk_approve_shops'.tr(context)),
             content: Text(
-              'Are you sure you want to approve ${_selectedShopIds.length} shops?',
+              'admin_confirm_bulk_approve'.tr(context).replaceAll('{count}', '${_selectedShopIds.length}'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text('Approve All'),
+                child: Text('admin_approve_all'.tr(context)),
               ),
             ],
           ),
     );
 
     if (confirmed == true) {
-      setLoading(true, message: 'Approving shops...');
+      setLoading(true, message: 'admin_approving_shops'.tr(context));
       try {
         int successCount = 0;
         for (final shopId in _selectedShopIds) {
@@ -1027,14 +1030,14 @@ class _AdminShopManagementScreenState
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$successCount shops approved successfully'),
+            content: Text('admin_shops_approved_success'.tr(context).replaceAll('{count}', '$successCount')),
             backgroundColor: Colors.green,
           ),
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error during bulk approval: $e'),
+            content: Text('${'admin_error_bulk_approval'.tr(context)}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1049,26 +1052,26 @@ class _AdminShopManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Bulk Unapprove Shops'),
+            title: Text('admin_bulk_unapprove_shops'.tr(context)),
             content: Text(
-              'Are you sure you want to unapprove ${_selectedShopIds.length} shops?',
+              'admin_confirm_bulk_unapprove'.tr(context).replaceAll('{count}', '${_selectedShopIds.length}'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                child: const Text('Unapprove All'),
+                child: Text('admin_unapprove_all'.tr(context)),
               ),
             ],
           ),
     );
 
     if (confirmed == true) {
-      setLoading(true, message: 'Unapproving shops...');
+      setLoading(true, message: 'admin_unapproving_shops'.tr(context));
       try {
         int successCount = 0;
         for (final shopId in _selectedShopIds) {
@@ -1086,14 +1089,14 @@ class _AdminShopManagementScreenState
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$successCount shops unapproved successfully'),
+            content: Text('admin_shops_unapproved_success'.tr(context).replaceAll('{count}', '$successCount')),
             backgroundColor: Colors.orange,
           ),
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error during bulk unapproval: $e'),
+            content: Text('${'admin_error_bulk_unapproval'.tr(context)}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1108,26 +1111,26 @@ class _AdminShopManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Bulk Delete Shops'),
+            title: Text('admin_bulk_delete_shops'.tr(context)),
             content: Text(
-              'Are you sure you want to delete ${_selectedShopIds.length} shops? This action cannot be undone.',
+              'admin_confirm_bulk_delete'.tr(context).replaceAll('{count}', '${_selectedShopIds.length}'),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Delete All'),
+                child: Text('admin_delete_all'.tr(context)),
               ),
             ],
           ),
     );
 
     if (confirmed == true) {
-      setLoading(true, message: 'Deleting shops...');
+      setLoading(true, message: 'admin_deleting_shops'.tr(context));
       try {
         int successCount = 0;
         for (final shopId in _selectedShopIds) {
@@ -1141,14 +1144,14 @@ class _AdminShopManagementScreenState
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('$successCount shops deleted successfully'),
+            content: Text('admin_shops_deleted_success'.tr(context).replaceAll('{count}', '$successCount')),
             backgroundColor: Colors.red,
           ),
         );
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error during bulk deletion: $e'),
+            content: Text('${'admin_error_bulk_deletion'.tr(context)}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1158,21 +1161,21 @@ class _AdminShopManagementScreenState
     }
   }
 
-  String _formatLastViewedTime(DateTime lastViewed) {
+  String _formatLastViewedTime(BuildContext context, DateTime lastViewed) {
     final now = DateTime.now();
     final difference = now.difference(lastViewed);
 
     if (difference.inMinutes < 1) {
-      return 'just now';
+      return 'admin_just_now'.tr(context);
     } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
+      return 'admin_minutes_ago'.tr(context).replaceAll('{m}', '${difference.inMinutes}');
     } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
+      return 'admin_hours_ago'.tr(context).replaceAll('{h}', '${difference.inHours}');
     } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
+      return 'admin_days_ago'.tr(context).replaceAll('{d}', '${difference.inDays}');
     } else if (difference.inDays < 30) {
       final weeks = (difference.inDays / 7).floor();
-      return '${weeks}w ago';
+      return 'admin_weeks_ago'.tr(context).replaceAll('{w}', '$weeks');
     } else {
       return DateFormat('MMM dd').format(lastViewed);
     }
@@ -1332,6 +1335,19 @@ class _EditShopDialogState extends State<_EditShopDialog> {
     'Express Service',
   ];
 
+  static const Map<String, String> _amenityToKey = {
+    'WiFi': 'admin_amenity_wifi',
+    'Parking': 'admin_amenity_parking',
+    'Air Conditioning': 'admin_amenity_air_conditioning',
+    'Waiting Area': 'admin_amenity_waiting_area',
+    'Restroom': 'admin_amenity_restroom',
+    'Credit Card Payment': 'admin_amenity_credit_card_payment',
+    'Cash Only': 'admin_amenity_cash_only',
+    'Appointment Required': 'admin_amenity_appointment_required',
+    'Walk-in Welcome': 'admin_amenity_walk_in_welcome',
+    'Express Service': 'admin_amenity_express_service',
+  };
+
   final List<String> _availableFeatures = [
     'Same Day Service',
     'Express Repair',
@@ -1344,6 +1360,19 @@ class _EditShopDialogState extends State<_EditShopDialog> {
     'Free Consultation',
     'Quality Guarantee',
   ];
+
+  static const Map<String, String> _featureToKey = {
+    'Same Day Service': 'admin_feature_same_day_service',
+    'Express Repair': 'admin_feature_express_repair',
+    'Warranty Provided': 'admin_feature_warranty_provided',
+    'Pick-up Service': 'admin_feature_pick_up_service',
+    'Delivery Service': 'admin_feature_delivery_service',
+    'Online Booking': 'admin_feature_online_booking',
+    'Expert Technician': 'admin_feature_expert_technician',
+    'Genuine Parts': 'admin_feature_genuine_parts',
+    'Free Consultation': 'admin_feature_free_consultation',
+    'Quality Guarantee': 'admin_feature_quality_guarantee',
+  };
 
   final List<String> _availableCategories = [
     'clothing',
@@ -1486,13 +1515,13 @@ class _EditShopDialogState extends State<_EditShopDialog> {
 
   // Parse price range from baht symbols to slider value
   double _parsePriceRange(String priceRange) {
-    final bahtCount = priceRange.split('₿').length - 1;
+    final bahtCount = priceRange.split('฿').length - 1;
     return bahtCount.toDouble().clamp(1.0, 5.0);
   }
 
   // Convert slider value to baht symbols
   String _formatPriceRange(double value) {
-    return '₿' * value.round();
+    return '฿' * value.round();
   }
 
   // Load existing hours data from the shop
@@ -1647,97 +1676,21 @@ class _EditShopDialogState extends State<_EditShopDialog> {
     }
   }
 
-  // Build price range slider section for edit dialog
-  Widget _buildPriceRangeSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Price Range',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Text(
-                '₿',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-              Expanded(
-                child: Slider(
-                  value: _priceRangeValue,
-                  min: 1.0,
-                  max: 5.0,
-                  divisions: 4,
-                  activeColor: AppConstants.primaryColor,
-                  onChanged: (value) {
-                    setState(() {
-                      _priceRangeValue = value;
-                    });
-                  },
-                ),
-              ),
-              Text(
-                '₿₿₿₿₿',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppConstants.primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppConstants.primaryColor),
-              ),
-              child: Text(
-                _formatPriceRange(_priceRangeValue),
-                style: GoogleFonts.inter(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppConstants.primaryColor,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        width: 1200,
-        height: 1000,
+        width: min(1200, MediaQuery.of(context).size.width - 32),
+        height: min(1000, MediaQuery.of(context).size.height - 64),
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -1750,7 +1703,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
             Row(
               children: [
                 Text(
-                  'Edit Shop',
+                  'admin_edit_shop'.tr(context),
                   style: GoogleFonts.inter(
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
@@ -1780,18 +1733,18 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                   child: Column(
                     children: [
                       // Basic Information
-                      _buildSectionHeader('Basic Information'),
+                      ShopFormWidgets.buildSectionHeader('admin_basic_info'.tr(context)),
                       const SizedBox(height: 16),
 
                       Row(
                         children: [
                           Expanded(
-                            child: _buildTextField(
+                            child: ShopFormWidgets.buildTextField(
                               controller: _nameController,
-                              label: 'Shop Name',
+                              label: 'shop_name_label'.tr(context),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Shop name is required';
+                                  return 'admin_shop_name_required'.tr(context);
                                 }
                                 return null;
                               },
@@ -1799,12 +1752,12 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _buildTextField(
+                            child: ShopFormWidgets.buildTextField(
                               controller: _areaController,
-                              label: 'Area',
+                              label: 'area_label'.tr(context),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Area is required';
+                                  return 'admin_area_required'.tr(context);
                                 }
                                 return null;
                               },
@@ -1814,26 +1767,26 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                       ),
                       const SizedBox(height: 16),
 
-                      _buildTextField(
+                      ShopFormWidgets.buildTextField(
                         controller: _descriptionController,
-                        label: 'Description',
+                        label: 'description'.tr(context),
                         maxLines: 3,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Description is required';
+                            return 'admin_description_required'.tr(context);
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 16),
 
-                      _buildTextField(
+                      ShopFormWidgets.buildTextField(
                         controller: _addressController,
-                        label: 'Full Address',
+                        label: 'admin_label_full_address'.tr(context),
                         maxLines: 2,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Address is required';
+                            return 'admin_address_required'.tr(context);
                           }
                           return null;
                         },
@@ -1841,18 +1794,18 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                       const SizedBox(height: 24),
 
                       // Contact Information
-                      _buildSectionHeader('Contact Information'),
+                      ShopFormWidgets.buildSectionHeader('admin_contact_info'.tr(context)),
                       const SizedBox(height: 16),
 
                       Row(
                         children: [
                           Expanded(
-                            child: _buildTextField(
+                            child: ShopFormWidgets.buildTextField(
                               controller: _phoneController,
-                              label: 'Phone Number',
+                              label: 'phone_number_label'.tr(context),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Phone number is required';
+                                  return 'admin_phone_required'.tr(context);
                                 }
                                 return null;
                               },
@@ -1860,9 +1813,9 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _buildTextField(
+                            child: ShopFormWidgets.buildTextField(
                               controller: _facebookPageController,
-                              label: 'Facebook Page (Optional)',
+                              label: 'facebook_optional_label'.tr(context),
                             ),
                           ),
                         ],
@@ -1870,11 +1823,33 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                       const SizedBox(height: 16),
 
                       // Price Range Slider Section
-                      _buildPriceRangeSection(),
+                      ShopFormWidgets.buildPriceRangeSection(
+                        context: context,
+                        value: _priceRangeValue,
+                        onChanged: (value) {
+                          setState(() {
+                            _priceRangeValue = value;
+                          });
+                        },
+                        formatPriceRange: _formatPriceRange,
+                      ),
                       const SizedBox(height: 16),
 
                       // Payment Methods Section
-                      _buildPaymentMethodsSection(),
+                      ShopFormWidgets.buildPaymentMethodsSection(
+                        context: context,
+                        availablePaymentMethods: _availablePaymentMethods,
+                        selectedPaymentMethods: _selectedPaymentMethods,
+                        onToggle: (method, selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedPaymentMethods.add(method);
+                            } else {
+                              _selectedPaymentMethods.remove(method);
+                            }
+                          });
+                        },
+                      ),
                       const SizedBox(height: 16),
 
                       // Additional Fields Section
@@ -1882,11 +1857,35 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                       const SizedBox(height: 16),
 
                       // Amenities Section
-                      _buildAmenitiesSection(),
+                      ShopFormWidgets.buildAmenitiesSection(
+                        context: context,
+                        availableAmenities: _availableAmenities,
+                        selectedAmenities: _selectedAmenities,
+                        amenityToKey: _amenityToKey,
+                        onToggle: (amenity, selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedAmenities.add(amenity);
+                            } else {
+                              _selectedAmenities.remove(amenity);
+                            }
+                          });
+                        },
+                      ),
                       const SizedBox(height: 16),
 
                       // Features Section
-                      _buildFeaturesSection(),
+                      ShopFormWidgets.buildFeaturesSection(
+                        context: context,
+                        availableFeatures: _availableFeatures,
+                        selectedFeatures: _selectedFeatures,
+                        featureToKey: _featureToKey,
+                        onToggle: (feature, selected) {
+                          setState(() {
+                            _selectedFeatures[feature] = selected;
+                          });
+                        },
+                      ),
                       const SizedBox(height: 16),
 
                       // Opening Hours Section
@@ -1894,33 +1893,33 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                       const SizedBox(height: 24),
 
                       // Cover Image
-                      _buildSectionHeader('Cover Image'),
+                      ShopFormWidgets.buildSectionHeader('admin_cover_image'.tr(context)),
                       const SizedBox(height: 16),
                       _buildImageUploadSection(),
                       const SizedBox(height: 24),
 
                       // Location
-                      _buildSectionHeader('Location'),
+                      ShopFormWidgets.buildSectionHeader('admin_location'.tr(context)),
                       const SizedBox(height: 16),
                       _buildLocationSection(),
                       const SizedBox(height: 24),
 
                       // Categories
-                      _buildSectionHeader('Categories'),
+                      ShopFormWidgets.buildSectionHeader('categories'.tr(context)),
                       const SizedBox(height: 16),
                       _buildCategorySelection(),
                       const SizedBox(height: 24),
 
                       // Sub-Services
                       if (_selectedCategories.isNotEmpty) ...[
-                        _buildSectionHeader('Sub-Services'),
+                        ShopFormWidgets.buildSectionHeader('admin_sub_services'.tr(context)),
                         const SizedBox(height: 16),
                         _buildSubServicesSelection(),
                         const SizedBox(height: 24),
                       ],
 
                       // Status
-                      _buildSectionHeader('Status'),
+                      ShopFormWidgets.buildSectionHeader('status_label'.tr(context)),
                       const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -1931,7 +1930,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                         ),
                         child: SwitchListTile(
                           title: Text(
-                            'Approved',
+                            'approved'.tr(context),
                             style: GoogleFonts.inter(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -1969,7 +1968,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  child: Text('cancel'.tr(context)),
                 ),
                 const SizedBox(width: 16),
                 ElevatedButton(
@@ -1982,59 +1981,12 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                       vertical: 12,
                     ),
                   ),
-                  child: const Text('Save Changes'),
+                  child: Text('admin_save_changes'.tr(context)),
                 ),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(bottom: 8),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
-      ),
-      child: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: const Color(0xFF1E293B),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    String? Function(String?)? validator,
-    int maxLines = 1,
-    TextInputType? keyboardType,
-  }) {
-    return TextFormField(
-      controller: controller,
-      validator: validator,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppConstants.primaryColor),
-        ),
-        filled: true,
-        fillColor: Colors.white,
       ),
     );
   }
@@ -2078,17 +2030,17 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                         }
                       });
                     },
-                    selectedColor: AppConstants.primaryColor.withOpacity(0.2),
+                    selectedColor: AppConstants.primaryColor.withValues(alpha: 0.2),
                     checkmarkColor: AppConstants.primaryColor,
                   );
                 }).toList(),
           ),
           if (_selectedCategories.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Please select at least one category',
-                style: TextStyle(color: Colors.red, fontSize: 12),
+                'please_select_at_least_one_category'.tr(context),
+                style: const TextStyle(color: Colors.red, fontSize: 12),
               ),
             ),
         ],
@@ -2114,7 +2066,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${category.toUpperCase()} Sub-Services:',
+                    'sub_services_for_category'.tr(context).replaceAll('{category}', category.toUpperCase()),
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -2124,7 +2076,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                   const SizedBox(height: 12),
                   if (availableSubServices.isEmpty)
                     Text(
-                      'No sub-services available for this category',
+                      'no_sub_services_available'.tr(context),
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: const Color(0xFF64748B),
@@ -2164,7 +2116,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                                 });
                               },
                               selectedColor: AppConstants.primaryColor
-                                  .withOpacity(0.15),
+                                  .withValues(alpha: 0.15),
                               checkmarkColor: AppConstants.primaryColor,
                               backgroundColor: Colors.grey[50],
                               side: BorderSide(
@@ -2207,7 +2159,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                 children: [
                   CircularProgressIndicator(color: AppConstants.primaryColor),
                   const SizedBox(width: 16),
-                  const Text('Uploading image...'),
+                  Text('admin_uploading_image'.tr(context)),
                 ],
               ),
             ),
@@ -2238,13 +2190,13 @@ class _EditShopDialogState extends State<_EditShopDialog> {
       // Update state with uploaded image
       setState(() {
         _uploadedImageUrl = downloadUrl;
-        _selectedImagePath = image.path;
+        _selectedImagePath = image.name;
       });
 
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Image uploaded successfully!'),
+          content: Text('admin_image_uploaded'.tr(context)),
           backgroundColor: AppConstants.primaryColor,
         ),
       );
@@ -2257,7 +2209,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
       // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error uploading image: $e'),
+          content: Text('${'admin_error_uploading_image'.tr(context)}: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -2277,7 +2229,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Upload Cover Photo',
+            'admin_upload_cover_photo'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -2295,7 +2247,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                 image:
                     _uploadedImageUrl != null
                         ? DecorationImage(
-                          image: NetworkImage(_uploadedImageUrl!),
+                          image: CachedNetworkImageProvider(_uploadedImageUrl!),
                           fit: BoxFit.cover,
                         )
                         : null,
@@ -2322,8 +2274,8 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                   icon: const Icon(Icons.upload, size: 20),
                   label: Text(
                     _uploadedImageUrl != null || _selectedImagePath != null
-                        ? 'Change Image'
-                        : 'Upload Image',
+                        ? 'admin_change_image'.tr(context)
+                        : 'admin_upload_image'.tr(context),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppConstants.primaryColor,
@@ -2347,7 +2299,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                       });
                     },
                     icon: const Icon(Icons.delete, size: 20),
-                    label: const Text('Remove'),
+                    label: Text('remove'.tr(context)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
@@ -2379,7 +2331,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Shop Location',
+            'admin_shop_location'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -2401,7 +2353,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Coordinates',
+                        'admin_coordinates'.tr(context),
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -2431,7 +2383,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
               ElevatedButton.icon(
                 onPressed: () => _openMapPicker(context),
                 icon: const Icon(Icons.map, size: 20),
-                label: const Text('Pick Location on Map'),
+                label: Text('admin_pick_location_on_map'.tr(context)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppConstants.primaryColor,
                   foregroundColor: Colors.white,
@@ -2451,89 +2403,6 @@ class _EditShopDialogState extends State<_EditShopDialog> {
     );
   }
 
-  // Build payment methods section for edit dialog
-  Widget _buildPaymentMethodsSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Payment Methods',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                _availablePaymentMethods.map((method) {
-                  final isSelected = _selectedPaymentMethods.contains(method);
-                  IconData icon;
-                  String label;
-
-                  switch (method) {
-                    case 'cash':
-                      icon = Icons.money;
-                      label = 'Cash';
-                      break;
-                    case 'card':
-                      icon = Icons.credit_card;
-                      label = 'Card';
-                      break;
-                    case 'qr':
-                      icon = Icons.qr_code;
-                      label = 'QR Code';
-                      break;
-                    case 'bank_transfer':
-                      icon = Icons.account_balance;
-                      label = 'Bank Transfer';
-                      break;
-                    case 'true_money':
-                      icon = Icons.account_balance_wallet;
-                      label = 'TrueMoney';
-                      break;
-                    case 'line_pay':
-                      icon = Icons.chat;
-                      label = 'LINE Pay';
-                      break;
-                    default:
-                      icon = Icons.payment;
-                      label = method;
-                  }
-
-                  return FilterChip(
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedPaymentMethods.add(method);
-                        } else {
-                          _selectedPaymentMethods.remove(method);
-                        }
-                      });
-                    },
-                    avatar: Icon(icon, size: 18),
-                    label: Text(label),
-                    selectedColor: AppConstants.primaryColor.withOpacity(0.2),
-                    checkmarkColor: AppConstants.primaryColor,
-                  );
-                }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
   // Build additional fields section for edit dialog
   Widget _buildAdditionalFieldsSection() {
     return Container(
@@ -2547,7 +2416,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Additional Information',
+            'admin_additional_information'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -2560,16 +2429,16 @@ class _EditShopDialogState extends State<_EditShopDialog> {
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _buildingNumberController,
-                  label: 'Building Number',
+                  label: 'building_number_label'.tr(context),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _buildingNameController,
-                  label: 'Building Name',
+                  label: 'building_name_label'.tr(context),
                 ),
               ),
             ],
@@ -2579,16 +2448,16 @@ class _EditShopDialogState extends State<_EditShopDialog> {
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _buildingFloorController,
-                  label: 'Floor',
+                  label: 'building_floor_label'.tr(context),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _soiController,
-                  label: 'Soi',
+                  label: 'soi_label'.tr(context),
                 ),
               ),
             ],
@@ -2598,62 +2467,62 @@ class _EditShopDialogState extends State<_EditShopDialog> {
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _districtController,
-                  label: 'District',
+                  label: 'district_label'.tr(context),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _provinceController,
-                  label: 'Province',
+                  label: 'province_label'.tr(context),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
 
-          _buildTextField(controller: _landmarkController, label: 'Landmark'),
+          ShopFormWidgets.buildTextField(controller: _landmarkController, label: 'landmark_label'.tr(context)),
           const SizedBox(height: 16),
 
           // Contact Information
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _lineIdController,
-                  label: 'LINE ID',
+                  label: 'line_id_label'.tr(context),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _instagramPageController,
-                  label: 'Instagram',
+                  label: 'instagram_label'.tr(context),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
 
-          _buildTextField(
+          ShopFormWidgets.buildTextField(
             controller: _otherContactsController,
-            label: 'Other Contacts',
+            label: 'other_contacts_label'.tr(context),
           ),
           const SizedBox(height: 16),
 
-          _buildTextField(
+          ShopFormWidgets.buildTextField(
             controller: _notesOrConditionsController,
-            label: 'Notes or Conditions',
+            label: 'admin_notes_or_conditions'.tr(context),
             maxLines: 3,
           ),
           const SizedBox(height: 16),
 
           // Duration field
-          _buildTextField(
+          ShopFormWidgets.buildTextField(
             controller: _durationMinutesController,
-            label: 'Service Duration (minutes)',
+            label: 'admin_service_duration_minutes'.tr(context),
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 16),
@@ -2671,7 +2540,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                 activeColor: AppConstants.primaryColor,
               ),
               Text(
-                'Try-on Area Available',
+                'admin_try_on_area_available'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   color: const Color(0xFF1E293B),
@@ -2691,7 +2560,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                 activeColor: AppConstants.primaryColor,
               ),
               Text(
-                'Requires Purchase',
+                'admin_requires_purchase'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   color: const Color(0xFF1E293B),
@@ -2708,107 +2577,13 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                 activeColor: AppConstants.primaryColor,
               ),
               Text(
-                'Irregular Hours',
+                'admin_irregular_hours'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   color: const Color(0xFF1E293B),
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Build amenities section
-  Widget _buildAmenitiesSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Amenities',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                _availableAmenities.map((amenity) {
-                  final isSelected = _selectedAmenities.contains(amenity);
-                  return FilterChip(
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedAmenities.add(amenity);
-                        } else {
-                          _selectedAmenities.remove(amenity);
-                        }
-                      });
-                    },
-                    label: Text(amenity),
-                    selectedColor: AppConstants.primaryColor.withOpacity(0.2),
-                    checkmarkColor: AppConstants.primaryColor,
-                  );
-                }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Build features section
-  Widget _buildFeaturesSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Features',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                _availableFeatures.map((feature) {
-                  final isSelected = _selectedFeatures[feature] ?? false;
-                  return FilterChip(
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedFeatures[feature] = selected;
-                      });
-                    },
-                    label: Text(feature),
-                    selectedColor: AppConstants.primaryColor.withOpacity(0.2),
-                    checkmarkColor: AppConstants.primaryColor,
-                  );
-                }).toList(),
           ),
         ],
       ),
@@ -2831,7 +2606,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Opening Hours',
+                'admin_opening_hours'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -2840,9 +2615,9 @@ class _EditShopDialogState extends State<_EditShopDialog> {
               ),
               Row(
                 children: [
-                  _buildQuickActionButton('Copy Mon', () => _copyMondayHours()),
+                  ShopFormWidgets.buildQuickActionButton('admin_copy_mon'.tr(context), () => _copyMondayHours()),
                   const SizedBox(width: 8),
-                  _buildQuickActionButton('Clear All', () => _clearAllHours()),
+                  ShopFormWidgets.buildQuickActionButton('admin_clear_all'.tr(context), () => _clearAllHours()),
                 ],
               ),
             ],
@@ -2853,36 +2628,27 @@ class _EditShopDialogState extends State<_EditShopDialog> {
           Wrap(
             spacing: 8,
             children: [
-              _buildPresetButton('9:00 AM - 6:00 PM', '09:00', '18:00'),
-              _buildPresetButton('10:00 AM - 7:00 PM', '10:00', '19:00'),
-              _buildPresetButton('8:00 AM - 5:00 PM', '08:00', '17:00'),
+              ShopFormWidgets.buildPresetButton(label: 'admin_preset_9_6'.tr(context), onPressed: () => _applyTimePreset('09:00', '18:00')),
+              ShopFormWidgets.buildPresetButton(label: 'admin_preset_10_7'.tr(context), onPressed: () => _applyTimePreset('10:00', '19:00')),
+              ShopFormWidgets.buildPresetButton(label: 'admin_preset_8_5'.tr(context), onPressed: () => _applyTimePreset('08:00', '17:00')),
             ],
           ),
           const SizedBox(height: 16),
 
           // Daily time pickers
           ...[
-            'Monday',
-            'Tuesday',
-            'Wednesday',
-            'Thursday',
-            'Friday',
-            'Saturday',
-            'Sunday',
-          ].map((day) {
+            'day_monday',
+            'day_tuesday',
+            'day_wednesday',
+            'day_thursday',
+            'day_friday',
+            'day_saturday',
+            'day_sunday',
+          ].map((dayKey) {
             final dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-            final dayNames = [
-              'Monday',
-              'Tuesday',
-              'Wednesday',
-              'Thursday',
-              'Friday',
-              'Saturday',
-              'Sunday',
-            ];
-            final dayIndex = dayNames.indexOf(day);
-            final dayKey = dayKeys[dayIndex];
-            final isClosed = _closedDays[dayKey] ?? false;
+            final dayIndex = ['day_monday', 'day_tuesday', 'day_wednesday', 'day_thursday', 'day_friday', 'day_saturday', 'day_sunday'].indexOf(dayKey);
+            final dayKeyShort = dayKeys[dayIndex];
+            final isClosed = _closedDays[dayKeyShort] ?? false;
 
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
@@ -2897,7 +2663,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                   SizedBox(
                     width: 100,
                     child: Text(
-                      day,
+                      dayKey.tr(context),
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -2912,13 +2678,13 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                     value: isClosed,
                     onChanged: (value) {
                       setState(() {
-                        _closedDays[dayKey] = value ?? false;
+                        _closedDays[dayKeyShort] = value ?? false;
                       });
                     },
                     activeColor: Colors.red,
                   ),
                   Text(
-                    'Closed',
+                    'closed_label'.tr(context),
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -2931,7 +2697,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                         children: [
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => _selectTime(context, dayKey, true),
+                              onTap: () => _selectTime(context, dayKeyShort, true),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -2944,8 +2710,8 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
-                                  _openingTimes[dayKey]?.format(context) ??
-                                      'Open',
+                                  _openingTimes[dayKeyShort]?.format(context) ??
+                                      'admin_open'.tr(context),
                                   style: GoogleFonts.inter(fontSize: 12),
                                 ),
                               ),
@@ -2956,7 +2722,7 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => _selectTime(context, dayKey, false),
+                              onTap: () => _selectTime(context, dayKeyShort, false),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -2969,8 +2735,8 @@ class _EditShopDialogState extends State<_EditShopDialog> {
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
-                                  _closingTimes[dayKey]?.format(context) ??
-                                      'Close',
+                                  _closingTimes[dayKeyShort]?.format(context) ??
+                                      'admin_close'.tr(context),
                                   style: GoogleFonts.inter(fontSize: 12),
                                 ),
                               ),
@@ -2986,37 +2752,6 @@ class _EditShopDialogState extends State<_EditShopDialog> {
           }).toList(),
         ],
       ),
-    );
-  }
-
-  // Helper methods for edit dialog
-  Widget _buildQuickActionButton(String label, VoidCallback onPressed) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.grey.shade200,
-        foregroundColor: Colors.grey.shade700,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      child: Text(label, style: GoogleFonts.inter(fontSize: 12)),
-    );
-  }
-
-  Widget _buildPresetButton(String label, String openTime, String closeTime) {
-    return ElevatedButton(
-      onPressed: () => _applyTimePreset(openTime, closeTime),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppConstants.primaryColor.withOpacity(0.1),
-        foregroundColor: AppConstants.primaryColor,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      child: Text(label, style: GoogleFonts.inter(fontSize: 12)),
     );
   }
 
@@ -3105,8 +2840,8 @@ class _EditShopDialogState extends State<_EditShopDialog> {
 
     if (_selectedCategories.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one category'),
+        SnackBar(
+          content: Text('please_select_at_least_one_category'.tr(context)),
           backgroundColor: Colors.red,
         ),
       );
@@ -3362,6 +3097,19 @@ class _AddShopDialogState extends State<_AddShopDialog> {
     'Express Service',
   ];
 
+  static const Map<String, String> _amenityToKey = {
+    'WiFi': 'admin_amenity_wifi',
+    'Parking': 'admin_amenity_parking',
+    'Air Conditioning': 'admin_amenity_air_conditioning',
+    'Waiting Area': 'admin_amenity_waiting_area',
+    'Restroom': 'admin_amenity_restroom',
+    'Credit Card Payment': 'admin_amenity_credit_card_payment',
+    'Cash Only': 'admin_amenity_cash_only',
+    'Appointment Required': 'admin_amenity_appointment_required',
+    'Walk-in Welcome': 'admin_amenity_walk_in_welcome',
+    'Express Service': 'admin_amenity_express_service',
+  };
+
   final List<String> _availableFeatures = [
     'Same Day Service',
     'Express Repair',
@@ -3374,6 +3122,19 @@ class _AddShopDialogState extends State<_AddShopDialog> {
     'Free Consultation',
     'Quality Guarantee',
   ];
+
+  static const Map<String, String> _featureToKey = {
+    'Same Day Service': 'admin_feature_same_day_service',
+    'Express Repair': 'admin_feature_express_repair',
+    'Warranty Provided': 'admin_feature_warranty_provided',
+    'Pick-up Service': 'admin_feature_pick_up_service',
+    'Delivery Service': 'admin_feature_delivery_service',
+    'Online Booking': 'admin_feature_online_booking',
+    'Expert Technician': 'admin_feature_expert_technician',
+    'Genuine Parts': 'admin_feature_genuine_parts',
+    'Free Consultation': 'admin_feature_free_consultation',
+    'Quality Guarantee': 'admin_feature_quality_guarantee',
+  };
 
   // Additional boolean fields
   bool _tryOnAreaAvailable = false;
@@ -3480,166 +3241,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
 
   // Convert slider value to baht symbols
   String _formatPriceRange(double value) {
-    return '₿' * value.round();
-  }
-
-  // Build price range slider section for add dialog
-  Widget _buildPriceRangeSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Price Range',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Text(
-                '₿',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-              Expanded(
-                child: Slider(
-                  value: _priceRangeValue,
-                  min: 1.0,
-                  max: 5.0,
-                  divisions: 4,
-                  activeColor: AppConstants.primaryColor,
-                  onChanged: (value) {
-                    setState(() {
-                      _priceRangeValue = value;
-                    });
-                  },
-                ),
-              ),
-              Text(
-                '₿₿₿₿₿',
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-            ],
-          ),
-          Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppConstants.primaryColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppConstants.primaryColor),
-              ),
-              child: Text(
-                _formatPriceRange(_priceRangeValue),
-                style: GoogleFonts.inter(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppConstants.primaryColor,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Build payment methods section for add dialog
-  Widget _buildPaymentMethodsSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Payment Methods',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                _availablePaymentMethods.map((method) {
-                  final isSelected = _selectedPaymentMethods.contains(method);
-                  IconData icon;
-                  String label;
-
-                  switch (method) {
-                    case 'cash':
-                      icon = Icons.money;
-                      label = 'Cash';
-                      break;
-                    case 'card':
-                      icon = Icons.credit_card;
-                      label = 'Card';
-                      break;
-                    case 'qr':
-                      icon = Icons.qr_code;
-                      label = 'QR Code';
-                      break;
-                    case 'bank_transfer':
-                      icon = Icons.account_balance;
-                      label = 'Bank Transfer';
-                      break;
-                    case 'true_money':
-                      icon = Icons.account_balance_wallet;
-                      label = 'TrueMoney';
-                      break;
-                    case 'line_pay':
-                      icon = Icons.chat;
-                      label = 'LINE Pay';
-                      break;
-                    default:
-                      icon = Icons.payment;
-                      label = method;
-                  }
-
-                  return FilterChip(
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedPaymentMethods.add(method);
-                        } else {
-                          _selectedPaymentMethods.remove(method);
-                        }
-                      });
-                    },
-                    avatar: Icon(icon, size: 18),
-                    label: Text(label),
-                    selectedColor: AppConstants.primaryColor.withOpacity(0.2),
-                    checkmarkColor: AppConstants.primaryColor,
-                  );
-                }).toList(),
-          ),
-        ],
-      ),
-    );
+    return '฿' * value.round();
   }
 
   // Build additional fields section for add dialog
@@ -3655,7 +3257,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Additional Information',
+            'admin_additional_information'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -3668,16 +3270,16 @@ class _AddShopDialogState extends State<_AddShopDialog> {
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _buildingNumberController,
-                  label: 'Building Number',
+                  label: 'building_number_label'.tr(context),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _buildingNameController,
-                  label: 'Building Name',
+                  label: 'building_name_label'.tr(context),
                 ),
               ),
             ],
@@ -3687,16 +3289,16 @@ class _AddShopDialogState extends State<_AddShopDialog> {
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _buildingFloorController,
-                  label: 'Floor',
+                  label: 'building_floor_label'.tr(context),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _soiController,
-                  label: 'Soi',
+                  label: 'soi_label'.tr(context),
                 ),
               ),
             ],
@@ -3706,62 +3308,62 @@ class _AddShopDialogState extends State<_AddShopDialog> {
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _districtController,
-                  label: 'District',
+                  label: 'district_label'.tr(context),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _provinceController,
-                  label: 'Province',
+                  label: 'province_label'.tr(context),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
 
-          _buildTextField(controller: _landmarkController, label: 'Landmark'),
+          ShopFormWidgets.buildTextField(controller: _landmarkController, label: 'landmark_label'.tr(context)),
           const SizedBox(height: 16),
 
           // Contact Information
           Row(
             children: [
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _lineIdController,
-                  label: 'LINE ID',
+                  label: 'line_id_label'.tr(context),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _buildTextField(
+                child: ShopFormWidgets.buildTextField(
                   controller: _instagramPageController,
-                  label: 'Instagram',
+                  label: 'instagram_label'.tr(context),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
 
-          _buildTextField(
+          ShopFormWidgets.buildTextField(
             controller: _otherContactsController,
-            label: 'Other Contacts',
+            label: 'other_contacts_label'.tr(context),
           ),
           const SizedBox(height: 16),
 
-          _buildTextField(
+          ShopFormWidgets.buildTextField(
             controller: _notesOrConditionsController,
-            label: 'Notes or Conditions',
+            label: 'admin_notes_or_conditions'.tr(context),
             maxLines: 3,
           ),
           const SizedBox(height: 16),
 
           // Duration field
-          _buildTextField(
+          ShopFormWidgets.buildTextField(
             controller: _durationMinutesController,
-            label: 'Service Duration (minutes)',
+            label: 'admin_service_duration_minutes'.tr(context),
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 16),
@@ -3779,7 +3381,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                 activeColor: AppConstants.primaryColor,
               ),
               Text(
-                'Try-on Area Available',
+                'admin_try_on_area_available'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   color: const Color(0xFF1E293B),
@@ -3799,7 +3401,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                 activeColor: AppConstants.primaryColor,
               ),
               Text(
-                'Requires Purchase',
+                'admin_requires_purchase'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   color: const Color(0xFF1E293B),
@@ -3816,107 +3418,13 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                 activeColor: AppConstants.primaryColor,
               ),
               Text(
-                'Irregular Hours',
+                'admin_irregular_hours'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   color: const Color(0xFF1E293B),
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Build amenities section
-  Widget _buildAmenitiesSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Amenities',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                _availableAmenities.map((amenity) {
-                  final isSelected = _selectedAmenities.contains(amenity);
-                  return FilterChip(
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        if (selected) {
-                          _selectedAmenities.add(amenity);
-                        } else {
-                          _selectedAmenities.remove(amenity);
-                        }
-                      });
-                    },
-                    label: Text(amenity),
-                    selectedColor: AppConstants.primaryColor.withOpacity(0.2),
-                    checkmarkColor: AppConstants.primaryColor,
-                  );
-                }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Build features section
-  Widget _buildFeaturesSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Features',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                _availableFeatures.map((feature) {
-                  final isSelected = _selectedFeatures[feature] ?? false;
-                  return FilterChip(
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() {
-                        _selectedFeatures[feature] = selected;
-                      });
-                    },
-                    label: Text(feature),
-                    selectedColor: AppConstants.primaryColor.withOpacity(0.2),
-                    checkmarkColor: AppConstants.primaryColor,
-                  );
-                }).toList(),
           ),
         ],
       ),
@@ -3939,7 +3447,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Opening Hours',
+                'admin_opening_hours'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -3948,9 +3456,9 @@ class _AddShopDialogState extends State<_AddShopDialog> {
               ),
               Row(
                 children: [
-                  _buildQuickActionButton('Copy Mon', () => _copyMondayHours()),
+                  ShopFormWidgets.buildQuickActionButton('admin_copy_mon'.tr(context), () => _copyMondayHours()),
                   const SizedBox(width: 8),
-                  _buildQuickActionButton('Clear All', () => _clearAllHours()),
+                  ShopFormWidgets.buildQuickActionButton('admin_clear_all'.tr(context), () => _clearAllHours()),
                 ],
               ),
             ],
@@ -3961,36 +3469,27 @@ class _AddShopDialogState extends State<_AddShopDialog> {
           Wrap(
             spacing: 8,
             children: [
-              _buildPresetButton('9:00 AM - 6:00 PM', '09:00', '18:00'),
-              _buildPresetButton('10:00 AM - 7:00 PM', '10:00', '19:00'),
-              _buildPresetButton('8:00 AM - 5:00 PM', '08:00', '17:00'),
+              ShopFormWidgets.buildPresetButton(label: 'admin_preset_9_6'.tr(context), onPressed: () => _applyTimePreset('09:00', '18:00')),
+              ShopFormWidgets.buildPresetButton(label: 'admin_preset_10_7'.tr(context), onPressed: () => _applyTimePreset('10:00', '19:00')),
+              ShopFormWidgets.buildPresetButton(label: 'admin_preset_8_5'.tr(context), onPressed: () => _applyTimePreset('08:00', '17:00')),
             ],
           ),
           const SizedBox(height: 16),
 
           // Daily time pickers
           ...[
-            'Monday',
-            'Tuesday',
-            'Wednesday',
-            'Thursday',
-            'Friday',
-            'Saturday',
-            'Sunday',
-          ].map((day) {
+            'day_monday',
+            'day_tuesday',
+            'day_wednesday',
+            'day_thursday',
+            'day_friday',
+            'day_saturday',
+            'day_sunday',
+          ].map((dayKey) {
             final dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-            final dayNames = [
-              'Monday',
-              'Tuesday',
-              'Wednesday',
-              'Thursday',
-              'Friday',
-              'Saturday',
-              'Sunday',
-            ];
-            final dayIndex = dayNames.indexOf(day);
-            final dayKey = dayKeys[dayIndex];
-            final isClosed = _closedDays[dayKey] ?? false;
+            final dayIndex = ['day_monday', 'day_tuesday', 'day_wednesday', 'day_thursday', 'day_friday', 'day_saturday', 'day_sunday'].indexOf(dayKey);
+            final dayKeyShort = dayKeys[dayIndex];
+            final isClosed = _closedDays[dayKeyShort] ?? false;
 
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
@@ -4005,7 +3504,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                   SizedBox(
                     width: 100,
                     child: Text(
-                      day,
+                      dayKey.tr(context),
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
@@ -4020,13 +3519,13 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                     value: isClosed,
                     onChanged: (value) {
                       setState(() {
-                        _closedDays[dayKey] = value ?? false;
+                        _closedDays[dayKeyShort] = value ?? false;
                       });
                     },
                     activeColor: Colors.red,
                   ),
                   Text(
-                    'Closed',
+                    'closed_label'.tr(context),
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       color: Colors.grey.shade600,
@@ -4039,7 +3538,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                         children: [
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => _selectTime(context, dayKey, true),
+                              onTap: () => _selectTime(context, dayKeyShort, true),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -4052,8 +3551,8 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
-                                  _openingTimes[dayKey]?.format(context) ??
-                                      'Open',
+                                  _openingTimes[dayKeyShort]?.format(context) ??
+                                      'admin_open'.tr(context),
                                   style: GoogleFonts.inter(fontSize: 12),
                                 ),
                               ),
@@ -4064,7 +3563,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => _selectTime(context, dayKey, false),
+                              onTap: () => _selectTime(context, dayKeyShort, false),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
@@ -4077,8 +3576,8 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
-                                  _closingTimes[dayKey]?.format(context) ??
-                                      'Close',
+                                  _closingTimes[dayKeyShort]?.format(context) ??
+                                      'admin_close'.tr(context),
                                   style: GoogleFonts.inter(fontSize: 12),
                                 ),
                               ),
@@ -4094,37 +3593,6 @@ class _AddShopDialogState extends State<_AddShopDialog> {
           }).toList(),
         ],
       ),
-    );
-  }
-
-  // Helper methods for edit dialog
-  Widget _buildQuickActionButton(String label, VoidCallback onPressed) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.grey.shade200,
-        foregroundColor: Colors.grey.shade700,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      child: Text(label, style: GoogleFonts.inter(fontSize: 12)),
-    );
-  }
-
-  Widget _buildPresetButton(String label, String openTime, String closeTime) {
-    return ElevatedButton(
-      onPressed: () => _applyTimePreset(openTime, closeTime),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppConstants.primaryColor.withOpacity(0.1),
-        foregroundColor: AppConstants.primaryColor,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      child: Text(label, style: GoogleFonts.inter(fontSize: 12)),
     );
   }
 
@@ -4289,7 +3757,16 @@ class _AddShopDialogState extends State<_AddShopDialog> {
   }
 
   // Validate opening hours
-  String? _validateHours() {
+  String? _validateHours(BuildContext context) {
+    const dayKeyToName = {
+      'mon': 'day_monday',
+      'tue': 'day_tuesday',
+      'wed': 'day_wednesday',
+      'thu': 'day_thursday',
+      'fri': 'day_friday',
+      'sat': 'day_saturday',
+      'sun': 'day_sunday',
+    };
     for (String day in _openingTimeControllers.keys) {
       if (_closedDays[day] == true) continue;
 
@@ -4297,7 +3774,8 @@ class _AddShopDialogState extends State<_AddShopDialog> {
       final closing = _closingTimes[day];
 
       if (opening == null || closing == null) {
-        return 'Please set both opening and closing times for $day or mark it as closed';
+        final dayName = (dayKeyToName[day] ?? day).tr(context);
+        return 'admin_hours_required_for_day'.tr(context).replaceAll('{day}', dayName);
       }
 
       // Check if closing time is after opening time
@@ -4305,7 +3783,8 @@ class _AddShopDialogState extends State<_AddShopDialog> {
       final closingMinutes = closing.hour * 60 + closing.minute;
 
       if (closingMinutes <= openingMinutes) {
-        return '$day: Closing time must be after opening time';
+        final dayName = (dayKeyToName[day] ?? day).tr(context);
+        return 'admin_closing_after_opening'.tr(context).replaceAll('{day}', dayName);
       }
     }
     return null;
@@ -4317,15 +3796,15 @@ class _AddShopDialogState extends State<_AddShopDialog> {
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        width: 1200,
-        height: 1000,
+        width: min(1200, MediaQuery.of(context).size.width - 32),
+        height: min(1000, MediaQuery.of(context).size.height - 64),
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -4338,7 +3817,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
             Row(
               children: [
                 Text(
-                  'Add New Shop',
+                  'admin_add_new_shop'.tr(context),
                   style: GoogleFonts.inter(
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
@@ -4368,18 +3847,18 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                   child: Column(
                     children: [
                       // Basic Information
-                      _buildSectionHeader('Basic Information'),
+                      ShopFormWidgets.buildSectionHeader('admin_basic_info'.tr(context)),
                       const SizedBox(height: 16),
 
                       Row(
                         children: [
                           Expanded(
-                            child: _buildTextField(
+                            child: ShopFormWidgets.buildTextField(
                               controller: _nameController,
-                              label: 'Shop Name',
+                              label: 'shop_name_label'.tr(context),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Shop name is required';
+                                  return 'admin_shop_name_required'.tr(context);
                                 }
                                 return null;
                               },
@@ -4387,12 +3866,12 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _buildTextField(
+                            child: ShopFormWidgets.buildTextField(
                               controller: _areaController,
-                              label: 'Area',
+                              label: 'area_label'.tr(context),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Area is required';
+                                  return 'admin_area_required'.tr(context);
                                 }
                                 return null;
                               },
@@ -4402,26 +3881,26 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                       ),
                       const SizedBox(height: 16),
 
-                      _buildTextField(
+                      ShopFormWidgets.buildTextField(
                         controller: _descriptionController,
-                        label: 'Description',
+                        label: 'description'.tr(context),
                         maxLines: 3,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Description is required';
+                            return 'admin_description_required'.tr(context);
                           }
                           return null;
                         },
                       ),
                       const SizedBox(height: 16),
 
-                      _buildTextField(
+                      ShopFormWidgets.buildTextField(
                         controller: _addressController,
-                        label: 'Full Address',
+                        label: 'admin_label_full_address'.tr(context),
                         maxLines: 2,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Address is required';
+                            return 'admin_address_required'.tr(context);
                           }
                           return null;
                         },
@@ -4429,18 +3908,18 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                       const SizedBox(height: 24),
 
                       // Contact Information
-                      _buildSectionHeader('Contact Information'),
+                      ShopFormWidgets.buildSectionHeader('admin_contact_info'.tr(context)),
                       const SizedBox(height: 16),
 
                       Row(
                         children: [
                           Expanded(
-                            child: _buildTextField(
+                            child: ShopFormWidgets.buildTextField(
                               controller: _phoneController,
-                              label: 'Phone Number',
+                              label: 'phone_number_label'.tr(context),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Phone number is required';
+                                  return 'admin_phone_required'.tr(context);
                                 }
                                 return null;
                               },
@@ -4448,9 +3927,9 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _buildTextField(
+                            child: ShopFormWidgets.buildTextField(
                               controller: _facebookPageController,
-                              label: 'Facebook Page (Optional)',
+                              label: 'facebook_optional_label'.tr(context),
                             ),
                           ),
                         ],
@@ -4458,11 +3937,33 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                       const SizedBox(height: 16),
 
                       // Price Range Slider Section
-                      _buildPriceRangeSection(),
+                      ShopFormWidgets.buildPriceRangeSection(
+                        context: context,
+                        value: _priceRangeValue,
+                        onChanged: (value) {
+                          setState(() {
+                            _priceRangeValue = value;
+                          });
+                        },
+                        formatPriceRange: _formatPriceRange,
+                      ),
                       const SizedBox(height: 16),
 
                       // Payment Methods Section
-                      _buildPaymentMethodsSection(),
+                      ShopFormWidgets.buildPaymentMethodsSection(
+                        context: context,
+                        availablePaymentMethods: _availablePaymentMethods,
+                        selectedPaymentMethods: _selectedPaymentMethods,
+                        onToggle: (method, selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedPaymentMethods.add(method);
+                            } else {
+                              _selectedPaymentMethods.remove(method);
+                            }
+                          });
+                        },
+                      ),
                       const SizedBox(height: 16),
 
                       // Additional Fields Section
@@ -4470,11 +3971,35 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                       const SizedBox(height: 16),
 
                       // Amenities Section
-                      _buildAmenitiesSection(),
+                      ShopFormWidgets.buildAmenitiesSection(
+                        context: context,
+                        availableAmenities: _availableAmenities,
+                        selectedAmenities: _selectedAmenities,
+                        amenityToKey: _amenityToKey,
+                        onToggle: (amenity, selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedAmenities.add(amenity);
+                            } else {
+                              _selectedAmenities.remove(amenity);
+                            }
+                          });
+                        },
+                      ),
                       const SizedBox(height: 16),
 
                       // Features Section
-                      _buildFeaturesSection(),
+                      ShopFormWidgets.buildFeaturesSection(
+                        context: context,
+                        availableFeatures: _availableFeatures,
+                        selectedFeatures: _selectedFeatures,
+                        featureToKey: _featureToKey,
+                        onToggle: (feature, selected) {
+                          setState(() {
+                            _selectedFeatures[feature] = selected;
+                          });
+                        },
+                      ),
                       const SizedBox(height: 16),
 
                       // Opening Hours Section
@@ -4482,33 +4007,33 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                       const SizedBox(height: 24),
 
                       // Cover Image
-                      _buildSectionHeader('Cover Image'),
+                      ShopFormWidgets.buildSectionHeader('admin_cover_image'.tr(context)),
                       const SizedBox(height: 16),
                       _buildImageUploadSection(),
                       const SizedBox(height: 24),
 
                       // Location
-                      _buildSectionHeader('Location'),
+                      ShopFormWidgets.buildSectionHeader('admin_location'.tr(context)),
                       const SizedBox(height: 16),
                       _buildLocationSection(),
                       const SizedBox(height: 24),
 
                       // Categories
-                      _buildSectionHeader('Categories'),
+                      ShopFormWidgets.buildSectionHeader('categories'.tr(context)),
                       const SizedBox(height: 16),
                       _buildCategorySelection(),
                       const SizedBox(height: 24),
 
                       // Sub-Services
                       if (_selectedCategories.isNotEmpty) ...[
-                        _buildSectionHeader('Sub-Services'),
+                        ShopFormWidgets.buildSectionHeader('admin_sub_services'.tr(context)),
                         const SizedBox(height: 16),
                         _buildSubServicesSelection(),
                         const SizedBox(height: 24),
                       ],
 
                       // Status
-                      _buildSectionHeader('Status'),
+                      ShopFormWidgets.buildSectionHeader('status_label'.tr(context)),
                       const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -4519,7 +4044,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                         ),
                         child: SwitchListTile(
                           title: Text(
-                            'Approved',
+                            'approved'.tr(context),
                             style: GoogleFonts.inter(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -4528,8 +4053,8 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                           ),
                           subtitle: Text(
                             _isApproved
-                                ? 'Shop will be approved and visible to users'
-                                : 'Shop will be pending approval',
+                                ? 'admin_shop_approved_visible'.tr(context)
+                                : 'admin_shop_pending_approval'.tr(context),
                             style: GoogleFonts.inter(
                               fontSize: 14,
                               color: const Color(0xFF64748B),
@@ -4557,7 +4082,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  child: Text('cancel'.tr(context)),
                 ),
                 const SizedBox(width: 16),
                 ElevatedButton(
@@ -4570,59 +4095,12 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                       vertical: 12,
                     ),
                   ),
-                  child: const Text('Add Shop'),
+                  child: Text('add_shop'.tr(context)),
                 ),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.only(bottom: 8),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
-      ),
-      child: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: const Color(0xFF1E293B),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    String? Function(String?)? validator,
-    int maxLines = 1,
-    TextInputType? keyboardType,
-  }) {
-    return TextFormField(
-      controller: controller,
-      validator: validator,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: AppConstants.primaryColor),
-        ),
-        filled: true,
-        fillColor: Colors.white,
       ),
     );
   }
@@ -4666,17 +4144,17 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                         }
                       });
                     },
-                    selectedColor: AppConstants.primaryColor.withOpacity(0.2),
+                    selectedColor: AppConstants.primaryColor.withValues(alpha: 0.2),
                     checkmarkColor: AppConstants.primaryColor,
                   );
                 }).toList(),
           ),
           if (_selectedCategories.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Please select at least one category',
-                style: TextStyle(color: Colors.red, fontSize: 12),
+                'please_select_at_least_one_category'.tr(context),
+                style: const TextStyle(color: Colors.red, fontSize: 12),
               ),
             ),
         ],
@@ -4702,7 +4180,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${category.toUpperCase()} Sub-Services:',
+                    'sub_services_for_category'.tr(context).replaceAll('{category}', category.toUpperCase()),
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -4712,7 +4190,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                   const SizedBox(height: 12),
                   if (availableSubServices.isEmpty)
                     Text(
-                      'No sub-services available for this category',
+                      'no_sub_services_available'.tr(context),
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: const Color(0xFF64748B),
@@ -4752,7 +4230,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                                 });
                               },
                               selectedColor: AppConstants.primaryColor
-                                  .withOpacity(0.15),
+                                  .withValues(alpha: 0.15),
                               checkmarkColor: AppConstants.primaryColor,
                               backgroundColor: Colors.grey[50],
                               side: BorderSide(
@@ -4778,8 +4256,8 @@ class _AddShopDialogState extends State<_AddShopDialog> {
 
     if (_selectedCategories.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one category'),
+        SnackBar(
+          content: Text('please_select_at_least_one_category'.tr(context)),
           backgroundColor: Colors.red,
         ),
       );
@@ -4787,7 +4265,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
     }
 
     // Validate opening hours
-    final hoursValidationError = _validateHours();
+    final hoursValidationError = _validateHours(context);
     if (hoursValidationError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -4934,7 +4412,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                 children: [
                   CircularProgressIndicator(color: AppConstants.primaryColor),
                   const SizedBox(width: 16),
-                  const Text('Uploading image...'),
+                  Text('admin_uploading_image'.tr(context)),
                 ],
               ),
             ),
@@ -4965,13 +4443,13 @@ class _AddShopDialogState extends State<_AddShopDialog> {
       // Update state with uploaded image
       setState(() {
         _uploadedImageUrl = downloadUrl;
-        _selectedImagePath = image.path;
+        _selectedImagePath = image.name;
       });
 
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Image uploaded successfully!'),
+          content: Text('admin_image_uploaded'.tr(context)),
           backgroundColor: AppConstants.primaryColor,
         ),
       );
@@ -4984,7 +4462,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
       // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error uploading image: $e'),
+          content: Text('${'admin_error_uploading_image'.tr(context)}: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -5004,7 +4482,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Upload Cover Photo',
+            'admin_upload_cover_photo'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -5022,7 +4500,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                 image:
                     _uploadedImageUrl != null
                         ? DecorationImage(
-                          image: NetworkImage(_uploadedImageUrl!),
+                          image: CachedNetworkImageProvider(_uploadedImageUrl!),
                           fit: BoxFit.cover,
                         )
                         : null,
@@ -5049,8 +4527,8 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                   icon: const Icon(Icons.upload, size: 20),
                   label: Text(
                     _uploadedImageUrl != null || _selectedImagePath != null
-                        ? 'Change Image'
-                        : 'Upload Image',
+                        ? 'admin_change_image'.tr(context)
+                        : 'admin_upload_image'.tr(context),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppConstants.primaryColor,
@@ -5074,7 +4552,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                       });
                     },
                     icon: const Icon(Icons.delete, size: 20),
-                    label: const Text('Remove'),
+                    label: Text('remove'.tr(context)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
@@ -5106,7 +4584,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Shop Location',
+            'admin_shop_location'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -5128,7 +4606,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Coordinates',
+                        'admin_coordinates'.tr(context),
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -5158,7 +4636,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
               ElevatedButton.icon(
                 onPressed: () => _openMapPicker(context),
                 icon: const Icon(Icons.map, size: 20),
-                label: const Text('Pick Location on Map'),
+                label: Text('admin_pick_location_on_map'.tr(context)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppConstants.primaryColor,
                   foregroundColor: Colors.white,

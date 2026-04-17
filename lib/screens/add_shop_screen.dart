@@ -137,6 +137,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
   bool _sameTimeEveryDay = false;
 
   bool _isSubmitting = false;
+  bool _formSubmittedSuccessfully = false;
 
   List<String> _selectedPaymentMethods = [];
   bool _tryOnAreaAvailable = false;
@@ -251,9 +252,94 @@ class _AddShopScreenState extends State<AddShopScreen> {
     super.dispose();
   }
 
+  bool get _hasUnsavedChanges {
+    if (_formSubmittedSuccessfully) return false;
+    return _nameController.text.isNotEmpty ||
+        _descriptionController.text.isNotEmpty ||
+        _addressController.text.isNotEmpty ||
+        _areaController.text.isNotEmpty ||
+        _latitudeController.text.isNotEmpty ||
+        _longitudeController.text.isNotEmpty ||
+        _phoneController.text.isNotEmpty ||
+        _buildingNumberController.text.isNotEmpty ||
+        _buildingNameController.text.isNotEmpty ||
+        _soiController.text.isNotEmpty ||
+        _districtController.text.isNotEmpty ||
+        _landmarkController.text.isNotEmpty ||
+        _lineIdController.text.isNotEmpty ||
+        _facebookPageController.text.isNotEmpty ||
+        _otherContactsController.text.isNotEmpty ||
+        _notesOrConditionsController.text.isNotEmpty ||
+        _instagramPageController.text.isNotEmpty ||
+        _buildingFloorController.text.isNotEmpty ||
+        _selectedCategories.isNotEmpty ||
+        _selectedImageBytes != null ||
+        _selectedPaymentMethods.isNotEmpty ||
+        _selectedProvince != null;
+  }
+
+  Future<bool> _showDiscardDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'discard_changes'.tr(context),
+          style: GoogleFonts.montserrat(
+            fontWeight: FontWeight.bold,
+            color: AppConstants.primaryColor,
+          ),
+        ),
+        content: Text(
+          'discard_changes_message'.tr(context),
+          style: GoogleFonts.montserrat(),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'keep_editing'.tr(context),
+              style: TextStyle(color: AppConstants.primaryColor),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'discard'.tr(context),
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<void> _handleBackButton() async {
+    if (_hasUnsavedChanges) {
+      final shouldDiscard = await _showDiscardDialog();
+      if (shouldDiscard && mounted) {
+        Navigator.pop(context);
+      }
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldDiscard = await _showDiscardDialog();
+        if (shouldDiscard && mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(
           'add_shop'.tr(context),
@@ -267,22 +353,26 @@ class _AddShopScreenState extends State<AddShopScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: _handleBackButton,
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: ResponsiveSize.getScaledPadding(
-              const EdgeInsets.all(16.0),
-            ),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Warning message
-                  Container(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 700),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: Padding(
+                padding: ResponsiveSize.getScaledPadding(
+                  const EdgeInsets.all(16.0),
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Warning message
+                      Container(
                     padding: ResponsiveSize.getScaledPadding(
                       const EdgeInsets.all(12),
                     ),
@@ -342,7 +432,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                     maxLines: 3,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter a description';
+                        return 'please_enter_description'.tr(context);
                       }
                       return null;
                     },
@@ -429,7 +519,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                       child: TextField(
                                         controller: _latitudeController,
                                         decoration: InputDecoration(
-                                          labelText: 'Latitude',
+                                          labelText: 'latitude_label_short'.tr(context),
                                           hintText: '13.7563',
                                           prefixIcon: Icon(
                                             Icons.location_on,
@@ -441,7 +531,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                               8,
                                             ),
                                           ),
-                                          helperText: 'e.g., 13.7563',
+                                          helperText: 'coord_helper_lat'.tr(context),
                                         ),
                                         keyboardType:
                                             const TextInputType.numberWithOptions(
@@ -455,7 +545,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                       child: TextField(
                                         controller: _longitudeController,
                                         decoration: InputDecoration(
-                                          labelText: 'Longitude',
+                                          labelText: 'longitude_label_short'.tr(context),
                                           hintText: '100.5018',
                                           prefixIcon: Icon(
                                             Icons.location_on,
@@ -467,7 +557,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                               8,
                                             ),
                                           ),
-                                          helperText: 'e.g., 100.5018',
+                                          helperText: 'coord_helper_lng'.tr(context),
                                         ),
                                         keyboardType:
                                             const TextInputType.numberWithOptions(
@@ -480,7 +570,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                 ),
                                 SizedBox(height: ResponsiveSize.getHeight(1)),
                                 Text(
-                                  'You can paste coordinates directly or use the map picker below',
+                                  'coord_paste_instruction'.tr(context),
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[600],
@@ -607,7 +697,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                   // Line ID (Optional)
                   _buildTextFormField(
                     controller: _lineIdController,
-                    label: '${'line_id_label'.tr(context)} (Optional)',
+                    label: '${'line_id_label'.tr(context)} (${'optional'.tr(context)})',
                     hint: 'enter_line_id_hint'.tr(context),
                     prefixIcon: Icon(
                       FontAwesomeIcons.line,
@@ -632,7 +722,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                   // Instagram Page (Optional)
                   _buildTextFormField(
                     controller: _instagramPageController,
-                    label: '${'instagram_label'.tr(context)} (Optional)',
+                    label: '${'instagram_label'.tr(context)} (${'optional'.tr(context)})',
                     hint: 'enter_instagram_url'.tr(context),
                     prefixIcon: Icon(
                       FontAwesomeIcons.instagram,
@@ -645,7 +735,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                   // Other Contacts
                   _buildTextFormField(
                     controller: _otherContactsController,
-                    label: '${'other_contacts_label'.tr(context)} (Optional)',
+                    label: '${'other_contacts_label'.tr(context)} (${'optional'.tr(context)})',
                     hint: 'enter_other_contacts_hint'.tr(context),
                     maxLines: 2,
                   ),
@@ -761,7 +851,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        "Please set Monday's opening and closing times first",
+                                        'please_set_monday_hours'.tr(context),
                                       ),
                                       backgroundColor: Colors.orange,
                                     ),
@@ -892,6 +982,9 @@ class _AddShopScreenState extends State<AddShopScreen> {
           ),
         ),
       ),
+    ),
+  ),
+),
     );
   }
 
@@ -1308,14 +1401,14 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                       color:
                                           isSyncedWithMonday
                                               ? AppConstants.primaryColor
-                                                  .withOpacity(0.05)
+                                                  .withValues(alpha: 0.05)
                                               : Colors.grey[100],
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
                                         color:
                                             isSyncedWithMonday
                                                 ? AppConstants.primaryColor
-                                                    .withOpacity(0.3)
+                                                    .withValues(alpha: 0.3)
                                                 : Colors.grey[300]!,
                                         width: 1,
                                       ),
@@ -1375,14 +1468,14 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                       color:
                                           isSyncedWithMonday
                                               ? AppConstants.primaryColor
-                                                  .withOpacity(0.05)
+                                                  .withValues(alpha: 0.05)
                                               : Colors.grey[100],
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
                                         color:
                                             isSyncedWithMonday
                                                 ? AppConstants.primaryColor
-                                                    .withOpacity(0.3)
+                                                    .withValues(alpha: 0.3)
                                                 : Colors.grey[300]!,
                                         width: 1,
                                       ),
@@ -1464,6 +1557,21 @@ class _AddShopScreenState extends State<AddShopScreen> {
         return;
       }
 
+      if (_latitudeController.text.isEmpty || _longitudeController.text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('please_set_location'.tr(context))),
+        );
+        return;
+      }
+      final lat = double.tryParse(_latitudeController.text);
+      final lng = double.tryParse(_longitudeController.text);
+      if (lat == null || lng == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('invalid_coordinates'.tr(context))),
+        );
+        return;
+      }
+
       setState(() {
         _isSubmitting = true;
       });
@@ -1519,8 +1627,8 @@ class _AddShopScreenState extends State<AddShopScreen> {
         rating: 0.0,
         hours: hours,
         closingDays: closingDays,
-        latitude: double.parse(_latitudeController.text),
-        longitude: double.parse(_longitudeController.text),
+        latitude: double.tryParse(_latitudeController.text) ?? 0.0,
+        longitude: double.tryParse(_longitudeController.text) ?? 0.0,
         irregularHours: _hasIrregularHours,
         approved: false,
         photos: photoUrls,
@@ -1559,7 +1667,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
         });
 
         if (success) {
-          // Show success dialog
+          _formSubmittedSuccessfully = true;
           _showSuccessDialog();
         } else {
           // Show error dialog
@@ -1763,7 +1871,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Crop Image',
+            toolbarTitle: 'crop_image'.tr(context),
             toolbarColor: Colors.brown,
             toolbarWidgetColor: Colors.white,
             initAspectRatio: CropAspectRatioPreset.original,
@@ -1772,7 +1880,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
             showCropGrid: true,
           ),
           IOSUiSettings(
-            title: 'Crop Image',
+            title: 'crop_image'.tr(context),
             minimumAspectRatio: 1.0,
             resetAspectRatioEnabled: false,
             aspectRatioLockEnabled: false,
@@ -1921,7 +2029,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.close, size: 18, color: Colors.black),

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/services/auth_service.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 class ViewReportsScreen extends StatefulWidget {
   const ViewReportsScreen({Key? key}) : super(key: key);
@@ -29,7 +30,9 @@ class _ViewReportsScreenState extends State<ViewReportsScreen> {
           await _firestore
               .collection('report')
               .where('resolved', isEqualTo: false)
+              .limit(200)
               .get();
+      if (!mounted) return;
       setState(() {
         _reports =
             reportSnapshot.docs
@@ -43,7 +46,8 @@ class _ViewReportsScreenState extends State<ViewReportsScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading reports: $e');
+      appLog('Error loading reports: $e');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -90,6 +94,7 @@ class _ViewReportsScreenState extends State<ViewReportsScreen> {
                               (context) => ReportDetailScreen(report: report),
                         ),
                       );
+                      if (!mounted) return;
                       if (changed == true) _refresh();
                     },
                     child: Card(
@@ -193,7 +198,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           final authService = AuthService();
           userId = await authService.getUserId();
           userName = await authService.getUserName();
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Error getting user info fallback: $e');
+        }
       }
       final updateData = {
         'resolved': resolved,
@@ -204,14 +211,16 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
           .collection('report')
           .doc(widget.report['docId'])
           .update(updateData);
-      Navigator.pop(context, true); // Indicate change to refresh list
+      if (!mounted) return;
+      Navigator.pop(context, true);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isProcessing = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to update status'),
+          content: Text('admin_failed_to_update_status'.tr(context)),
           backgroundColor: Colors.red,
         ),
       );
@@ -223,7 +232,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final report = widget.report;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Report Details'),
+        title: Text('admin_report_details'.tr(context)),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -284,7 +293,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Correct Information',
+                          'admin_correct_information'.tr(context),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.brown[800],
@@ -310,7 +319,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Additional Details',
+                          'admin_additional_details'.tr(context),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.blueGrey[800],
@@ -410,9 +419,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                             ),
                           ),
                           onPressed: () => _setResolved(true),
-                          label: const Text(
-                            'Resolve',
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                          label: Text(
+                            'admin_resolve'.tr(context),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                       if (!_isProcessing && report['resolved'] == true)
@@ -430,9 +439,9 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                             ),
                           ),
                           onPressed: () => _setResolved(false),
-                          label: const Text(
-                            'Unresolve',
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                          label: Text(
+                            'admin_unresolve'.tr(context),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
                       if (_isProcessing)

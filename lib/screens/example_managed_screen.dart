@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wonwonw2/mixins/widget_disposal_mixin.dart';
 import 'package:wonwonw2/services/unified_memory_manager.dart';
 import 'package:wonwonw2/services/optimized_image_cache_manager.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 /// Example screen showing how to use the new memory management system
 class ExampleManagedScreen extends ManagedStatefulWidget {
@@ -88,7 +89,7 @@ class _ExampleManagedScreenState extends ManagedState<ExampleManagedScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Memory Managed Screen'),
+        title: Text('memory_managed_screen'.tr(context)),
         actions: [
           IconButton(
             icon: const Icon(Icons.memory),
@@ -105,9 +106,9 @@ class _ExampleManagedScreenState extends ManagedState<ExampleManagedScreen>
               padding: const EdgeInsets.all(16),
               child: TextField(
                 controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: 'Search...',
-                  prefixIcon: Icon(Icons.search),
+                decoration: InputDecoration(
+                  hintText: 'search_hint'.tr(context),
+                  prefixIcon: const Icon(Icons.search),
                 ),
               ),
             ),
@@ -157,14 +158,14 @@ class _ExampleManagedScreenState extends ManagedState<ExampleManagedScreen>
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Memory Statistics'),
+            title: Text('memory_statistics'.tr(context)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Weak References: ${stats.weakReferences}'),
-                Text('Active References: ${stats.activeReferences}'),
-                Text('Widget States: ${stats.widgetStates}'),
+                Text('weak_references'.tr(context).replaceAll('{count}', stats.weakReferences.toString())),
+                Text('active_references'.tr(context).replaceAll('{count}', stats.activeReferences.toString())),
+                Text('widget_states'.tr(context).replaceAll('{count}', stats.widgetStates.toString())),
                 Text(
                   'Image Cache Entries: ${stats.imageCacheStats.totalEntries}',
                 ),
@@ -179,11 +180,11 @@ class _ExampleManagedScreenState extends ManagedState<ExampleManagedScreen>
                   memoryManager.forceCleanup();
                   Navigator.of(context).pop();
                 },
-                child: const Text('Force Cleanup'),
+                child: Text('force_cleanup'.tr(context)),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
+                child: Text('close_button'.tr(context)),
               ),
             ],
           ),
@@ -205,4 +206,5 @@ extension TextControllerExtension on TextEditingController {
     ).map((_) => text).distinct();
   }
 }
+
 

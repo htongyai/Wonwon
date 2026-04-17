@@ -45,18 +45,18 @@ class RepairRecord {
 
   factory RepairRecord.fromMap(Map<String, dynamic> map) {
     return RepairRecord(
-      id: map['id'] as String,
-      shopId: map['shopId'] as String,
-      shopName: map['shopName'] as String,
-      itemFixed: map['itemFixed'] as String,
-      price: map['price'] != null ? (map['price'] as num).toDouble() : null,
-      date: (map['date'] as Timestamp).toDate(),
+      id: map['id']?.toString() ?? '',
+      shopId: map['shopId']?.toString() ?? '',
+      shopName: map['shopName']?.toString() ?? '',
+      itemFixed: map['itemFixed']?.toString() ?? '',
+      price: (map['price'] as num?)?.toDouble(),
+      date: map['date'] != null ? (map['date'] as Timestamp).toDate() : DateTime.now(),
       duration:
           map['duration'] != null ? Duration(days: map['duration']) : null,
-      notes: map['notes'] as String?,
+      notes: map['notes']?.toString(),
       satisfactionRating: map['satisfactionRating'] as int?,
-      category: map['category'] as String,
-      subService: map['subService'] as String,
+      category: map['category']?.toString() ?? '',
+      subService: map['subService']?.toString() ?? '',
     );
   }
 }

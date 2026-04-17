@@ -31,7 +31,7 @@ class AssetHelpers {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: (color ?? AppConstants.primaryColor).withOpacity(0.1),
+        color: (color ?? AppConstants.primaryColor).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Center(
@@ -87,7 +87,7 @@ class AssetHelpers {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppConstants.primaryColor.withOpacity(0.7),
+            AppConstants.primaryColor.withValues(alpha: 0.7),
             AppConstants.primaryColor,
           ],
           begin: Alignment.topLeft,

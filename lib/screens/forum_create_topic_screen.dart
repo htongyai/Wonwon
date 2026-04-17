@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wonwonw2/services/forum_service.dart';
-import 'package:wonwonw2/screens/forum_screen.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/services/analytics_service.dart';
 
 class ForumCreateTopicScreen extends StatefulWidget {
   const ForumCreateTopicScreen({Key? key}) : super(key: key);
@@ -21,35 +24,36 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
   String _selectedCategory = 'general';
   List<String> _tags = [];
   bool _isSubmitting = false;
+  bool _submittedSuccessfully = false;
 
   final List<Map<String, dynamic>> _categories = [
     {
       'id': 'general',
-      'name': 'General Discussion',
+      'nameKey': 'general_discussion',
       'icon': FontAwesomeIcons.comments,
       'color': Colors.green,
     },
     {
       'id': 'repair_tips',
-      'name': 'Repair Tips & Tricks',
+      'nameKey': 'repair_tips_tricks',
       'icon': FontAwesomeIcons.wrench,
       'color': Colors.orange,
     },
     {
       'id': 'shop_reviews',
-      'name': 'Shop Reviews',
+      'nameKey': 'shop_reviews_category',
       'icon': FontAwesomeIcons.star,
       'color': Colors.purple,
     },
     {
       'id': 'questions',
-      'name': 'Questions & Help',
+      'nameKey': 'questions_help',
       'icon': FontAwesomeIcons.questionCircle,
       'color': Colors.red,
     },
     {
       'id': 'announcements',
-      'name': 'Announcements',
+      'nameKey': 'announcements',
       'icon': FontAwesomeIcons.bullhorn,
       'color': Colors.teal,
     },
@@ -58,7 +62,6 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
   @override
   void initState() {
     super.initState();
-    print('ForumCreateTopicScreen initState called');
   }
 
   @override
@@ -69,14 +72,79 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
     super.dispose();
   }
 
+  bool get _hasUnsavedChanges {
+    if (_submittedSuccessfully) return false;
+    return _titleController.text.isNotEmpty ||
+        _contentController.text.isNotEmpty ||
+        _tags.isNotEmpty;
+  }
+
+  Future<bool> _showDiscardDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'discard_changes'.tr(context),
+          style: GoogleFonts.montserrat(
+            fontWeight: FontWeight.bold,
+            color: AppConstants.primaryColor,
+          ),
+        ),
+        content: Text(
+          'discard_changes_message'.tr(context),
+          style: GoogleFonts.montserrat(),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'keep_editing'.tr(context),
+              style: TextStyle(color: AppConstants.primaryColor),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'discard'.tr(context),
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<void> _handleBackButton() async {
+    if (_hasUnsavedChanges) {
+      final shouldDiscard = await _showDiscardDialog();
+      if (shouldDiscard && mounted) {
+        Navigator.of(context).pop();
+      }
+    } else {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    print('ForumCreateTopicScreen build method called');
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldDiscard = await _showDiscardDialog();
+        if (shouldDiscard && mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
-          'Create New Topic',
+          'create_new_topic'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 20,
             fontWeight: FontWeight.w600,
@@ -87,7 +155,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
         iconTheme: const IconThemeData(color: AppConstants.darkColor),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _handleBackButton,
         ),
         actions: [
           TextButton(
@@ -100,7 +168,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                     : Text(
-                      'Post',
+                      'post'.tr(context),
                       style: GoogleFonts.montserrat(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -110,28 +178,34 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Category selection
-            _buildCategorySection(),
-            const SizedBox(height: 24),
-            // Title field
-            _buildTitleField(),
-            const SizedBox(height: 24),
-            // Content field
-            _buildContentField(),
-            const SizedBox(height: 24),
-            // Tags section
-            _buildTagsSection(),
-            const SizedBox(height: 24),
-            // Guidelines
-            _buildGuidelines(),
-          ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
+              children: [
+                // Category selection
+                _buildCategorySection(),
+                const SizedBox(height: 24),
+                // Title field
+                _buildTitleField(),
+                const SizedBox(height: 24),
+                // Content field
+                _buildContentField(),
+                const SizedBox(height: 24),
+                // Tags section
+                _buildTagsSection(),
+                const SizedBox(height: 24),
+                // Guidelines
+                _buildGuidelines(),
+              ],
         ),
       ),
+    ),
+  ),
+),
     );
   }
 
@@ -140,7 +214,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Category',
+          'select_category'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -152,7 +226,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.withOpacity(0.2)),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
           ),
           child: Column(
             children:
@@ -182,7 +256,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
           decoration: BoxDecoration(
             color:
                 isSelected
-                    ? AppConstants.primaryColor.withOpacity(0.1)
+                    ? AppConstants.primaryColor.withValues(alpha: 0.1)
                     : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -197,7 +271,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: category['color'].withOpacity(0.1),
+                  color: category['color'].withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
@@ -214,7 +288,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      category['name'],
+                      (category['nameKey'] as String).tr(context),
                       style: GoogleFonts.montserrat(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -250,15 +324,15 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
   String _getCategoryDescription(String categoryId) {
     switch (categoryId) {
       case 'general':
-        return 'General discussions about repair services and community topics';
+        return 'forum_desc_general'.tr(context);
       case 'repair_tips':
-        return 'Share and discover repair tips, tricks, and DIY guides';
+        return 'forum_desc_repair_tips'.tr(context);
       case 'shop_reviews':
-        return 'Share your experiences with repair shops and services';
+        return 'forum_desc_shop_reviews'.tr(context);
       case 'questions':
-        return 'Ask questions and get help from the community';
+        return 'forum_desc_questions'.tr(context);
       case 'announcements':
-        return 'Important announcements and platform updates';
+        return 'forum_desc_announcements'.tr(context);
       default:
         return '';
     }
@@ -269,7 +343,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Title',
+          'topic_title'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -280,14 +354,14 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
         TextFormField(
           controller: _titleController,
           decoration: InputDecoration(
-            hintText: 'Enter a descriptive title for your topic...',
+            hintText: 'topic_title_hint'.tr(context),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+              borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+              borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -299,13 +373,13 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Please enter a title';
+              return 'title_required'.tr(context);
             }
             if (value.trim().length < 10) {
-              return 'Title must be at least 10 characters long';
+              return 'title_too_short'.tr(context);
             }
             if (value.trim().length > 100) {
-              return 'Title must be less than 100 characters';
+              return 'title_too_long'.tr(context);
             }
             return null;
           },
@@ -320,7 +394,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Content',
+          'topic_content'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -331,14 +405,14 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
         TextFormField(
           controller: _contentController,
           decoration: InputDecoration(
-            hintText: 'Write your topic content here...',
+            hintText: 'topic_content_hint'.tr(context),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+              borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+              borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -350,10 +424,10 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Please enter content';
+              return 'content_required'.tr(context);
             }
             if (value.trim().length < 20) {
-              return 'Content must be at least 20 characters long';
+              return 'content_too_short'.tr(context);
             }
             return null;
           },
@@ -369,7 +443,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Tags (Optional)',
+          'tags_optional'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -378,7 +452,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Add tags to help others find your topic',
+          'forum_tags_help'.tr(context),
           style: GoogleFonts.montserrat(fontSize: 12, color: Colors.grey[600]),
         ),
         const SizedBox(height: 12),
@@ -389,14 +463,14 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
               child: TextField(
                 controller: _tagController,
                 decoration: InputDecoration(
-                  hintText: 'Add a tag...',
+                  hintText: 'tags_hint'.tr(context),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                    borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                    borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -423,7 +497,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
                   vertical: 12,
                 ),
               ),
-              child: const Text('Add'),
+              child: Text('forum_add'.tr(context)),
             ),
           ],
         ),
@@ -442,10 +516,10 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: AppConstants.primaryColor.withOpacity(0.1),
+                          color: AppConstants.primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: AppConstants.primaryColor.withOpacity(0.3),
+                            color: AppConstants.primaryColor.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Row(
@@ -482,9 +556,9 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.05),
+        color: Colors.blue.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -494,7 +568,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
               Icon(Icons.info_outline, color: Colors.blue[600], size: 20),
               const SizedBox(width: 8),
               Text(
-                'Community Guidelines',
+                'community_guidelines'.tr(context),
                 style: GoogleFonts.montserrat(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -505,11 +579,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '• Be respectful and constructive in your posts\n'
-            '• Provide clear and helpful information\n'
-            '• Use appropriate categories for your topics\n'
-            '• Avoid spam and promotional content\n'
-            '• Follow the community rules and guidelines',
+            'forum_guidelines_text'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 12,
               color: Colors.blue[700],
@@ -540,49 +610,64 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
   }
 
   Future<void> _submitTopic() async {
-    print('_submitTopic called');
+    appLog('_submitTopic called');
     if (!_formKey.currentState!.validate()) {
-      print('Form validation failed');
+      appLog('Form validation failed');
       return;
     }
 
-    print('Form validation passed, submitting topic...');
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      appLog('User not authenticated - cannot create topic');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('forum_login_to_create'.tr(context)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    appLog('Form validation passed, submitting topic...');
     setState(() {
       _isSubmitting = true;
     });
 
     try {
-      print('Calling ForumService.createTopic...');
+      appLog('Calling ForumService.createTopic...');
       final topicId = await ForumService.createTopic(
         title: _titleController.text.trim(),
         content: _contentController.text.trim(),
         category: _selectedCategory,
         tags: _tags,
       );
-      print('Topic created with ID: $topicId');
+      appLog('Topic created with ID: $topicId');
+      AnalyticsService.safeLog(() => AnalyticsService().logCreateTopic(topicId));
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Topic created successfully!'),
+        _submittedSuccessfully = true;
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('topic_created'.tr(context)),
             backgroundColor: Colors.green,
           ),
         );
 
-        // Navigate to the topic detail screen
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const ForumScreen()),
-        );
+        Navigator.of(context).pop();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error creating topic: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      appLog('Error creating topic: $e');
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('error_creating_topic'.tr(context).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {

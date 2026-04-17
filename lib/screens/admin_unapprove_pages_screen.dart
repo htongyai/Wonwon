@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class AdminUnapprovePagesScreen extends StatefulWidget {
   const AdminUnapprovePagesScreen({Key? key}) : super(key: key);
@@ -51,7 +54,8 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
       });
       _applySorting();
     } catch (e) {
-      print('Error loading unapproved shops: $e');
+      appLog('Error loading unapproved shops: $e');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _hasError = true;
@@ -130,7 +134,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
               color: const Color(0xFFF8F9FA),
               border: Border(
                 bottom: BorderSide(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
@@ -144,7 +148,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
                 ),
                 const SizedBox(width: 16),
                 Text(
-                  'Unapproved Pages',
+                  'admin_unapproved_pages'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -156,7 +160,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
                 IconButton(
                   onPressed: _loadUnapprovedShops,
                   icon: Icon(Icons.refresh, color: AppConstants.primaryColor),
-                  tooltip: 'Refresh',
+                  tooltip: 'refresh'.tr(context),
                 ),
               ],
             ),
@@ -171,7 +175,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
                   child: TextField(
                     onChanged: _applySearch,
                     decoration: InputDecoration(
-                      hintText: 'Search unapproved shops...',
+                      hintText: 'admin_search_unapproved_shops'.tr(context),
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -185,7 +189,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
                 ),
                 const SizedBox(width: 16),
                 Text(
-                  '${_filteredShops.length} pending',
+                  'admin_pending_count'.tr(context).replaceAll('{count}', '${_filteredShops.length}'),
                   style: GoogleFonts.montserrat(
                     fontSize: 14,
                     color: Colors.grey[600],
@@ -219,7 +223,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
           Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
           const SizedBox(height: 16),
           Text(
-            'Error loading unapproved shops',
+            'admin_error_loading_shops'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -229,7 +233,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: _loadUnapprovedShops,
-            child: const Text('Try Again'),
+            child: Text('try_again'.tr(context)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppConstants.primaryColor,
             ),
@@ -247,7 +251,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
           Icon(Icons.check_circle_outline, size: 64, color: Colors.green[400]),
           const SizedBox(height: 16),
           Text(
-            'No unapproved shops',
+            'admin_no_unapproved_shops'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -256,7 +260,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'All shops have been approved',
+            'admin_all_shops_approved'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 14,
               color: Colors.grey[600],
@@ -272,12 +276,12 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
       scrollDirection: Axis.horizontal,
       child: DataTable(
         columns: [
-          _buildSortableColumn('Shop Name', 'name'),
-          _buildSortableColumn('Address', 'address'),
-          _buildSortableColumn('Submitted', 'submittedDate'),
-          const DataColumn(label: Text('Categories')),
-          const DataColumn(label: Text('Services')),
-          const DataColumn(label: Text('Actions')),
+          _buildSortableColumn('shop_name'.tr(context), 'name'),
+          _buildSortableColumn('address'.tr(context), 'address'),
+          _buildSortableColumn('admin_submitted'.tr(context), 'submittedDate'),
+          DataColumn(label: Text('categories'.tr(context))),
+          DataColumn(label: Text('services'.tr(context))),
+          DataColumn(label: Text('admin_actions'.tr(context))),
         ],
         rows:
             _filteredShops
@@ -346,7 +350,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: AppConstants.primaryColor.withOpacity(0.1),
+                            color: AppConstants.primaryColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -365,8 +369,8 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
         DataCell(
           Text(
             shop.subServices.isNotEmpty
-                ? '${shop.subServices.values.first.length} services'
-                : 'No services',
+                ? 'admin_services_count'.tr(context).replaceAll('{count}', '${shop.subServices.values.first.length}')
+                : 'admin_no_services'.tr(context),
             style: GoogleFonts.montserrat(fontSize: 12),
           ),
         ),
@@ -377,7 +381,7 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
               IconButton(
                 onPressed: () => _viewShopDetails(shop),
                 icon: const Icon(Icons.visibility, size: 16),
-                tooltip: 'View Details',
+                tooltip: 'view_details'.tr(context),
               ),
               IconButton(
                 onPressed: () => _approveShop(shop),
@@ -386,12 +390,12 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
                   size: 16,
                   color: Colors.green,
                 ),
-                tooltip: 'Approve Shop',
+                tooltip: 'admin_approve_shop'.tr(context),
               ),
               IconButton(
                 onPressed: () => _rejectShop(shop),
                 icon: const Icon(Icons.cancel, size: 16, color: Colors.red),
-                tooltip: 'Reject Shop',
+                tooltip: 'admin_reject_shop'.tr(context),
               ),
             ],
           ),
@@ -413,23 +417,37 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Approve Shop'),
-            content: Text('Are you sure you want to approve "${shop.name}"?'),
+            title: Text('admin_approve_shop'.tr(context)),
+            content: Text('admin_approve_shop_confirm'.tr(context).replaceAll('{shop_name}', shop.name)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               TextButton(
-                onPressed: () {
+                onPressed: () async {
                   Navigator.of(context).pop();
-                  // TODO: Implement approve shop functionality
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Approved shop: ${shop.name}')),
-                  );
+                  try {
+                    await FirebaseFirestore.instance.collection('shops').doc(shop.id).update({
+                      'approved': true,
+                      'approvedAt': FieldValue.serverTimestamp(),
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('shop_approved_msg'.tr(this.context).replaceAll('{name}', shop.name))),
+                      );
+                      _loadUnapprovedShops();
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('error_approving_shop_msg'.tr(this.context).replaceAll('{error}', e.toString())), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
                 },
                 style: TextButton.styleFrom(foregroundColor: Colors.green),
-                child: const Text('Approve'),
+                child: Text('admin_approve'.tr(context)),
               ),
             ],
           ),
@@ -441,23 +459,34 @@ class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Reject Shop'),
-            content: Text('Are you sure you want to reject "${shop.name}"?'),
+            title: Text('admin_reject_shop'.tr(context)),
+            content: Text('admin_reject_shop_confirm'.tr(context).replaceAll('{shop_name}', shop.name)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               TextButton(
-                onPressed: () {
+                onPressed: () async {
                   Navigator.of(context).pop();
-                  // TODO: Implement reject shop functionality
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Rejected shop: ${shop.name}')),
-                  );
+                  try {
+                    await FirebaseFirestore.instance.collection('shops').doc(shop.id).delete();
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('shop_rejected_msg'.tr(this.context).replaceAll('{name}', shop.name))),
+                      );
+                      _loadUnapprovedShops();
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('error_rejecting_shop_msg'.tr(this.context).replaceAll('{error}', e.toString())), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
                 },
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Reject'),
+                child: Text('admin_reject'.tr(context)),
               ),
             ],
           ),

@@ -12,6 +12,9 @@ class LocationService with ChangeNotifier {
   // Subscription to position updates stream
   StreamSubscription<Position>? _positionStreamSubscription;
 
+  // Periodic timer for web location polling
+  Timer? _webPollingTimer;
+
   // Most recent user position data
   Position? _currentPosition;
 
@@ -23,7 +26,7 @@ class LocationService with ChangeNotifier {
 
   // Cooldown mechanism to prevent infinite retries
   DateTime? _lastFailedAttempt;
-  static const Duration _retryCooldown = Duration(seconds: 10); // Reduced for testing
+  static const Duration _retryCooldown = Duration(seconds: 30);
 
   // Getters for internal state
   Position? get currentPosition => _currentPosition;
@@ -289,12 +292,13 @@ class LocationService with ChangeNotifier {
     // Don't start tracking if already tracking
     if (_isTracking) return true;
 
-    // Web doesn't support background location tracking in the same way
     if (kIsWeb) {
       try {
-        // For web, we'll just get the current position periodically
         await getCurrentPosition();
         _isTracking = true;
+        _webPollingTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+          await getCurrentPosition();
+        });
         notifyListeners();
         return true;
       } catch (e) {
@@ -338,9 +342,10 @@ class LocationService with ChangeNotifier {
 
   /// Stop continuous location tracking
   void stopTracking() {
-    // Cancel the subscription if it exists
     _positionStreamSubscription?.cancel();
     _positionStreamSubscription = null;
+    _webPollingTimer?.cancel();
+    _webPollingTimer = null;
     _isTracking = false;
     notifyListeners();
   }

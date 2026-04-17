@@ -39,7 +39,7 @@ mixin AuthStateMixin<T extends StatefulWidget> on State<T> {
   /// Initialize auth state and set up listeners
   void _initializeAuthState() {
     // Set initial state
-    _isLoggedIn = _authManager.getIsLoggedIn();
+    _isLoggedIn = _authManager.isLoggedIn;
     _currentUser = _authManager.currentUser;
     _isAuthLoading = false;
 
@@ -106,7 +106,8 @@ mixin AuthStateMixin<T extends StatefulWidget> on State<T> {
     String password,
     String accountType,
   ) async {
-    return await _authManager.register(name, email, password, accountType);
+    final result = await _authManager.register(name, email, password, accountType);
+    return result.success;
   }
 
   /// Show login dialog when user needs to be authenticated

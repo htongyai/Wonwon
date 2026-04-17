@@ -331,12 +331,13 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
       bool success;
 
       if (isSignup) {
-        success = await _authService.register(
+        final regResult = await _authService.register(
           _nameController.text.trim(),
           _emailController.text.trim(),
           _passwordController.text,
           _selectedAccountType,
         );
+        success = regResult.success;
       } else {
         final result = await _authService.login(
           _emailController.text.trim(),
@@ -370,7 +371,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
       }
     } catch (e) {
       if (mounted) {
-        _showErrorSnackBar('Error: ${e.toString()}');
+        _showErrorSnackBar('error_generic'.tr(context).replaceAll('{error}', e.toString()));
       }
     } finally {
       if (mounted) {

@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wonwonw2/models/repair_shop.dart';
+import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 
 class SavedShopService {
@@ -9,6 +11,12 @@ class SavedShopService {
   // Firebase instances
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ShopService _shopService = ShopService();
+
+  /// Fetches multiple shops by ID in batch (delegates to ShopService).
+  Future<List<RepairShop>> getShopsByIds(List<String> ids) async {
+    return _shopService.getShopsByIds(ids);
+  }
 
   // Get all saved shops for the current user
   Future<List<String>> getSavedShopIds() async {

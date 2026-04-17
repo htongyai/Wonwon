@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/widgets/optimized_screen.dart';
 import 'package:wonwonw2/services/report_service.dart';
 import 'package:intl/intl.dart';
@@ -50,7 +51,7 @@ class _AdminReportsManagementScreenState
           child: Row(
             children: [
               Text(
-                'Reports & Issues Management',
+                'admin_reports_issues_management'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
@@ -58,41 +59,6 @@ class _AdminReportsManagementScreenState
                 ),
               ),
               const Spacer(),
-              StreamBuilder<QuerySnapshot>(
-                stream:
-                    _firestore
-                        .collection('report')
-                        .where('resolved', isEqualTo: false)
-                        .snapshots(),
-                builder: (context, snapshot) {
-                  final count =
-                      snapshot.hasData ? snapshot.data!.docs.length : 0;
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          count > 0
-                              ? const Color(0xFFEF4444).withOpacity(0.1)
-                              : const Color(0xFF10B981).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '$count Pending Reports',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color:
-                            count > 0
-                                ? const Color(0xFFEF4444)
-                                : const Color(0xFF10B981),
-                      ),
-                    ),
-                  );
-                },
-              ),
             ],
           ),
         ),
@@ -118,7 +84,7 @@ class _AdminReportsManagementScreenState
                     });
                   },
                   decoration: InputDecoration(
-                    hintText: 'Search reports...',
+                    hintText: 'admin_search_reports'.tr(context),
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -144,19 +110,19 @@ class _AdminReportsManagementScreenState
                 child: DropdownButtonFormField<String>(
                   value: _statusFilter,
                   decoration: InputDecoration(
-                    labelText: 'Status',
+                    labelText: 'admin_status'.tr(context),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     filled: true,
                     fillColor: Colors.white,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Status')),
-                    DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                  items: [
+                    DropdownMenuItem(value: 'all', child: Text('admin_all_status'.tr(context))),
+                    DropdownMenuItem(value: 'pending', child: Text('admin_pending'.tr(context))),
                     DropdownMenuItem(
                       value: 'resolved',
-                      child: Text('Resolved'),
+                      child: Text('admin_resolved'.tr(context)),
                     ),
                   ],
                   onChanged: (value) {
@@ -173,7 +139,7 @@ class _AdminReportsManagementScreenState
                 child: DropdownButtonFormField<String>(
                   value: _typeFilter,
                   decoration: InputDecoration(
-                    labelText: 'Type',
+                    labelText: 'admin_type'.tr(context),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -181,13 +147,15 @@ class _AdminReportsManagementScreenState
                     fillColor: Colors.white,
                   ),
                   items: [
-                    const DropdownMenuItem(
+                    DropdownMenuItem(
                       value: 'all',
-                      child: Text('All Types'),
+                      child: Text('admin_all_types'.tr(context)),
                     ),
                     ..._reportTypes.map(
-                      (type) =>
-                          DropdownMenuItem(value: type, child: Text(type)),
+                      (type) => DropdownMenuItem(
+                        value: type,
+                        child: Text(_translateReportType(context, type)),
+                      ),
                     ),
                   ],
                   onChanged: (value) {
@@ -211,7 +179,7 @@ class _AdminReportsManagementScreenState
               }
 
               if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
+                return Center(child: Text('admin_error_prefix'.tr(context).replaceAll('{error}', '${snapshot.error}')));
               }
 
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -311,7 +279,7 @@ class _AdminReportsManagementScreenState
           FaIcon(FontAwesomeIcons.flag, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            'No reports found',
+            'admin_no_reports_found'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -320,7 +288,7 @@ class _AdminReportsManagementScreenState
           ),
           const SizedBox(height: 8),
           Text(
-            'No reports match your current filters',
+            'admin_no_reports_match_filters'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 14,
               color: const Color(0xFF64748B),
@@ -346,7 +314,7 @@ class _AdminReportsManagementScreenState
             ? (report['createdAt'] as Timestamp).toDate()
             : DateTime.now();
     final type = report['type'] ?? 'Other';
-    final description = report['description'] ?? 'No description provided';
+    final description = report['description'] ?? 'admin_no_description_provided'.tr(context);
     final shopId = report['shopId'] ?? '';
     final userId = report['userId'] ?? '';
 
@@ -358,12 +326,12 @@ class _AdminReportsManagementScreenState
         border: Border.all(
           color:
               isResolved
-                  ? const Color(0xFF10B981).withOpacity(0.3)
-                  : const Color(0xFFEF4444).withOpacity(0.3),
+                  ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                  : const Color(0xFFEF4444).withValues(alpha: 0.3),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -382,11 +350,11 @@ class _AdminReportsManagementScreenState
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: _getTypeColor(type).withOpacity(0.1),
+                    color: _getTypeColor(type).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
-                    type,
+                    _translateReportType(context, type),
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -403,12 +371,12 @@ class _AdminReportsManagementScreenState
                   decoration: BoxDecoration(
                     color:
                         isResolved
-                            ? const Color(0xFF10B981).withOpacity(0.1)
-                            : const Color(0xFFEF4444).withOpacity(0.1),
+                            ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                            : const Color(0xFFEF4444).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
-                    isResolved ? 'RESOLVED' : 'PENDING',
+                    isResolved ? 'admin_resolved_label'.tr(context) : 'admin_pending_label'.tr(context),
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -449,7 +417,7 @@ class _AdminReportsManagementScreenState
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'Shop ID: $shopId',
+                    'admin_shop_id_prefix'.tr(context).replaceAll('{id}', shopId),
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       color: const Color(0xFF64748B),
@@ -465,7 +433,7 @@ class _AdminReportsManagementScreenState
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'User ID: $userId',
+                    'admin_user_id_prefix'.tr(context).replaceAll('{id}', userId),
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       color: const Color(0xFF64748B),
@@ -479,11 +447,11 @@ class _AdminReportsManagementScreenState
                     IconButton(
                       onPressed: () => _viewReportDetails(report),
                       icon: const FaIcon(FontAwesomeIcons.eye, size: 16),
-                      tooltip: 'View Details',
+                      tooltip: 'admin_view_details'.tr(context),
                       style: IconButton.styleFrom(
                         backgroundColor: const Color(
                           0xFF3B82F6,
-                        ).withOpacity(0.1),
+                        ).withValues(alpha: 0.1),
                         foregroundColor: const Color(0xFF3B82F6),
                       ),
                     ),
@@ -492,11 +460,11 @@ class _AdminReportsManagementScreenState
                       IconButton(
                         onPressed: () => _resolveReport(report),
                         icon: const FaIcon(FontAwesomeIcons.check, size: 16),
-                        tooltip: 'Mark as Resolved',
+                        tooltip: 'admin_mark_as_resolved'.tr(context),
                         style: IconButton.styleFrom(
                           backgroundColor: const Color(
                             0xFF10B981,
-                          ).withOpacity(0.1),
+                          ).withValues(alpha: 0.1),
                           foregroundColor: const Color(0xFF10B981),
                         ),
                       ),
@@ -504,11 +472,11 @@ class _AdminReportsManagementScreenState
                     IconButton(
                       onPressed: () => _deleteReport(report),
                       icon: const FaIcon(FontAwesomeIcons.trash, size: 16),
-                      tooltip: 'Delete Report',
+                      tooltip: 'admin_delete_report'.tr(context),
                       style: IconButton.styleFrom(
                         backgroundColor: const Color(
                           0xFFEF4444,
-                        ).withOpacity(0.1),
+                        ).withValues(alpha: 0.1),
                         foregroundColor: const Color(0xFFEF4444),
                       ),
                     ),
@@ -520,6 +488,25 @@ class _AdminReportsManagementScreenState
         ),
       ),
     );
+  }
+
+  String _translateReportType(BuildContext context, String type) {
+    switch (type) {
+      case 'Inappropriate Content':
+        return 'admin_report_type_inappropriate_content'.tr(context);
+      case 'Spam':
+        return 'admin_report_type_spam'.tr(context);
+      case 'Incorrect Information':
+        return 'admin_report_type_incorrect_information'.tr(context);
+      case 'Harassment':
+        return 'admin_report_type_harassment'.tr(context);
+      case 'Copyright Violation':
+        return 'admin_report_type_copyright_violation'.tr(context);
+      case 'Other':
+        return 'admin_report_type_other'.tr(context);
+      default:
+        return type;
+    }
   }
 
   Color _getTypeColor(String type) {
@@ -550,7 +537,7 @@ class _AdminReportsManagementScreenState
       builder:
           (context) => Dialog(
             child: Container(
-              width: 600,
+              width: MediaQuery.of(context).size.width > 640 ? 600 : MediaQuery.of(context).size.width * 0.92,
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -559,7 +546,7 @@ class _AdminReportsManagementScreenState
                   Row(
                     children: [
                       Text(
-                        'Report Details',
+                        'admin_report_details'.tr(context),
                         style: GoogleFonts.inter(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
@@ -573,20 +560,22 @@ class _AdminReportsManagementScreenState
                     ],
                   ),
                   const SizedBox(height: 20),
-                  _buildDetailRow('Type', report['type'] ?? 'Other'),
+                  _buildDetailRow(context, 'admin_type'.tr(context), _translateReportType(context, report['type'] ?? 'Other')),
                   _buildDetailRow(
-                    'Status',
-                    report['resolved'] == true ? 'Resolved' : 'Pending',
+                    context,
+                    'admin_status'.tr(context),
+                    report['resolved'] == true ? 'admin_resolved'.tr(context) : 'admin_pending'.tr(context),
                   ),
                   _buildDetailRow(
-                    'Submitted',
+                    context,
+                    'admin_submitted'.tr(context),
                     DateFormat('MMM dd, yyyy HH:mm').format(createdAt),
                   ),
-                  _buildDetailRow('Shop ID', report['shopId'] ?? 'N/A'),
-                  _buildDetailRow('User ID', report['userId'] ?? 'N/A'),
+                  _buildDetailRow(context, 'admin_shop_id'.tr(context), report['shopId'] ?? 'N/A'),
+                  _buildDetailRow(context, 'admin_user_id'.tr(context), report['userId'] ?? 'N/A'),
                   const SizedBox(height: 16),
                   Text(
-                    'Description:',
+                    'admin_description_label'.tr(context),
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -603,7 +592,7 @@ class _AdminReportsManagementScreenState
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Text(
-                      report['description'] ?? 'No description provided',
+                      report['description'] ?? 'admin_no_description_provided'.tr(context),
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         color: const Color(0xFF1E293B),
@@ -617,7 +606,7 @@ class _AdminReportsManagementScreenState
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Close'),
+                        child: Text('admin_close'.tr(context)),
                       ),
                       if (report['resolved'] != true) ...[
                         const SizedBox(width: 12),
@@ -629,7 +618,7 @@ class _AdminReportsManagementScreenState
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF10B981),
                           ),
-                          child: const Text('Mark as Resolved'),
+                          child: Text('admin_mark_as_resolved'.tr(context)),
                         ),
                       ],
                     ],
@@ -641,7 +630,7 @@ class _AdminReportsManagementScreenState
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -677,48 +666,50 @@ class _AdminReportsManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Resolve Report'),
-            content: const Text(
-              'Are you sure you want to mark this report as resolved?',
+            title: Text('resolve_report'.tr(context)),
+            content: Text(
+              'admin_resolve_report_confirm'.tr(context),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF10B981),
                 ),
-                child: const Text('Resolve'),
+                child: Text('resolve_button'.tr(context)),
               ),
             ],
           ),
     );
 
-    if (confirmed == true) {
-      setLoading(true, message: 'Resolving report...');
+    if (confirmed != true || !mounted) return;
 
-      try {
-        await _reportService.resolveReport(report['docId']);
+    setLoading(true, message: 'admin_resolving_report'.tr(context));
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Report has been marked as resolved'),
-            backgroundColor: Color(0xFF10B981),
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error resolving report: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      } finally {
-        setLoading(false);
-      }
+    try {
+      await _reportService.resolveReport(report['docId']);
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('admin_report_marked_resolved'.tr(context)),
+          backgroundColor: const Color(0xFF10B981),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('admin_error_resolving_report'.tr(context).replaceAll('{error}', '$e')),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -727,46 +718,48 @@ class _AdminReportsManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Delete Report'),
-            content: const Text(
-              'Are you sure you want to delete this report? This action cannot be undone.',
+            title: Text('admin_delete_report'.tr(context)),
+            content: Text(
+              'admin_delete_report_confirm'.tr(context),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Delete'),
+                child: Text('delete'.tr(context)),
               ),
             ],
           ),
     );
 
-    if (confirmed == true) {
-      setLoading(true, message: 'Deleting report...');
+    if (confirmed != true || !mounted) return;
 
-      try {
-        await _firestore.collection('report').doc(report['docId']).delete();
+    setLoading(true, message: 'admin_deleting_report'.tr(context));
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Report has been deleted'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting report: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      } finally {
-        setLoading(false);
-      }
+    try {
+      await _firestore.collection('report').doc(report['docId']).delete();
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('admin_report_deleted'.tr(context)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('admin_error_deleting_report'.tr(context).replaceAll('{error}', '$e')),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setLoading(false);
     }
   }
 }

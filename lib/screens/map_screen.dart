@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/constants/map_constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'dart:async';
 import 'package:wonwonw2/services/location_service.dart';
 import 'package:wonwonw2/services/service_providers.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:ui' as ui;
 import 'package:wonwonw2/screens/shop_detail_screen.dart';
@@ -24,197 +25,10 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
-  // Custom map style JSON string
-  static const String _mapStyle = '''
-[
-  {
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#f5f5f5"
-      }
-    ]
-  },
-  {
-    "elementType": "labels.icon",
-    "stylers": [
-      {
-        "visibility": "off"
-      }
-    ]
-  },
-  {
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#616161"
-      }
-    ]
-  },
-  {
-    "elementType": "labels.text.stroke",
-    "stylers": [
-      {
-        "color": "#f5f5f5"
-      }
-    ]
-  },
-  {
-    "featureType": "administrative.land_parcel",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#bdbdbd"
-      }
-    ]
-  },
-  {
-    "featureType": "landscape.natural",
-    "elementType": "geometry.fill",
-    "stylers": [
-      {
-        "color": "#bac6b9"
-      }
-    ]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#eeeeee"
-      }
-    ]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#757575"
-      }
-    ]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#e5e5e5"
-      }
-    ]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#9e9e9e"
-      }
-    ]
-  },
-  {
-    "featureType": "road",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#ffffff"
-      }
-    ]
-  },
-  {
-    "featureType": "road.arterial",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#757575"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#dadada"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#616161"
-      }
-    ]
-  },
-  {
-    "featureType": "road.local",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#9e9e9e"
-      }
-    ]
-  },
-  {
-    "featureType": "transit.line",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#e5e5e5"
-      }
-    ]
-  },
-  {
-    "featureType": "transit.station",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#eeeeee"
-      }
-    ]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#c9c9c9"
-      }
-    ]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry.fill",
-    "stylers": [
-      {
-        "color": "#b7cad2"
-      }
-    ]
-  },
-  {
-    "featureType": "water",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#9e9e9e"
-      }
-    ]
-  }
-]
-  ''';
-
-  // Default center coordinates (Bangkok)
-  final LatLng bangkokLocation = const LatLng(13.7563, 100.5018);
-
-  // Controller for Google Map
-  final Completer<GoogleMapController> _controller =
-      Completer<GoogleMapController>();
+  GoogleMapController? _mapController;
 
   // Current map center position
-  LatLng _mapCenter = const LatLng(13.7563, 100.5018);
+  LatLng _mapCenter = MapConstants.defaultLocation;
 
   // Map accent color for custom markers and UI elements
   final Color mapAccentColor = const Color(0xFFC3C130);
@@ -254,13 +68,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     super.initState();
     // Add observer for app lifecycle changes (to check permissions when app resumes)
     WidgetsBinding.instance.addObserver(this);
-    // Get shared location service instance
     _locationService = locationService;
-    // Initialize map markers
     _loadMarkers();
-    // Create custom marker for user location
     _createCustomMarkerIcon();
-    // Setup location tracking
     _initLocationTracking();
 
     // Allow a short delay before starting to show the map
@@ -285,9 +95,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    // Clean up resources when widget is removed
+    _mapController?.dispose();
     WidgetsBinding.instance.removeObserver(this);
-    // Remove the listener but don't dispose the service since it's shared
     _locationService.removeListener(_onLocationChanged);
     super.dispose();
   }
@@ -302,6 +111,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Check if location permissions were granted while app was in background
   Future<void> _checkPermissionsOnResume() async {
+    if (kIsWeb) {
+      if (!_locationService.isTracking) _startLocationTracking();
+      return;
+    }
     final isGranted = await Permission.location.isGranted;
     if (isGranted && !_locationService.isTracking) {
       _startLocationTracking();
@@ -312,6 +125,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   Future<void> _initLocationTracking() async {
     // First try to get user's current position
     final position = await _locationService.getCurrentPosition();
+    if (!mounted) return;
     if (position != null) {
       setState(() {
         _mapCenter = LatLng(position.latitude, position.longitude);
@@ -347,8 +161,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Create a custom marker icon for user's location
   Future<void> _createCustomMarkerIcon() async {
-    // Create a custom person icon with green background
     final customMarker = await _createUserLocationMarker();
+    if (!mounted) return;
     setState(() {
       _userLocationIcon = customMarker;
     });
@@ -376,7 +190,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     // Background circle paint
     final bgPaint =
         Paint()
-          ..color = mapAccentColor.withOpacity(0.8)
+          ..color = mapAccentColor.withValues(alpha: 0.8)
           ..style = PaintingStyle.fill;
 
     // White border paint
@@ -444,12 +258,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Animate the map camera to user's current location
-  Future<void> _animateToUserLocation() async {
+  void _animateToUserLocation() {
     final currentLatLng = _locationService.currentLatLng;
-    if (currentLatLng != null && _controller.isCompleted) {
-      final GoogleMapController controller = await _controller.future;
-      controller.animateCamera(
+    if (currentLatLng != null && _mapController != null) {
+      _mapController!.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(target: currentLatLng, zoom: _currentZoom),
         ),
@@ -462,47 +274,51 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Load all repair shop markers onto the map
   Future<void> _loadMarkers() async {
-    final shopService = ShopService();
-    final shops = await shopService.getAllShops();
+    try {
+      final shopService = ShopService();
+      final shops = await shopService.getAllShops();
+      if (!mounted) return;
 
-    // Add shop markers
-    for (final shop in shops) {
-      _markers.add(
-        Marker(
-          markerId: MarkerId(shop.id),
-          position: LatLng(shop.latitude, shop.longitude),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueAzure,
-          ),
-          infoWindow: InfoWindow(
-            title: shop.name,
-            snippet: 'Rating: ${shop.rating}',
-          ),
-          onTap: () {
-            setState(() {
-              _selectedShop = shop;
-              _isFollowingUser = false;
-            });
+      for (final shop in shops) {
+        _markers.add(
+          Marker(
+            markerId: MarkerId(shop.id),
+            position: LatLng(shop.latitude, shop.longitude),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueAzure,
+            ),
+            infoWindow: InfoWindow(
+              title: shop.name,
+              snippet: 'rating_label'.tr(context).replaceAll('{rating}', '${shop.rating}'),
+            ),
+            onTap: () {
+              setState(() {
+                _selectedShop = shop;
+                _isFollowingUser = false;
+              });
 
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => ShopDetailScreen(shopId: shop.id),
-              ),
-            );
-          },
-        ),
-      );
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ShopDetailScreen(shopId: shop.id),
+                ),
+              );
+            },
+          ),
+        );
+      }
+      setState(() {});
+    } catch (e) {
+      debugPrint('Error loading markers: $e');
     }
-    setState(() {});
   }
 
-  /// Go to user's current location on the map
   Future<void> _goToCurrentLocation() async {
     setState(() {
       _isLoadingLocation = true;
     });
 
     final position = await _locationService.getCurrentPosition();
+    if (!mounted) return;
     if (position == null) {
       setState(() {
         _isLoadingLocation = false;
@@ -513,8 +329,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
     final currentLatLng = _locationService.currentLatLng;
     if (currentLatLng != null) {
-      final GoogleMapController controller = await _controller.future;
-      controller.animateCamera(
+      _mapController?.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(target: currentLatLng, zoom: 15.0),
         ),
@@ -534,12 +349,32 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   /// Show dialog requesting location permission
   void _showLocationPermissionDialog() {
+    final isPermanentlyDenied = _locationService.permissionStatus ==
+        LocationPermissionStatus.permanentlyDenied;
+
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
             title: Text('location_permission_required'.tr(context)),
-            content: Text('location_permission_explanation'.tr(context)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('location_permission_explanation'.tr(context)),
+                if (isPermanentlyDenied) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'location_enable_instructions'.tr(context),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[700],
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ],
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -551,25 +386,26 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 ),
                 onPressed: () async {
                   Navigator.of(context).pop();
-                  if (_locationService.permissionStatus ==
-                      LocationPermissionStatus.permanentlyDenied) {
+                  if (isPermanentlyDenied) {
                     await openAppSettings();
                   } else {
                     await _locationService.requestPermission();
                     _goToCurrentLocation();
                   }
                 },
-                child: Text('enable'.tr(context)),
+                child: Text(
+                  isPermanentlyDenied
+                      ? 'open_settings'.tr(context)
+                      : 'enable'.tr(context),
+                ),
               ),
             ],
           ),
     );
   }
 
-  /// Go to a specific shop location on the map
-  Future<void> _goToShopLocation(LatLng location) async {
-    final GoogleMapController controller = await _controller.future;
-    controller.animateCamera(
+  void _goToShopLocation(LatLng location) {
+    _mapController?.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(target: location, zoom: 15.0),
       ),
@@ -581,16 +417,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     });
   }
 
-  /// Called when the Google Map is created
   void _onMapCreated(GoogleMapController controller) {
-    // Apply the map style immediately, before completing the controller
+    _mapController = controller;
     controller
-        .setMapStyle(_mapStyle)
+        .setMapStyle(MapConstants.mapStyle)
         .then((_) {
-          // Complete the controller first
-          _controller.complete(controller);
-
-          // Then update the state once map style is loaded
           if (mounted) {
             setState(() {
               _isMapStyleLoaded = true;
@@ -599,15 +430,13 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
         })
         .catchError((error) {
           appLog("Error setting map style: $error");
-          // Complete the controller even if there's an error
-          _controller.complete(controller);
-
           if (mounted) {
             setState(() {
               _isMapStyleLoaded = true;
             });
           }
         });
+    _loadMarkers();
   }
 
   /// Called when the map camera position changes
@@ -615,15 +444,15 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _mapCenter = position.target;
     _currentZoom = position.zoom;
 
-    // If map is moved manually, stop following user
-    if (_isFollowingUser &&
-        _locationService.currentLatLng != null &&
-        (_mapCenter.latitude != _locationService.currentLatLng!.latitude ||
-            _mapCenter.longitude !=
-                _locationService.currentLatLng!.longitude)) {
-      setState(() {
-        _isFollowingUser = false;
-      });
+    if (_isFollowingUser && _locationService.currentLatLng != null) {
+      final userLat = _locationService.currentLatLng!.latitude;
+      final userLng = _locationService.currentLatLng!.longitude;
+      if ((_mapCenter.latitude - userLat).abs() > 0.0001 ||
+          (_mapCenter.longitude - userLng).abs() > 0.0001) {
+        setState(() {
+          _isFollowingUser = false;
+        });
+      }
     }
   }
 

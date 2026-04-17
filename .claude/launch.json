@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "client",
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": ["run", "-d", "chrome", "--web-port", "${PORT}"],
+      "autoPort": true,
+      "cwd": "apps/client",
+      "env": {
+        "PATH": "/Users/htongyai/development/flutter/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    },
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": ["run", "-d", "chrome", "--web-port", "${PORT}"],
+      "autoPort": true,
+      "cwd": "apps/dashboard",
+      "env": {
+        "PATH": "/Users/htongyai/development/flutter/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    }
+  ]
+}

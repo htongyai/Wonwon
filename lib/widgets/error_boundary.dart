@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/theme/app_theme.dart';
 import 'package:wonwonw2/utils/error_logger.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class ErrorBoundary extends StatefulWidget {
   final Widget child;
@@ -14,22 +15,24 @@ class ErrorBoundary extends StatefulWidget {
 }
 
 class _ErrorBoundaryState extends State<ErrorBoundary> {
+  static bool _globalHandlerSet = false;
   Object? _error;
   StackTrace? _stackTrace;
 
   @override
   void initState() {
     super.initState();
-    ErrorWidget.builder = (FlutterErrorDetails details) {
-      _error = details.exception;
-      _stackTrace = details.stack;
-      ErrorLogger.logError(
-        error: details.exception,
-        stackTrace: details.stack,
-        context: 'ErrorBoundary',
-      );
-      return _buildErrorWidget(details);
-    };
+    if (!_globalHandlerSet) {
+      _globalHandlerSet = true;
+      FlutterError.onError = (FlutterErrorDetails details) {
+        FlutterError.presentError(details);
+        ErrorLogger.logError(
+          error: details.exception,
+          stackTrace: details.stack,
+          context: 'ErrorBoundary',
+        );
+      };
+    }
   }
 
   Widget _buildErrorWidget(FlutterErrorDetails details) {
@@ -38,32 +41,33 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
     }
 
     return Material(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
+      child: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
               Icons.error_outline,
               color: AppTheme.errorColor,
               size: 48,
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Something went wrong',
+              const SizedBox(height: 16),
+              Text(
+              'something_went_wrong'.tr(context),
               style: AppTheme.getTitleStyle().copyWith(
                 color: AppTheme.errorColor,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'We\'re sorry, but something went wrong. Please try again later.',
+              const SizedBox(height: 8),
+              Text(
+              'error_try_again'.tr(context),
               style: AppTheme.getSubtitleStyle(),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
-            ElevatedButton(
+              const SizedBox(height: 24),
+              ElevatedButton(
               onPressed: () {
                 setState(() {
                   _error = null;
@@ -71,11 +75,12 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
                 });
               },
               style: AppTheme.getPrimaryButtonStyle(),
-              child: const Text('Try Again'),
-            ),
-          ],
-        ),
+              child: Text('try_again'.tr(context)),
+              ),
+            ],
+          ),
       ),
+    ),
     );
   }
 

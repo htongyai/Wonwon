@@ -1,8 +1,11 @@
+import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class ActivityLogScreen extends StatefulWidget {
   const ActivityLogScreen({Key? key}) : super(key: key);
@@ -60,16 +63,18 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
       // Fetch real activity logs from Firestore
       final activities = await _fetchRealActivityLogs(startDate, now);
 
+      if (!mounted) return;
       setState(() {
         _activities = activities;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load activity log: $e')),
+        SnackBar(content: Text('failed_to_load_activity'.tr(context).replaceAll('{error}', e.toString()))),
       );
     }
   }
@@ -104,7 +109,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
 
       return activities;
     } catch (e) {
-      print('Error fetching activity logs: $e');
+      appLog('Error fetching activity logs: $e');
       return [];
     }
   }
@@ -192,7 +197,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                 _loadActivityLog();
               },
               backgroundColor: Colors.grey[100],
-              selectedColor: const Color(0xFF3B82F6).withOpacity(0.1),
+              selectedColor: const Color(0xFF3B82F6).withValues(alpha: 0.1),
               labelStyle: GoogleFonts.inter(
                 color: isSelected ? const Color(0xFF3B82F6) : Colors.grey[700],
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
@@ -296,7 +301,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: _getActivityTypeColor(type).withOpacity(0.1),
+                color: _getActivityTypeColor(type).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Center(
@@ -316,7 +321,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          activity['title'] ?? 'Unknown Activity',
+                          activity['title'] ?? 'unknown_activity'.tr(context),
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -330,7 +335,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: _getActivityTypeColor(type).withOpacity(0.1),
+                          color: _getActivityTypeColor(type).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -346,7 +351,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    activity['description'] ?? 'No description available',
+                    activity['description'] ?? 'no_description'.tr(context),
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       color: const Color(0xFF64748B),
@@ -366,7 +371,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                             ? DateFormat(
                               'MMM dd, yyyy HH:mm',
                             ).format(timestamp.toDate())
-                            : 'Unknown time',
+                            : 'unknown_time'.tr(context),
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: const Color(0xFF94A3B8),
@@ -387,7 +392,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                                 decoration: BoxDecoration(
                                   color: const Color(
                                     0xFF64748B,
-                                  ).withOpacity(0.1),
+                                  ).withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
@@ -420,7 +425,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
             borderRadius: BorderRadius.circular(16),
           ),
           child: Container(
-            width: 600,
+            width: min(600, MediaQuery.of(context).size.width - 32),
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -434,7 +439,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                       decoration: BoxDecoration(
                         color: _getActivityTypeColor(
                           activity['type'],
-                        ).withOpacity(0.1),
+                        ).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: Center(
@@ -463,7 +468,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                Expanded(child: _buildActivityDetailsContent(activity)),
+                Flexible(child: _buildActivityDetailsContent(activity)),
               ],
             ),
           ),
@@ -490,7 +495,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  activity['title'] ?? 'Unknown Activity',
+                  activity['title'] ?? 'unknown_activity'.tr(context),
                   style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -499,7 +504,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  activity['description'] ?? 'No description available',
+                  activity['description'] ?? 'no_description'.tr(context),
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     color: const Color(0xFF64748B),
@@ -521,7 +526,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Activity Information',
+                  'activity_information'.tr(context),
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -529,28 +534,28 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                _buildDetailRow('ID', activity['id'] ?? 'Unknown'),
-                _buildDetailRow('Type', activity['type']),
-                _buildDetailRow('Action', activity['action']),
+                _buildDetailRow('id_label'.tr(context), activity['id'] ?? 'unknown'.tr(context)),
+                _buildDetailRow('type_label'.tr(context), activity['type']),
+                _buildDetailRow('action_label'.tr(context), activity['action']),
                 _buildDetailRow(
-                  'Timestamp',
+                  'timestamp_label'.tr(context),
                   timestamp != null
                       ? DateFormat(
                         'MMM dd, yyyy HH:mm:ss',
                       ).format(timestamp.toDate())
-                      : 'Unknown',
+                      : 'unknown'.tr(context),
                 ),
 
                 if (activity.containsKey('userId'))
-                  _buildDetailRow('User ID', activity['userId']),
+                  _buildDetailRow('user_id_label'.tr(context), activity['userId']),
                 if (activity.containsKey('userName'))
-                  _buildDetailRow('User Name', activity['userName']),
+                  _buildDetailRow('user_name_label'.tr(context), activity['userName']),
                 if (activity.containsKey('userEmail'))
-                  _buildDetailRow('User Email', activity['userEmail']),
+                  _buildDetailRow('user_email_label'.tr(context), activity['userEmail']),
                 if (activity.containsKey('shopId'))
-                  _buildDetailRow('Shop ID', activity['shopId']),
+                  _buildDetailRow('shop_id_label'.tr(context), activity['shopId']),
                 if (activity.containsKey('shopName'))
-                  _buildDetailRow('Shop Name', activity['shopName']),
+                  _buildDetailRow('shop_name_label'.tr(context), activity['shopName']),
                 if (activity.containsKey('reviewId'))
                   _buildDetailRow('Review ID', activity['reviewId']),
               ],

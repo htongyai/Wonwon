@@ -10,10 +10,11 @@ import 'package:wonwonw2/screens/login_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
-import 'package:wonwonw2/screens/admin_dashboard_main_screen.dart';
 import 'package:wonwonw2/mixins/widget_disposal_mixin.dart';
 import 'package:wonwonw2/services/optimized_image_cache_manager.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/services/unified_memory_manager.dart';
+import 'package:wonwonw2/widgets/common/shimmer_loading.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -29,6 +30,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _loading = true;
   bool _isAdmin = false;
   bool _uploadingImage = false;
+  Future<List<RepairRecord>>? _repairRecordsFuture;
+  int _savedCount = 0;
+  int _repairCount = 0;
 
   @override
   void onInitState() {
@@ -36,12 +40,15 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (_user != null) {
       _setupUserDataListener(_user!.uid);
       _fetchAdminStatus(_user!.uid);
+      _repairRecordsFuture = _fetchRepairRecords();
+      _fetchCounts();
     }
 
     // Use the mixin's automatic subscription management
     listenToStream(firebase_auth.FirebaseAuth.instance.authStateChanges(), (
       user,
     ) {
+      if (!mounted) return;
       setState(() {
         _user = user;
         _loading = false;
@@ -49,10 +56,15 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (user != null) {
         _setupUserDataListener(user.uid);
         _fetchAdminStatus(user.uid);
+        _repairRecordsFuture = _fetchRepairRecords();
+        _fetchCounts();
       } else {
         setState(() {
           _isAdmin = false;
           _userData = null;
+          _repairRecordsFuture = null;
+          _savedCount = 0;
+          _repairCount = 0;
         });
       }
     });
@@ -71,7 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         }
       },
       onError: (error) {
-        print('Error listening to user data: $error');
+        appLog('Error listening to user data: $error');
         if (mounted) {
           setState(() {
             _loading = false;
@@ -86,21 +98,37 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     try {
       final userData = await UserService.getCurrentUser();
+      if (!mounted) return;
       setState(() {
         _userData = userData;
       });
     } catch (e) {
-      print('Error fetching user data: $e');
+      appLog('Error fetching user data: $e');
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     }
   }
 
   Future<void> _fetchAdminStatus(String uid) async {
-    final doc =
-        await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    setState(() {
-      _isAdmin =
-          doc.data()?['admin'] == true || doc.data()?['accountType'] == 'admin';
-    });
+    try {
+      final doc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (!mounted) return;
+      setState(() {
+        _isAdmin =
+            doc.data()?['admin'] == true || doc.data()?['accountType'] == 'admin';
+      });
+    } catch (e) {
+      appLog('Error fetching admin status: $e');
+      if (mounted) {
+        setState(() {
+          _isAdmin = false;
+        });
+      }
+    }
   }
 
   Future<void> _uploadProfileImage() async {
@@ -110,23 +138,27 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     try {
       final imageUrl = await UserService.uploadProfileImage();
+      if (!mounted) return;
       if (imageUrl != null) {
-        await _fetchUserData(); // Refresh user data
+        await _fetchUserData();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile image updated successfully!'),
+          SnackBar(
+            content: Text('profile_image_updated'.tr(context)),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error uploading image: $e'),
+          content: Text('error_uploading_image'.tr(context).replaceAll('{error}', '$e')),
           backgroundColor: Colors.red,
         ),
       );
     } finally {
+      if (!mounted) return;
       setState(() {
         _uploadingImage = false;
       });
@@ -136,19 +168,22 @@ class _ProfileScreenState extends State<ProfileScreen>
   Future<void> _deleteProfileImage() async {
     try {
       final success = await UserService.deleteProfileImage();
+      if (!mounted) return;
       if (success) {
-        await _fetchUserData(); // Refresh user data
+        await _fetchUserData();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile image removed successfully!'),
+          SnackBar(
+            content: Text('profile_image_removed'.tr(context)),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error removing image: $e'),
+          content: Text('error_removing_image'.tr(context).replaceAll('{error}', '$e')),
           backgroundColor: Colors.red,
         ),
       );
@@ -164,6 +199,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               .doc(_user!.uid)
               .collection('repairRecords')
               .orderBy('date', descending: true)
+              .limit(50)
               .get();
 
       return snapshot.docs.map((doc) {
@@ -172,39 +208,108 @@ class _ProfileScreenState extends State<ProfileScreen>
         return RepairRecord.fromMap(data);
       }).toList();
     } catch (e) {
-      print('Error fetching repair records: $e');
+      appLog('Error fetching repair records: $e');
       return [];
     }
   }
 
-  // Disposal is now handled automatically by WidgetDisposalMixin
+  Future<void> _fetchCounts() async {
+    if (_user == null) return;
+    try {
+      final results = await Future.wait([
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(_user!.uid)
+            .collection('savedShops')
+            .get(),
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(_user!.uid)
+            .collection('repairRecords')
+            .get(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _savedCount = results[0].docs.length;
+        _repairCount = results[1].docs.length;
+      });
+    } catch (e) {
+      appLog('Error fetching counts: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Scaffold(
+        body: ShimmerProfileCard(avatarRadius: 40, showStats: true),
+      );
     }
 
     if (_user == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Please log in to view your profile',
-              style: GoogleFonts.montserrat(fontSize: 16),
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: AppConstants.primaryColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.person_outline_rounded,
+                    size: 64,
+                    color: AppConstants.primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'login_to_view_profile'.tr(context),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'please_login_to_view_profile'.tr(context),
+                  style: GoogleFonts.montserrat(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: 220,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.login_rounded),
+                    label: Text('log_in'.tr(context)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
-              },
-              child: const Text('Log In'),
-            ),
-          ],
+          ),
         ),
       );
     }
@@ -224,25 +329,28 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Stack(
                   children: [
                     Container(
-                      width: 80,
-                      height: 80,
+                      width: 100,
+                      height: 100,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: AppConstants.primaryColor.withOpacity(0.3),
-                          width: 2,
+                          color: AppConstants.primaryColor.withValues(alpha: 0.3),
+                          width: 3,
                         ),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 12),
+                        ],
                       ),
                       child: ClipOval(
                         child:
                             _userData?.profileImageUrl != null
                                 ? getCachedImage(
-                                  imageUrl: _userData!.profileImageUrl!,
+                                  imageUrl: _userData?.profileImageUrl ?? '',
                                   imageType: ImageType.profile,
                                   priority: MemoryPriority.high,
                                   fit: BoxFit.cover,
-                                  width: 120,
-                                  height: 120,
+                                  width: 100,
+                                  height: 100,
                                   placeholder: Container(
                                     color: Colors.grey[200],
                                     child: const Center(
@@ -251,21 +359,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   ),
                                   errorWidget: Container(
                                     color: AppConstants.primaryColor
-                                        .withOpacity(0.15),
+                                        .withValues(alpha: 0.15),
                                     child: Icon(
                                       Icons.person,
-                                      size: 40,
+                                      size: 48,
                                       color: AppConstants.primaryColor,
                                     ),
                                   ),
                                 )
                                 : Container(
-                                  color: AppConstants.primaryColor.withOpacity(
-                                    0.15,
+                                  color: AppConstants.primaryColor.withValues(
+                                    alpha: 0.15,
                                   ),
                                   child: Icon(
                                     Icons.person,
-                                    size: 40,
+                                    size: 48,
                                     color: AppConstants.primaryColor,
                                   ),
                                 ),
@@ -281,7 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
+                              color: Colors.black.withValues(alpha: 0.2),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -307,7 +415,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     color: Colors.white,
                                     size: 16,
                                   ),
-                          tooltip: 'Upload Profile Image',
+                          tooltip: 'upload_profile_image'.tr(context),
                         ),
                       ),
                     ),
@@ -321,7 +429,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     Text(
                       _userData?.name.isNotEmpty == true
                           ? _userData!.name
-                          : _user!.email ?? 'User',
+                          : _user!.email ?? 'user_fallback'.tr(context),
                       style: GoogleFonts.montserrat(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -349,7 +457,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          'Admin',
+                          'admin'.tr(context),
                           style: GoogleFonts.montserrat(
                             fontSize: 12,
                             color: Colors.blue[900],
@@ -361,6 +469,37 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ],
                 ),
 
+                // Stats row
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildStatItem(
+                        _savedCount,
+                        'saved'.tr(context),
+                        Icons.bookmark_rounded,
+                      ),
+                      _buildStatItem(
+                        _repairCount,
+                        'repairs'.tr(context),
+                        Icons.build_rounded,
+                      ),
+                      _buildStatItem(
+                        0,
+                        'reviews'.tr(context),
+                        Icons.star_rounded,
+                      ),
+                    ],
+                  ),
+                ),
+
                 // Action buttons
                 const SizedBox(height: 16),
                 if (_userData?.profileImageUrl != null) ...[
@@ -369,7 +508,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     child: OutlinedButton.icon(
                       onPressed: _deleteProfileImage,
                       icon: const Icon(Icons.delete_outline, size: 18),
-                      label: const Text('Remove Image'),
+                      label: Text('remove_image'.tr(context)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red,
                         side: const BorderSide(color: Colors.red),
@@ -387,8 +526,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     icon: const Icon(Icons.edit, size: 18),
                     label: Text(
                       _userData?.profileImageUrl != null
-                          ? 'Change Image'
-                          : 'Upload Image',
+                          ? 'change_image'.tr(context)
+                          : 'upload_image'.tr(context),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppConstants.primaryColor,
@@ -398,53 +537,26 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                 ),
 
-                // Admin Dashboard Button
-                if (_isAdmin) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder:
-                                (context) => const AdminDashboardMainScreen(),
-                          ),
-                        );
-                      },
-                      icon: const FaIcon(FontAwesomeIcons.userShield, size: 18),
-                      label: const Text('Admin Dashboard'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red[600],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                // Admin Dashboard Button — disabled, admin is a separate app
               ],
             ),
           ),
-          const Divider(),
+          const Divider(height: 1),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
               'repair_history'.tr(context),
-              style: GoogleFonts.montserrat(
-                fontSize: 16,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
           Expanded(
             child: FutureBuilder<List<RepairRecord>>(
-              future: _fetchRepairRecords(),
+              future: _repairRecordsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const ShimmerRepairRecordList(itemCount: 4);
                 }
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return Center(
@@ -470,6 +582,37 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
+  Widget _buildStatItem(int count, String label, IconData icon) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 20, color: AppConstants.primaryColor),
+        const SizedBox(height: 6),
+        TweenAnimationBuilder<int>(
+          tween: IntTween(begin: 0, end: count),
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, child) => Text(
+            '$value',
+            style: GoogleFonts.montserrat(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppConstants.primaryTextColor,
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: GoogleFonts.montserrat(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildRepairRecordCard(RepairRecord record) {
     return GestureDetector(
       onTap: () {
@@ -481,18 +624,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         );
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              spreadRadius: 0,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -505,7 +641,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppConstants.primaryColor.withOpacity(0.1),
+                      color: AppConstants.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -519,57 +655,73 @@ class _ProfileScreenState extends State<ProfileScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          record.shopName,
-                          style: GoogleFonts.montserrat(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                            color: AppConstants.primaryTextColor,
+                        Flexible(
+                          child: Text(
+                            record.shopName,
+                            style: GoogleFonts.montserrat(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: AppConstants.primaryTextColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          record.itemFixed,
-                          style: GoogleFonts.montserrat(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                        Flexible(
+                          child: Text(
+                            record.itemFixed,
+                            style: GoogleFonts.montserrat(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                record.category,
-                                style: GoogleFonts.montserrat(
-                                  fontSize: 12,
-                                  color: Colors.grey[700],
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  record.category,
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 12,
+                                    color: Colors.grey[700],
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                record.subService,
-                                style: GoogleFonts.montserrat(
-                                  fontSize: 12,
-                                  color: Colors.grey[700],
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  record.subService,
+                                  style: GoogleFonts.montserrat(
+                                    fontSize: 12,
+                                    color: Colors.grey[700],
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                               ),
                             ),
@@ -592,7 +744,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         const SizedBox(height: 4),
                         Row(
                           children: List.generate(
-                            record.satisfactionRating!,
+                            record.satisfactionRating ?? 0,
                             (index) => Icon(
                               Icons.thumb_up,
                               color: Colors.green,
@@ -627,6 +779,7 @@ class RepairRecordDetailScreen extends StatelessWidget {
         elevation: 0,
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -638,7 +791,7 @@ class RepairRecordDetailScreen extends StatelessWidget {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     spreadRadius: 0,
                     offset: const Offset(0, 4),
@@ -653,7 +806,7 @@ class RepairRecordDetailScreen extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppConstants.primaryColor.withOpacity(0.1),
+                          color: AppConstants.primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
@@ -689,7 +842,9 @@ class RepairRecordDetailScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -708,7 +863,6 @@ class RepairRecordDetailScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -756,16 +910,16 @@ class RepairRecordDetailScreen extends StatelessWidget {
                   if (record.price != null)
                     _buildDetailItem(
                       context,
-                      Icons.attach_money,
+                      Icons.payments_outlined,
                       'price'.tr(context),
-                      '${record.price} THB',
+                      '฿${record.price!.toStringAsFixed(0)}',
                     ),
                   if (record.duration != null)
                     _buildDetailItem(
                       context,
                       Icons.timer,
                       'duration'.tr(context),
-                      '${record.duration!.inDays} ' + 'days'.tr(context),
+                      '${record.duration?.inDays ?? 0} ' + 'days'.tr(context),
                     ),
                   if (record.satisfactionRating != null)
                     _buildDetailItem(
@@ -779,7 +933,7 @@ class RepairRecordDetailScreen extends StatelessWidget {
                       context,
                       Icons.notes,
                       'notes'.tr(context),
-                      record.notes!,
+                      record.notes ?? '',
                     ),
                 ],
               ),

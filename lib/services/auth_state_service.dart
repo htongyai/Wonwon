@@ -22,6 +22,8 @@ class AuthStateService {
   final StreamController<AuthState> _authStateController =
       StreamController<AuthState>.broadcast();
 
+  StreamSubscription<User?>? _authSubscription;
+
   // Singleton pattern
   static final AuthStateService _instance = AuthStateService._internal();
   factory AuthStateService() => _instance;
@@ -49,10 +51,13 @@ class AuthStateService {
     _isLoggedIn = await _authService.isLoggedIn();
 
     // Set up Firebase Auth state listener
-    FirebaseAuth.instance.authStateChanges().listen((User? user) {
-      _isLoggedIn = user != null;
-      _notifyAuthStateChange();
-    });
+    _authSubscription?.cancel();
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen(
+      (User? user) {
+        _isLoggedIn = user != null;
+        _notifyAuthStateChange();
+      },
+    );
 
     // Notify initial state
     _notifyAuthStateChange();
@@ -107,6 +112,8 @@ class AuthStateService {
 
   // Dispose resources
   void dispose() {
+    _authSubscription?.cancel();
+    _authSubscription = null;
     _authStateController.close();
   }
 }

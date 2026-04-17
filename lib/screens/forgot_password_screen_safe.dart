@@ -1,4 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/services/auth_service.dart';
 
 /// Safe version of forgot password screen that works without localization
@@ -31,35 +35,36 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
       });
 
       try {
-        final success = await _authService.resetPassword(
+        final result = await _authService.resetPassword(
           _emailController.text.trim(),
         );
 
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _emailSent = success;
+            _emailSent = result.success;
           });
 
-          if (success) {
+          if (result.success) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Password reset email sent! Please check your inbox.',
-                ),
+              SnackBar(
+                content: Text('reset_email_sent'.tr(context)),
                 backgroundColor: Colors.green,
               ),
             );
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to send reset email. Please try again.'),
+              SnackBar(
+                content: Text(
+                  (result.errorKey ?? 'reset_failed').tr(context),
+                ),
                 backgroundColor: Colors.red,
               ),
             );
           }
         }
       } catch (e) {
+        debugPrint('Password reset error: $e');
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -67,7 +72,7 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error: ${e.toString()}'),
+              content: Text('unexpected_error'.tr(context)),
               backgroundColor: Colors.red,
             ),
           );
@@ -79,14 +84,14 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 768;
-    final isMobile = screenWidth < 600;
+    final isDesktop = screenWidth >= ResponsiveBreakpoints.tablet;
+    final isMobile = ResponsiveBreakpoints.isMobile(screenWidth);
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Forgot Password'),
-        backgroundColor: Colors.brown,
+        title: Text('forgot_password'.tr(context)),
+        backgroundColor: AppConstants.primaryColor,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -98,6 +103,7 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
               maxWidth: isDesktop ? 400 : screenWidth * 0.9,
             ),
             child: SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
               child: Padding(
                 padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
                 child: Form(
@@ -112,9 +118,9 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                         child: Container(
                           width: isMobile ? 70 : 90,
                           height: isMobile ? 70 : 90,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.brown,
+                            color: AppConstants.primaryColor,
                           ),
                           child: Icon(
                             Icons.lock_reset,
@@ -128,11 +134,11 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
 
                       // Title
                       Text(
-                        'Reset Your Password',
+                        'reset_password'.tr(context),
                         style: TextStyle(
                           fontSize: isMobile ? 24 : 28,
                           fontWeight: FontWeight.bold,
-                          color: Colors.brown,
+                          color: AppConstants.primaryColor,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -140,7 +146,7 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                       SizedBox(height: isMobile ? 12 : 16),
 
                       Text(
-                        'Enter your email address and we\'ll send you a link to reset your password.',
+                        'reset_password_description'.tr(context),
                         style: TextStyle(
                           fontSize: isMobile ? 14 : 16,
                           color: Colors.grey[600],
@@ -154,10 +160,10 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                       TextFormField(
                         controller: _emailController,
                         decoration: InputDecoration(
-                          labelText: 'Email Address',
+                          labelText: 'email'.tr(context),
                           prefixIcon: const Icon(
                             Icons.email_outlined,
-                            color: Colors.brown,
+                            color: AppConstants.primaryColor,
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -170,7 +176,7 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: const BorderSide(
-                              color: Colors.brown,
+                              color: AppConstants.primaryColor,
                               width: 2,
                             ),
                           ),
@@ -184,10 +190,10 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Email is required';
+                            return 'email_required'.tr(context);
                           }
-                          if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-                            return 'Please enter a valid email address';
+                          if (!AuthService.isValidEmail(value)) {
+                            return 'valid_email_required'.tr(context);
                           }
                           return null;
                         },
@@ -213,7 +219,7 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'Reset Email Sent!',
+                                'reset_link_sent'.tr(context),
                                 style: TextStyle(
                                   fontSize: isMobile ? 14 : 16,
                                   fontWeight: FontWeight.bold,
@@ -223,7 +229,7 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Please check your email and follow the instructions to reset your password.',
+                                'check_email_instructions'.tr(context),
                                 style: TextStyle(
                                   fontSize: isMobile ? 12 : 14,
                                   color: Colors.green.shade700,
@@ -249,7 +255,7 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                                                   BorderRadius.circular(8),
                                             ),
                                           ),
-                                          child: const Text('Back to Login'),
+                                          child: Text('back_to_login'.tr(context)),
                                         ),
                                       ),
                                       const SizedBox(height: 8),
@@ -265,8 +271,8 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                                             foregroundColor:
                                                 Colors.green.shade700,
                                           ),
-                                          child: const Text(
-                                            'Send Another Email',
+                                          child: Text(
+                                            'send_another_email'.tr(context),
                                           ),
                                         ),
                                       ),
@@ -286,7 +292,7 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                                           foregroundColor:
                                               Colors.green.shade700,
                                         ),
-                                        child: const Text('Send Another Email'),
+                                        child: Text('send_another_email'.tr(context)),
                                       ),
                                       ElevatedButton(
                                         onPressed:
@@ -301,7 +307,7 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                                             ),
                                           ),
                                         ),
-                                        child: const Text('Back to Login'),
+                                        child: Text('back_to_login'.tr(context)),
                                       ),
                                     ],
                                   ),
@@ -316,7 +322,7 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                         ElevatedButton(
                           onPressed: _isLoading ? null : _handleResetPassword,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.brown,
+                            backgroundColor: AppConstants.primaryColor,
                             minimumSize: Size(
                               double.infinity,
                               isMobile ? 45 : 50,
@@ -337,7 +343,7 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                                     ),
                                   )
                                   : Text(
-                                    'Reset Password',
+                                    'reset_password'.tr(context),
                                     style: TextStyle(
                                       fontSize: isMobile ? 14 : 16,
                                       fontWeight: FontWeight.bold,
@@ -355,10 +361,10 @@ class _ForgotPasswordScreenSafeState extends State<ForgotPasswordScreenSafe> {
                             Navigator.pop(context);
                           },
                           style: TextButton.styleFrom(
-                            foregroundColor: Colors.brown,
+                            foregroundColor: AppConstants.primaryColor,
                           ),
                           child: Text(
-                            'Back to Login',
+                            'back_to_login'.tr(context),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: isMobile ? 14 : 16,

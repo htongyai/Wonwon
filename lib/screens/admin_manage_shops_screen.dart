@@ -1,3 +1,4 @@
+import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -17,6 +18,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/widgets/optimized_image.dart';
 
 class AdminManageShopsScreen extends StatefulWidget {
   const AdminManageShopsScreen({Key? key}) : super(key: key);
@@ -31,6 +34,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
   String _searchQuery = '';
   String _sortBy = 'name';
   bool _sortAscending = true;
+  int _refreshCounter = 0;
 
   final List<String> _availableCategories = [
     'clothing',
@@ -101,16 +105,16 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Column(
+      body: SafeArea(
+        child: Column(
         children: [
-          // Header
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: const Color(0xFFF8F9FA),
               border: Border(
                 bottom: BorderSide(
-                  color: Colors.grey.withOpacity(0.2),
+                  color: Colors.grey.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
@@ -124,7 +128,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 ),
                 const SizedBox(width: 16),
                 Text(
-                  'Manage Shops',
+                  'manage_shops'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -144,7 +148,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   },
                   icon: const Icon(Icons.add, size: 18),
                   label: Text(
-                    'Add Shop',
+                    'add_shop'.tr(context),
                     style: GoogleFonts.montserrat(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -168,7 +172,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   onPressed: _importFromExcel,
                   icon: const Icon(Icons.upload_file, size: 18),
                   label: Text(
-                    'Import Excel',
+                    'import_excel'.tr(context),
                     style: GoogleFonts.montserrat(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -192,7 +196,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   onPressed: _showDeleteAllConfirmation,
                   icon: const Icon(Icons.delete_forever, size: 18),
                   label: Text(
-                    'Delete All',
+                    'delete_all'.tr(context),
                     style: GoogleFonts.montserrat(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -215,11 +219,11 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 IconButton(
                   onPressed: () {
                     setState(() {
-                      // Force rebuild
+                      _refreshCounter++;
                     });
                   },
                   icon: Icon(Icons.refresh, color: AppConstants.primaryColor),
-                  tooltip: 'Refresh',
+                  tooltip: 'refresh_tooltip'.tr(context),
                 ),
               ],
             ),
@@ -238,7 +242,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                       });
                     },
                     decoration: InputDecoration(
-                      hintText: 'Search shops...',
+                      hintText: 'search_shops_hint'.tr(context),
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -251,39 +255,13 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                StreamBuilder<QuerySnapshot>(
-                  stream:
-                      _firestore
-                          .collection('shops')
-                          .where('approved', isEqualTo: true)
-                          .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData) {
-                      final shops = snapshot.data!.docs;
-                      return Text(
-                        '${shops.length} shops',
-                        style: GoogleFonts.montserrat(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      );
-                    }
-                    return Text(
-                      'Loading...',
-                      style: GoogleFonts.montserrat(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    );
-                  },
-                ),
               ],
             ),
           ),
 
-          // Table
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
+              key: ValueKey(_refreshCounter),
               stream:
                   _firestore
                       .collection('shops')
@@ -390,6 +368,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -401,7 +380,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
           Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
           const SizedBox(height: 16),
           Text(
-            'Error loading shops',
+            'admin_error_loading_shops'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -412,10 +391,10 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
           ElevatedButton(
             onPressed: () {
               setState(() {
-                // Force rebuild
+                _refreshCounter++;
               });
             },
-            child: const Text('Try Again'),
+            child: Text('try_again'.tr(context)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppConstants.primaryColor,
             ),
@@ -433,7 +412,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
           Icon(Icons.store_outlined, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            'No shops found',
+            'no_shops_found'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -442,7 +421,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Try adjusting your search criteria',
+            'try_adjusting_filters'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 14,
               color: Colors.grey[600],
@@ -470,20 +449,20 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 columnSpacing: isLargeScreen ? 20 : (isMediumScreen ? 16 : 12),
                 horizontalMargin: isLargeScreen ? 16 : 12,
                 columns: [
-                  _buildSortableColumn('Name', 'name'),
-                  if (isMediumScreen) _buildSortableColumn('Rating', 'rating'),
+                  _buildSortableColumn('admin_sort_name'.tr(context), 'name'),
+                  if (isMediumScreen) _buildSortableColumn('rating'.tr(context), 'rating'),
                   if (isMediumScreen)
-                    _buildSortableColumn('Reviews', 'reviewCount'),
-                  _buildSortableColumn('Address', 'address'),
+                    _buildSortableColumn('reviews'.tr(context), 'reviewCount'),
+                  _buildSortableColumn('address'.tr(context), 'address'),
                   if (isLargeScreen)
-                    _buildSortableColumn('Categories', 'categories'),
+                    _buildSortableColumn('categories'.tr(context), 'categories'),
                   if (isLargeScreen)
-                    _buildSortableColumn('Services', 'services'),
+                    _buildSortableColumn('services'.tr(context), 'services'),
                   if (isLargeScreen)
-                    _buildSortableColumn('Latitude', 'latitude'),
+                    _buildSortableColumn('latitude_label_short'.tr(context), 'latitude'),
                   if (isLargeScreen)
-                    _buildSortableColumn('Longitude', 'longitude'),
-                  const DataColumn(label: Text('Actions')),
+                    _buildSortableColumn('longitude_label_short'.tr(context), 'longitude'),
+                  DataColumn(label: Text('actions'.tr(context))),
                 ],
                 rows:
                     shops
@@ -568,32 +547,34 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
               IconButton(
                 onPressed: () => _showNameEditor(shop),
                 icon: const Icon(Icons.edit, size: 12),
-                tooltip: 'Edit Name',
+                tooltip: 'edit_name_tooltip'.tr(context),
                 padding: const EdgeInsets.all(2),
                 constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
               ),
             ],
           ),
         ),
-        DataCell(
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.star, color: Colors.amber, size: 14),
-              const SizedBox(width: 2),
-              Text(
-                shop.rating.toStringAsFixed(1),
-                style: GoogleFonts.montserrat(fontSize: 12),
-              ),
-            ],
+        if (isMediumScreen)
+          DataCell(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.star, color: Colors.amber, size: 14),
+                const SizedBox(width: 2),
+                Text(
+                  shop.rating.toStringAsFixed(1),
+                  style: GoogleFonts.montserrat(fontSize: 12),
+                ),
+              ],
+            ),
           ),
-        ),
-        DataCell(
-          Text(
-            shop.reviewCount.toString(),
-            style: GoogleFonts.montserrat(fontSize: 12),
+        if (isMediumScreen)
+          DataCell(
+            Text(
+              shop.reviewCount.toString(),
+              style: GoogleFonts.montserrat(fontSize: 12),
+            ),
           ),
-        ),
         DataCell(
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -612,107 +593,109 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
               IconButton(
                 onPressed: () => _showAddressEditor(shop),
                 icon: const Icon(Icons.edit, size: 12),
-                tooltip: 'Edit Address',
+                tooltip: 'edit_address_tooltip'.tr(context),
                 padding: const EdgeInsets.all(2),
                 constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
               ),
             ],
           ),
         ),
-        DataCell(
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Expanded(
-                child: SizedBox(
-                  width: 120,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (shop.categories.isNotEmpty)
-                        ...shop.categories
-                            .take(2)
-                            .map(
-                              (category) => Container(
-                                margin: const EdgeInsets.only(bottom: 2),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 1,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppConstants.primaryColor.withOpacity(
-                                    0.1,
+        if (isLargeScreen)
+          DataCell(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    width: 120,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (shop.categories.isNotEmpty)
+                          ...shop.categories
+                              .take(2)
+                              .map(
+                                (category) => Container(
+                                  margin: const EdgeInsets.only(bottom: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                    vertical: 1,
                                   ),
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                                child: Text(
-                                  category,
-                                  style: GoogleFonts.montserrat(
-                                    fontSize: 9,
-                                    color: AppConstants.primaryColor,
+                                  decoration: BoxDecoration(
+                                    color: AppConstants.primaryColor.withValues(alpha: 
+                                      0.1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(3),
                                   ),
-                                  overflow: TextOverflow.ellipsis,
+                                  child: Text(
+                                    category,
+                                    style: GoogleFonts.montserrat(
+                                      fontSize: 9,
+                                      color: AppConstants.primaryColor,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ),
+                        if (shop.categories.length > 2)
+                          Text(
+                            'plus_more'.tr(context).replaceAll('{count}', (shop.categories.length - 2).toString()),
+                            style: GoogleFonts.montserrat(
+                              fontSize: 8,
+                              color: Colors.grey[600],
                             ),
-                      if (shop.categories.length > 2)
-                        Text(
-                          '+${shop.categories.length - 2} more',
-                          style: GoogleFonts.montserrat(
-                            fontSize: 8,
-                            color: Colors.grey[600],
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                onPressed: () => _showCategoryDropdown(shop),
-                icon: const Icon(Icons.settings, size: 14),
-                tooltip: 'Manage Categories',
-                padding: const EdgeInsets.all(2),
-                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-              ),
-              IconButton(
-                onPressed: () => _showAddCategoryDropdown(shop),
-                icon: const Icon(Icons.add_circle_outline, size: 14),
-                tooltip: 'Add Category',
-                padding: const EdgeInsets.all(2),
-                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-              ),
-            ],
-          ),
-        ),
-        DataCell(
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Expanded(
-                child: Text(
-                  shop.subServices.isNotEmpty
-                      ? '${shop.subServices.values.fold<int>(0, (sum, services) => sum + services.length)} services'
-                      : 'No services',
-                  style: GoogleFonts.montserrat(fontSize: 11),
+                IconButton(
+                  onPressed: () => _showCategoryDropdown(shop),
+                  icon: const Icon(Icons.settings, size: 14),
+                  tooltip: 'manage_categories_tooltip'.tr(context),
+                  padding: const EdgeInsets.all(2),
+                  constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
                 ),
-              ),
-              IconButton(
-                onPressed: () => _showSubServiceDropdown(shop),
-                icon: const Icon(Icons.settings, size: 14),
-                tooltip: 'Manage Sub-Services',
-                padding: const EdgeInsets.all(2),
-                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-              ),
-              IconButton(
-                onPressed: () => _showAddServiceDropdown(shop),
-                icon: const Icon(Icons.add_circle_outline, size: 14),
-                tooltip: 'Add Service',
-                padding: const EdgeInsets.all(2),
-                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-              ),
-            ],
+                IconButton(
+                  onPressed: () => _showAddCategoryDropdown(shop),
+                  icon: const Icon(Icons.add_circle_outline, size: 14),
+                  tooltip: 'add_category_tooltip'.tr(context),
+                  padding: const EdgeInsets.all(2),
+                  constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                ),
+              ],
+            ),
           ),
-        ),
+        if (isLargeScreen)
+          DataCell(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Expanded(
+                  child: Text(
+                    shop.subServices.isNotEmpty
+                        ? 'admin_services_count'.tr(context).replaceAll('{count}', shop.subServices.values.fold<int>(0, (sum, services) => sum + services.length).toString())
+                        : 'admin_no_services'.tr(context),
+                    style: GoogleFonts.montserrat(fontSize: 11),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => _showSubServiceDropdown(shop),
+                  icon: const Icon(Icons.settings, size: 14),
+                  tooltip: 'manage_subservices_tooltip'.tr(context),
+                  padding: const EdgeInsets.all(2),
+                  constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                ),
+                IconButton(
+                  onPressed: () => _showAddServiceDropdown(shop),
+                  icon: const Icon(Icons.add_circle_outline, size: 14),
+                  tooltip: 'add_service_tooltip'.tr(context),
+                  padding: const EdgeInsets.all(2),
+                  constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                ),
+              ],
+            ),
+          ),
         if (isLargeScreen)
           DataCell(
             Row(
@@ -727,7 +710,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 IconButton(
                   onPressed: () => _showCoordinateEditor(shop, 'latitude'),
                   icon: const Icon(Icons.edit, size: 12),
-                  tooltip: 'Edit Latitude',
+                  tooltip: 'edit_latitude_tooltip'.tr(context),
                   padding: const EdgeInsets.all(2),
                   constraints: const BoxConstraints(
                     minWidth: 16,
@@ -751,7 +734,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 IconButton(
                   onPressed: () => _showCoordinateEditor(shop, 'longitude'),
                   icon: const Icon(Icons.edit, size: 12),
-                  tooltip: 'Edit Longitude',
+                  tooltip: 'edit_longitude_tooltip'.tr(context),
                   padding: const EdgeInsets.all(2),
                   constraints: const BoxConstraints(
                     minWidth: 16,
@@ -768,28 +751,28 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
               IconButton(
                 onPressed: () => _viewShopDetails(shop),
                 icon: const Icon(Icons.visibility, size: 14),
-                tooltip: 'View Details',
+                tooltip: 'view_details_tooltip'.tr(context),
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
               ),
               IconButton(
                 onPressed: () => _editShop(shop),
                 icon: const Icon(Icons.edit, size: 14),
-                tooltip: 'Edit Shop',
+                tooltip: 'edit_shop_tooltip'.tr(context),
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
               ),
               IconButton(
                 onPressed: () => _showPhotoOptions(shop),
                 icon: const Icon(Icons.photo_camera, size: 14),
-                tooltip: 'Photo Options',
+                tooltip: 'photo_options_tooltip'.tr(context),
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
               ),
               IconButton(
                 onPressed: () => _deleteShop(shop),
                 icon: const Icon(Icons.delete, size: 14, color: Colors.red),
-                tooltip: 'Delete Shop',
+                tooltip: 'delete_shop_tooltip'.tr(context),
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
               ),
@@ -813,10 +796,10 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       context,
       MaterialPageRoute(builder: (context) => EditShopScreen(shop: shop)),
     ).then((result) {
+      if (!mounted) return;
       if (result == true) {
-        // Refresh the list if shop was updated successfully
         setState(() {
-          // Force rebuild
+          _refreshCounter++;
         });
       }
     });
@@ -829,12 +812,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         barrierDismissible: false,
         builder:
-            (context) => const AlertDialog(
+            (context) => AlertDialog(
               content: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Updating category...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text('updating_category'.tr(context)),
                 ],
               ),
             ),
@@ -851,87 +834,72 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         'categories': updatedCategories,
       });
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Category "$category" added to "${shop.name}"'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('category_added_to_shop'.tr(context).replaceAll('{category}', category).replaceAll('{shop}', shop.name)),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating category: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_updating_category'.tr(context).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
       appLog('Error updating category: $e');
     }
   }
 
   Future<void> _removeCategory(RepairShop shop, String category) async {
     try {
-      // Show loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
         builder:
-            (context) => const AlertDialog(
+            (context) => AlertDialog(
               content: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Removing category...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text('removing_category'.tr(context)),
                 ],
               ),
             ),
       );
 
-      // Update the shop's categories
       List<String> updatedCategories = List.from(shop.categories);
       updatedCategories.remove(category);
 
-      // Update in Firestore
       await _firestore.collection('shops').doc(shop.id).update({
         'categories': updatedCategories,
       });
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Category "$category" removed from "${shop.name}"'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('category_removed_from_shop'.tr(context).replaceAll('{category}', category).replaceAll('{shop}', shop.name)),
+          backgroundColor: Colors.orange,
+        ),
+      );
     } catch (e) {
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error removing category: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_removing_category'.tr(context).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
       appLog('Error removing category: $e');
     }
   }
@@ -941,14 +909,14 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Manage Categories for ${shop.name}'),
+            title: Text('manage_categories_for'.tr(context).replaceAll('{name}', shop.name)),
             content: SizedBox(
-              width: 350,
+              width: min(350, MediaQuery.of(context).size.width - 32),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Current categories: ${shop.categories.isEmpty ? "None" : shop.categories.join(", ")}',
+                    'current_categories'.tr(context).replaceAll('{categories}', shop.categories.isEmpty ? 'none_label'.tr(context) : shop.categories.join(', ')),
                     style: GoogleFonts.montserrat(fontSize: 14),
                   ),
                   const SizedBox(height: 16),
@@ -979,7 +947,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                                   Icons.remove_circle_outline,
                                   color: Colors.red,
                                 ),
-                                tooltip: 'Remove category',
+                                tooltip: 'remove_category_tooltip'.tr(context),
                               )
                               : null,
                       onTap: () {
@@ -996,7 +964,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
             ],
           ),
@@ -1014,12 +982,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         barrierDismissible: false,
         builder:
-            (context) => const AlertDialog(
+            (context) => AlertDialog(
               content: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Adding sub-service...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text('adding_subservice'.tr(context)),
                 ],
               ),
             ),
@@ -1039,31 +1007,25 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         'subServices': updatedSubServices,
       });
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sub-service "$subService" added to "${shop.name}"'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('subservice_added_to_shop'.tr(context).replaceAll('{service}', subService).replaceAll('{shop}', shop.name)),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error adding sub-service: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_adding_subservice'.tr(context).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
       appLog('Error adding sub-service: $e');
     }
   }
@@ -1079,12 +1041,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         barrierDismissible: false,
         builder:
-            (context) => const AlertDialog(
+            (context) => AlertDialog(
               content: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Removing sub-service...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text('removing_subservice'.tr(context)),
                 ],
               ),
             ),
@@ -1104,33 +1066,27 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         'subServices': updatedSubServices,
       });
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Sub-service "$subService" removed from "${shop.name}"',
-            ),
-            backgroundColor: Colors.orange,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'subservice_added_to_shop'.tr(context).replaceAll('{service}', subService).replaceAll('{shop}', shop.name),
           ),
-        );
-      }
+          backgroundColor: Colors.orange,
+        ),
+      );
     } catch (e) {
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error removing sub-service: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_removing_subservice'.tr(context).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
       appLog('Error removing sub-service: $e');
     }
   }
@@ -1138,9 +1094,9 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
   void _showSubServiceDropdown(RepairShop shop) {
     if (shop.categories.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Please assign categories first before managing sub-services',
+            'assign_categories_first_subservices'.tr(context),
           ),
           backgroundColor: Colors.orange,
         ),
@@ -1152,10 +1108,10 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Manage Sub-Services for ${shop.name}'),
+            title: Text('manage_subservices_for'.tr(context).replaceAll('{name}', shop.name)),
             content: SizedBox(
-              width: 400,
-              height: 500,
+              width: min(400, MediaQuery.of(context).size.width - 32),
+              height: min(500, MediaQuery.of(context).size.height - 64),
               child: Column(
                 children: [
                   Expanded(
@@ -1215,7 +1171,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                                               color: Colors.red,
                                               size: 20,
                                             ),
-                                            tooltip: 'Remove sub-service',
+                                            tooltip: 'remove_subservice_tooltip'.tr(context),
                                           )
                                           : null,
                                   onTap: () {
@@ -1240,7 +1196,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
             ],
           ),
@@ -1255,8 +1211,8 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
 
     if (availableCategories.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('All categories are already assigned to this shop'),
+        SnackBar(
+          content: Text('all_categories_assigned'.tr(context)),
           backgroundColor: Colors.orange,
         ),
       );
@@ -1271,14 +1227,14 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
           (context) => StatefulBuilder(
             builder:
                 (context, setState) => AlertDialog(
-                  title: Text('Add Categories to ${shop.name}'),
+                  title: Text('add_categories_to'.tr(context).replaceAll('{name}', shop.name)),
                   content: SizedBox(
-                    width: 350,
-                    height: 400,
+                    width: min(350, MediaQuery.of(context).size.width - 32),
+                    height: min(400, MediaQuery.of(context).size.height - 64),
                     child: Column(
                       children: [
                         Text(
-                          'Select categories to add:',
+                          'select_categories_to_add'.tr(context),
                           style: GoogleFonts.montserrat(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -1319,7 +1275,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
-                              '${selectedCategories.length} category(ies) selected',
+                              'categories_selected_count'.tr(context).replaceAll('{count}', selectedCategories.length.toString()),
                               style: GoogleFonts.montserrat(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -1332,7 +1288,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                      child: Text('cancel'.tr(context)),
                     ),
                     ElevatedButton(
                       onPressed:
@@ -1345,7 +1301,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                                   selectedCategories.toList(),
                                 );
                               },
-                      child: const Text('Add Selected'),
+                      child: Text('add_selected'.tr(context)),
                     ),
                   ],
                 ),
@@ -1363,12 +1319,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         barrierDismissible: false,
         builder:
-            (context) => const AlertDialog(
+            (context) => AlertDialog(
               content: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Adding categories...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text('adding_categories'.tr(context)),
                 ],
               ),
             ),
@@ -1387,33 +1343,27 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         'categories': updatedCategories,
       });
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${categories.length} category(ies) added to "${shop.name}"',
-            ),
-            backgroundColor: Colors.green,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'categories_added_count'.tr(context).replaceAll('{count}', categories.length.toString()).replaceAll('{shop}', shop.name),
           ),
-        );
-      }
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error adding categories: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_adding_categories'.tr(context).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
       appLog('Error adding multiple categories: $e');
     }
   }
@@ -1421,9 +1371,9 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
   void _showAddServiceDropdown(RepairShop shop) {
     if (shop.categories.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Please assign categories first before adding services',
+            'assign_categories_first_services'.tr(context),
           ),
           backgroundColor: Colors.orange,
         ),
@@ -1439,14 +1389,14 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
           (context) => StatefulBuilder(
             builder:
                 (context, setState) => AlertDialog(
-                  title: Text('Add Services to ${shop.name}'),
+                  title: Text('add_services_to'.tr(context).replaceAll('{name}', shop.name)),
                   content: SizedBox(
-                    width: 400,
-                    height: 500,
+                    width: min(400, MediaQuery.of(context).size.width - 32),
+                    height: min(500, MediaQuery.of(context).size.height - 64),
                     child: Column(
                       children: [
                         Text(
-                          'Select services to add:',
+                          'select_services_to_add'.tr(context),
                           style: GoogleFonts.montserrat(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -1484,7 +1434,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                                   ),
                                 ),
                                 subtitle: Text(
-                                  '${availableSubServices.length} services available',
+                                  'services_available_count'.tr(context).replaceAll('{count}', availableSubServices.length.toString()),
                                   style: GoogleFonts.montserrat(
                                     fontSize: 12,
                                     color: Colors.grey[600],
@@ -1535,7 +1485,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
-                              '${selectedServices.values.fold<int>(0, (sum, services) => sum + services.length)} service(s) selected',
+                              'services_selected_count'.tr(context).replaceAll('{count}', selectedServices.values.fold<int>(0, (sum, services) => sum + services.length).toString()),
                               style: GoogleFonts.montserrat(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -1548,7 +1498,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                      child: Text('cancel'.tr(context)),
                     ),
                     ElevatedButton(
                       onPressed:
@@ -1561,7 +1511,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                                   selectedServices,
                                 );
                               },
-                      child: const Text('Add Selected'),
+                      child: Text('add_selected'.tr(context)),
                     ),
                   ],
                 ),
@@ -1579,12 +1529,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         barrierDismissible: false,
         builder:
-            (context) => const AlertDialog(
+            (context) => AlertDialog(
               content: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Adding services...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text('adding_services'.tr(context)),
                 ],
               ),
             ),
@@ -1613,37 +1563,30 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         'subServices': updatedSubServices,
       });
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Calculate total services added
       final totalServices = selectedServices.values.fold<int>(
         0,
         (sum, services) => sum + services.length,
       );
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$totalServices service(s) added to "${shop.name}"'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('services_added_to_shop'.tr(context).replaceAll('{count}', totalServices.toString()).replaceAll('{shop}', shop.name)),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error adding services: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_adding_services'.tr(context).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
       appLog('Error adding multiple services: $e');
     }
   }
@@ -1662,13 +1605,13 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       builder:
           (context) => AlertDialog(
             title: Text(
-              'Edit ${coordinateType.toUpperCase()} for ${shop.name}',
+              'edit_coordinate_for'.tr(context).replaceAll('{type}', coordinateType.toUpperCase()).replaceAll('{name}', shop.name),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Current ${coordinateType}: $currentValue',
+                  'current_coordinate'.tr(context).replaceAll('{type}', coordinateType).replaceAll('{value}', currentValue),
                   style: GoogleFonts.montserrat(
                     fontSize: 12,
                     color: Colors.grey[600],
@@ -1678,7 +1621,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 TextField(
                   controller: coordinateController,
                   decoration: InputDecoration(
-                    labelText: 'New ${coordinateType.toUpperCase()}',
+                    labelText: 'new_coordinate'.tr(context).replaceAll('{type}', coordinateType.toUpperCase()),
                     hintText:
                         coordinateType == 'latitude' ? '13.7563' : '100.5018',
                     prefixIcon: Icon(
@@ -1689,8 +1632,8 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                     border: const OutlineInputBorder(),
                     helperText:
                         coordinateType == 'latitude'
-                            ? 'Enter latitude (e.g., 13.7563 for Bangkok) - You can paste coordinates'
-                            : 'Enter longitude (e.g., 100.5018 for Bangkok) - You can paste coordinates',
+                            ? 'latitude_helper_text'.tr(context)
+                            : 'longitude_helper_text'.tr(context),
                   ),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -1699,7 +1642,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Format: Decimal degrees (e.g., 13.7563, 100.5018)',
+                  'coordinate_format_hint'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 10,
                     color: Colors.grey[500],
@@ -1710,15 +1653,15 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () async {
                   final newValue = coordinateController.text.trim();
                   if (newValue.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter a valid coordinate'),
+                      SnackBar(
+                        content: Text('please_enter_valid_coordinate'.tr(context)),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -1728,8 +1671,8 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   final double? parsedValue = double.tryParse(newValue);
                   if (parsedValue == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter a valid number'),
+                      SnackBar(
+                        content: Text('please_enter_valid_number'.tr(context)),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -1740,9 +1683,9 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   if (coordinateType == 'latitude' &&
                       (parsedValue < -90 || parsedValue > 90)) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content: Text(
-                          'Latitude must be between -90 and 90 degrees',
+                          'latitude_range_error'.tr(context),
                         ),
                         backgroundColor: Colors.red,
                       ),
@@ -1753,9 +1696,9 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   if (coordinateType == 'longitude' &&
                       (parsedValue < -180 || parsedValue > 180)) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content: Text(
-                          'Longitude must be between -180 and 180 degrees',
+                          'longitude_range_error'.tr(context),
                         ),
                         backgroundColor: Colors.red,
                       ),
@@ -1766,11 +1709,11 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   Navigator.of(context).pop();
                   await _updateCoordinate(shop, coordinateType, parsedValue);
                 },
-                child: const Text('Update'),
+                child: Text('update_button'.tr(context)),
               ),
             ],
           ),
-    );
+    ).then((_) => coordinateController.dispose());
   }
 
   Future<void> _updateCoordinate(
@@ -1784,12 +1727,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         barrierDismissible: false,
         builder:
-            (context) => const AlertDialog(
+            (context) => AlertDialog(
               content: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Updating coordinate...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text('updating_coordinate'.tr(context)),
                 ],
               ),
             ),
@@ -1803,33 +1746,27 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
 
       await _firestore.collection('shops').doc(shop.id).update(updateData);
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${coordinateType.toUpperCase()} updated for "${shop.name}"',
-            ),
-            backgroundColor: Colors.green,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'coordinate_updated_for'.tr(context).replaceAll('{type}', coordinateType.toUpperCase()).replaceAll('{name}', shop.name),
           ),
-        );
-      }
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating ${coordinateType}: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_updating_coordinate'.tr(context).replaceAll('{type}', coordinateType).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
       appLog('Error updating coordinate: $e');
     }
   }
@@ -1842,12 +1779,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Edit Shop Name'),
+            title: Text('edit_shop_name_dialog'.tr(context)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Current name: ${shop.name}',
+                  'current_name'.tr(context).replaceAll('{name}', shop.name),
                   style: GoogleFonts.montserrat(
                     fontSize: 12,
                     color: Colors.grey[600],
@@ -1856,11 +1793,11 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'New Shop Name',
-                    hintText: 'Enter shop name',
-                    border: OutlineInputBorder(),
-                    helperText: 'Enter the complete shop name',
+                  decoration: InputDecoration(
+                    labelText: 'new_shop_name'.tr(context),
+                    hintText: 'enter_shop_name_hint'.tr(context),
+                    border: const OutlineInputBorder(),
+                    helperText: 'enter_complete_shop_name'.tr(context),
                   ),
                   maxLength: 100,
                 ),
@@ -1869,15 +1806,15 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () async {
                   final newName = nameController.text.trim();
                   if (newName.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter a valid shop name'),
+                      SnackBar(
+                        content: Text('please_enter_valid_shop_name'.tr(context)),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -1886,9 +1823,9 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
 
                   if (newName.length < 2) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content: Text(
-                          'Shop name must be at least 2 characters long',
+                          'shop_name_min_length'.tr(context),
                         ),
                         backgroundColor: Colors.red,
                       ),
@@ -1899,11 +1836,11 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   Navigator.of(context).pop();
                   await _updateShopName(shop, newName);
                 },
-                child: const Text('Update'),
+                child: Text('update_button'.tr(context)),
               ),
             ],
           ),
-    );
+    ).then((_) => nameController.dispose());
   }
 
   void _showAddressEditor(RepairShop shop) {
@@ -1914,12 +1851,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Edit Address for ${shop.name}'),
+            title: Text('edit_address_for'.tr(context).replaceAll('{name}', shop.name)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Current address: ${shop.address}',
+                  'current_address'.tr(context).replaceAll('{address}', shop.address),
                   style: GoogleFonts.montserrat(
                     fontSize: 12,
                     color: Colors.grey[600],
@@ -1928,11 +1865,11 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'New Address',
-                    hintText: 'Enter complete address',
-                    border: OutlineInputBorder(),
-                    helperText: 'Enter the full shop address',
+                  decoration: InputDecoration(
+                    labelText: 'new_address'.tr(context),
+                    hintText: 'enter_complete_address'.tr(context),
+                    border: const OutlineInputBorder(),
+                    helperText: 'enter_full_shop_address'.tr(context),
                   ),
                   maxLines: 3,
                   maxLength: 200,
@@ -1942,15 +1879,15 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () async {
                   final newAddress = addressController.text.trim();
                   if (newAddress.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please enter a valid address'),
+                      SnackBar(
+                        content: Text('please_enter_valid_address'.tr(context)),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -1959,9 +1896,9 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
 
                   if (newAddress.length < 5) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content: Text(
-                          'Address must be at least 5 characters long',
+                          'address_min_length'.tr(context),
                         ),
                         backgroundColor: Colors.red,
                       ),
@@ -1972,11 +1909,11 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   Navigator.of(context).pop();
                   await _updateShopAddress(shop, newAddress);
                 },
-                child: const Text('Update'),
+                child: Text('update_button'.tr(context)),
               ),
             ],
           ),
-    );
+    ).then((_) => addressController.dispose());
   }
 
   Future<void> _updateShopName(RepairShop shop, String newName) async {
@@ -1986,12 +1923,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         barrierDismissible: false,
         builder:
-            (context) => const AlertDialog(
+            (context) => AlertDialog(
               content: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Updating shop name...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text('updating_shop_name'.tr(context)),
                 ],
               ),
             ),
@@ -2002,31 +1939,25 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         'name': newName,
       });
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Shop name updated to "$newName"'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('shop_name_updated'.tr(context).replaceAll('{name}', newName)),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating shop name: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_updating_shop_name'.tr(context).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
       appLog('Error updating shop name: $e');
     }
   }
@@ -2038,12 +1969,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         barrierDismissible: false,
         builder:
-            (context) => const AlertDialog(
+            (context) => AlertDialog(
               content: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Updating address...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text('updating_address'.tr(context)),
                 ],
               ),
             ),
@@ -2054,31 +1985,25 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         'address': newAddress,
       });
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Address updated for "${shop.name}"'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('address_updated_for'.tr(context).replaceAll('{name}', shop.name)),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error updating address: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_updating_address'.tr(context).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
       appLog('Error updating address: $e');
     }
   }
@@ -2101,12 +2026,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         barrierDismissible: false,
         builder:
-            (context) => const AlertDialog(
+            (context) => AlertDialog(
               content: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Uploading photo...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text('uploading_photo'.tr(context)),
                 ],
               ),
             ),
@@ -2152,31 +2077,25 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         'photos': updatedPhotos,
       });
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Cover photo updated for "${shop.name}"'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('cover_photo_updated'.tr(context).replaceAll('{name}', shop.name)),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error uploading photo: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_uploading_photo'.tr(context).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
       appLog('Error uploading cover photo: $e');
     }
   }
@@ -2186,7 +2105,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Photo Options for ${shop.name}'),
+            title: Text('photo_options_for'.tr(context).replaceAll('{name}', shop.name)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -2200,24 +2119,22 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        shop.photos.first,
+                      child: OptimizedImage(
+                        imageUrl: shop.photos.first,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[200],
-                            child: const Icon(
-                              Icons.image_not_supported,
-                              size: 40,
-                            ),
-                          );
-                        },
+                        errorWidget: Container(
+                          color: Colors.grey[200],
+                          child: const Icon(
+                            Icons.image_not_supported,
+                            size: 40,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Current cover photo',
+                    'current_cover_photo'.tr(context),
                     style: GoogleFonts.montserrat(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -2227,8 +2144,8 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 ],
                 ListTile(
                   leading: const Icon(Icons.photo_library, color: Colors.blue),
-                  title: const Text('Upload New Cover Photo'),
-                  subtitle: const Text('Select from gallery'),
+                  title: Text('upload_new_cover_photo'.tr(context)),
+                  subtitle: Text('select_from_gallery'.tr(context)),
                   onTap: () {
                     Navigator.of(context).pop();
                     _uploadCoverPhoto(shop);
@@ -2237,8 +2154,8 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 if (shop.photos.isNotEmpty)
                   ListTile(
                     leading: const Icon(Icons.visibility, color: Colors.green),
-                    title: const Text('View All Photos'),
-                    subtitle: Text('${shop.photos.length} photos'),
+                    title: Text('view_all_photos'.tr(context)),
+                    subtitle: Text('photo_count'.tr(context).replaceAll('{count}', shop.photos.length.toString())),
                     onTap: () {
                       Navigator.of(context).pop();
                       _viewAllPhotos(shop);
@@ -2249,7 +2166,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
             ],
           ),
@@ -2259,8 +2176,8 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
   void _viewAllPhotos(RepairShop shop) {
     if (shop.photos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No photos available for this shop'),
+        SnackBar(
+          content: Text('no_photos_available'.tr(context)),
           backgroundColor: Colors.orange,
         ),
       );
@@ -2271,10 +2188,10 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Photos for ${shop.name}'),
+            title: Text('photos_for'.tr(context).replaceAll('{name}', shop.name)),
             content: SizedBox(
-              width: 400,
-              height: 300,
+              width: min(400, MediaQuery.of(context).size.width - 32),
+              height: min(300, MediaQuery.of(context).size.height - 64),
               child: ListView.builder(
                 itemCount: shop.photos.length,
                 itemBuilder: (context, index) {
@@ -2291,18 +2208,16 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(4),
-                            child: Image.network(
-                              shop.photos[index],
+                            child: OptimizedImage(
+                              imageUrl: shop.photos[index],
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: Colors.grey[200],
-                                  child: const Icon(
-                                    Icons.image_not_supported,
-                                    size: 20,
-                                  ),
-                                );
-                              },
+                              errorWidget: Container(
+                                color: Colors.grey[200],
+                                child: const Icon(
+                                  Icons.image_not_supported,
+                                  size: 20,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -2312,14 +2227,14 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Photo ${index + 1}',
+                                'photo_index'.tr(context).replaceAll('{index}', (index + 1).toString()),
                                 style: GoogleFonts.montserrat(
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                               if (index == 0)
                                 Text(
-                                  'Cover Photo',
+                                  'cover_photo_label'.tr(context),
                                   style: GoogleFonts.montserrat(
                                     fontSize: 12,
                                     color: Colors.green[600],
@@ -2337,7 +2252,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
+                child: Text('close_button'.tr(context)),
               ),
             ],
           ),
@@ -2350,16 +2265,16 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Delete Shop'),
+            title: Text('delete_shop_dialog'.tr(context)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Are you sure you want to delete "${shop.name}"?'),
+                Text('confirm_delete_shop'.tr(context).replaceAll('{name}', shop.name)),
                 const SizedBox(height: 8),
-                const Text(
-                  'This action cannot be undone. All shop data, reviews, and photos will be permanently deleted.',
-                  style: TextStyle(
+                Text(
+                  'delete_shop_warning'.tr(context),
+                  style: const TextStyle(
                     fontSize: 12,
                     color: Colors.red,
                     fontStyle: FontStyle.italic,
@@ -2370,12 +2285,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Delete'),
+                child: Text('delete'.tr(context)),
               ),
             ],
           ),
@@ -2391,12 +2306,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         barrierDismissible: false,
         builder:
-            (context) => const AlertDialog(
+            (context) => AlertDialog(
               content: Row(
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(width: 16),
-                  Text('Deleting shop...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 16),
+                  Text('deleting_shop'.tr(context)),
                 ],
               ),
             ),
@@ -2405,31 +2320,25 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       // Delete the shop document from Firestore
       await _firestore.collection('shops').doc(shop.id).delete();
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Shop "${shop.name}" deleted successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('shop_deleted_success'.tr(context).replaceAll('{name}', shop.name)),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show error message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting shop: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_deleting_shop_msg'.tr(context).replaceAll('{error}', e.toString())),
+          backgroundColor: Colors.red,
+        ),
+      );
       appLog('Error deleting shop: $e');
     }
   }
@@ -2444,20 +2353,20 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
               Icon(Icons.warning, color: Colors.red, size: 28),
               const SizedBox(width: 8),
               Text(
-                'Delete All Shops',
+                'delete_all_shops'.tr(context),
                 style: GoogleFonts.montserrat(fontWeight: FontWeight.bold),
               ),
             ],
           ),
           content: Text(
-            'Are you sure you want to delete ALL shops? This action cannot be undone and will permanently remove all shop data from the database.',
+            'confirm_delete_all_shops'.tr(context),
             style: GoogleFonts.montserrat(fontSize: 16),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Text(
-                'Cancel',
+                'cancel'.tr(context),
                 style: GoogleFonts.montserrat(
                   color: Colors.grey[600],
                   fontWeight: FontWeight.w500,
@@ -2474,7 +2383,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                 foregroundColor: Colors.white,
               ),
               child: Text(
-                'Delete All',
+                'delete_all'.tr(context),
                 style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
               ),
             ),
@@ -2496,7 +2405,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
               children: [
                 CircularProgressIndicator(),
                 const SizedBox(width: 16),
-                Text('Deleting all shops...', style: GoogleFonts.montserrat()),
+                Text('deleting_all_shops'.tr(context), style: GoogleFonts.montserrat()),
               ],
             ),
           );
@@ -2507,10 +2416,11 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       final QuerySnapshot snapshot = await _firestore.collection('shops').get();
 
       if (snapshot.docs.isEmpty) {
-        Navigator.of(context).pop(); // Close loading dialog
+        if (!mounted) return;
+        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('No shops found to delete.'),
+            content: Text('no_shops_to_delete'.tr(context)),
             backgroundColor: Colors.orange,
           ),
         );
@@ -2529,27 +2439,26 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
       // Commit the batch
       await batch.commit();
 
-      // Close loading dialog
+      if (!mounted) return;
       Navigator.of(context).pop();
 
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Successfully deleted $deletedCount shops.'),
+            content: Text('shops_deleted_count'.tr(context).replaceAll('{count}', deletedCount.toString())),
           backgroundColor: Colors.green,
         ),
       );
 
       appLog('Successfully deleted $deletedCount shops');
     } catch (e) {
-      // Close loading dialog if it's still open
+      if (!mounted) return;
       if (Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error deleting shops: $e'),
+            content: Text('error_deleting_shops'.tr(context).replaceAll('{error}', e.toString())),
           backgroundColor: Colors.red,
         ),
       );
@@ -2764,7 +2673,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
                   (data['requirespurchase']?.toString().toLowerCase() ==
                       'true'),
               photos: imageUrl != null ? [imageUrl] : [],
-              priceRange: data['pricerange']?.toString() ?? '₿',
+              priceRange: data['pricerange']?.toString() ?? '฿',
               features: {},
               approved:
                   (data['isapproved']?.toString().toLowerCase() == 'true'),
@@ -2814,15 +2723,15 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         builder:
             (context) => AlertDialog(
-              title: const Text('Import Complete'),
+              title: Text('import_complete'.tr(context)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Successfully imported $importedCount shops.'),
+                  Text('imported_count'.tr(context).replaceAll('{count}', importedCount.toString())),
                   if (failedCount > 0) ...[
                     const SizedBox(height: 8),
-                    Text('Failed to import $failedCount shops:'),
+                    Text('failed_import_count'.tr(context).replaceAll('{count}', failedCount.toString())),
                     const SizedBox(height: 8),
                     Container(
                       height: 150,
@@ -2856,7 +2765,7 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
+                  child: Text('ok'.tr(context)),
                 ),
               ],
             ),
@@ -2866,12 +2775,12 @@ class _AdminManageShopsScreenState extends State<AdminManageShopsScreen> {
         context: context,
         builder:
             (context) => AlertDialog(
-              title: const Text('Import Failed'),
-              content: Text('Error: ${e.toString()}'),
+              title: Text('import_failed'.tr(context)),
+              content: Text('error_prefix'.tr(context).replaceAll('{error}', e.toString())),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
+                  child: Text('ok'.tr(context)),
                 ),
               ],
             ),

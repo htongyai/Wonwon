@@ -37,6 +37,8 @@ class AppStateManager extends ChangeNotifier {
   // Subscriptions for real-time updates
   StreamSubscription? _userSubscription;
   StreamSubscription? _shopsSubscription;
+  StreamSubscription? _authSubscription;
+  Timer? _refreshTimer;
 
   // Getters
   app_user.User? get currentUser => _currentUser;
@@ -53,25 +55,22 @@ class AppStateManager extends ChangeNotifier {
   String get searchQuery => _searchQuery;
   String? get selectedCategory => _selectedCategory;
 
-  /// Initialize the state manager
+  bool _initialized = false;
+
+  /// Initialize the state manager.
+  /// ServiceManager must be initialized before calling this.
   Future<void> initialize() async {
+    if (_initialized) return;
     appLog('AppStateManager: Initializing...');
 
     try {
       setLoading(true);
 
-      // Initialize services
-      await _serviceManager.initialize();
-
-      // Check authentication state
       await _checkAuthState();
-
-      // Load initial data
       await _loadInitialData();
-
-      // Set up real-time listeners
       _setupRealtimeListeners();
 
+      _initialized = true;
       setLoading(false);
       appLog('AppStateManager: Initialized successfully');
     } catch (e) {
@@ -137,10 +136,15 @@ class AppStateManager extends ChangeNotifier {
     }
   }
 
-  /// Set up real-time listeners
+  /// Set up real-time listeners (safe to call multiple times)
   void _setupRealtimeListeners() {
+    // Cancel existing listeners to avoid duplicates
+    _authSubscription?.cancel();
+    _refreshTimer?.cancel();
+
     // Listen to Firebase auth changes
-    firebase_auth.FirebaseAuth.instance.authStateChanges().listen((user) {
+    _authSubscription =
+        firebase_auth.FirebaseAuth.instance.authStateChanges().listen((user) {
       _firebaseUser = user;
       _isAuthenticated = user != null;
 
@@ -153,7 +157,7 @@ class AppStateManager extends ChangeNotifier {
     });
 
     // Listen to shops changes (simplified - using periodic refresh for now)
-    Timer.periodic(const Duration(minutes: 5), (_) {
+    _refreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       if (_isAuthenticated) {
         _loadInitialData();
       }
@@ -195,14 +199,14 @@ class AppStateManager extends ChangeNotifier {
       _isAuthLoading = true;
       notifyListeners();
 
-      final success = await _serviceManager.authService.register(
+      final result = await _serviceManager.authService.register(
         name,
         email,
         password,
         accountType,
       );
 
-      if (success) {
+      if (result.success) {
         await _checkAuthState();
         await _loadInitialData();
         _setupRealtimeListeners();
@@ -211,7 +215,7 @@ class AppStateManager extends ChangeNotifier {
       _isAuthLoading = false;
       notifyListeners();
 
-      return success;
+      return result.success;
     } catch (e) {
       _isAuthLoading = false;
       setError('Registration failed: $e');
@@ -234,8 +238,12 @@ class AppStateManager extends ChangeNotifier {
       // Cancel subscriptions
       await _userSubscription?.cancel();
       await _shopsSubscription?.cancel();
+      await _authSubscription?.cancel();
+      _refreshTimer?.cancel();
       _userSubscription = null;
       _shopsSubscription = null;
+      _authSubscription = null;
+      _refreshTimer = null;
 
       notifyListeners();
       appLog('AppStateManager: User logged out');
@@ -372,6 +380,8 @@ class AppStateManager extends ChangeNotifier {
   void dispose() {
     _userSubscription?.cancel();
     _shopsSubscription?.cancel();
+    _authSubscription?.cancel();
+    _refreshTimer?.cancel();
     _serviceManager.dispose();
     super.dispose();
   }

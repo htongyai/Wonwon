@@ -12,7 +12,7 @@ class ContentManagementService {
   final AuthService _authService = AuthService();
 
   // Delete a review
-  Future<bool> deleteReview(String reviewId, String reviewAuthorId) async {
+  Future<bool> deleteReview(String shopId, String reviewId, String reviewAuthorId) async {
     try {
       // Check if user has permission to delete this review
       final canDelete = await _authService.canDeleteContent(reviewAuthorId);
@@ -21,8 +21,8 @@ class ContentManagementService {
         return false;
       }
 
-      // Delete the review
-      await _firestore.collection('reviews').doc(reviewId).delete();
+      // Delete the review from the shop's subcollection
+      await _firestore.collection('shops').doc(shopId).collection('review').doc(reviewId).delete();
       appLog('Review deleted successfully: $reviewId');
       return true;
     } catch (e) {
@@ -41,23 +41,28 @@ class ContentManagementService {
         return false;
       }
 
-      // Delete all replies first
-      final repliesSnapshot =
-          await _firestore
-              .collection('forum_replies')
-              .where('topicId', isEqualTo: topicId)
-              .get();
+      // Delete all replies first, chunked to respect Firestore batch limit of 500
+      final repliesSnapshot = await _firestore
+          .collection('forum_topics')
+          .doc(topicId)
+          .collection('replies')
+          .get();
 
-      final batch = _firestore.batch();
-      for (final doc in repliesSnapshot.docs) {
-        batch.delete(doc.reference);
+      final docs = repliesSnapshot.docs;
+      for (int i = 0; i < docs.length; i += 499) {
+        final batch = _firestore.batch();
+        final end = (i + 499 < docs.length) ? i + 499 : docs.length;
+        for (int j = i; j < end; j++) {
+          batch.delete(docs[j].reference);
+        }
+        if (end == docs.length) {
+          batch.delete(_firestore.collection('forum_topics').doc(topicId));
+        }
+        await batch.commit();
       }
-
-      // Delete the topic
-      batch.delete(_firestore.collection('forum_topics').doc(topicId));
-
-      // Commit the batch
-      await batch.commit();
+      if (docs.isEmpty) {
+        await _firestore.collection('forum_topics').doc(topicId).delete();
+      }
       appLog('Forum topic and all replies deleted successfully: $topicId');
       return true;
     } catch (e) {
@@ -67,7 +72,7 @@ class ContentManagementService {
   }
 
   // Delete a forum reply
-  Future<bool> deleteForumReply(String replyId, String replyAuthorId) async {
+  Future<bool> deleteForumReply(String topicId, String replyId, String replyAuthorId) async {
     try {
       // Check if user has permission to delete this reply
       final canDelete = await _authService.canDeleteContent(replyAuthorId);
@@ -77,7 +82,7 @@ class ContentManagementService {
       }
 
       // Delete the reply
-      await _firestore.collection('forum_replies').doc(replyId).delete();
+      await _firestore.collection('forum_topics').doc(topicId).collection('replies').doc(replyId).delete();
       appLog('Forum reply deleted successfully: $replyId');
       return true;
     } catch (e) {

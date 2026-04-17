@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wonwonw2/screens/login_screen.dart';
@@ -5,6 +7,7 @@ import 'package:wonwonw2/screens/main_navigation.dart';
 import 'package:wonwonw2/screens/home_screen.dart';
 import 'package:wonwonw2/services/auth_state_service.dart';
 import 'package:wonwonw2/services/service_providers.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 /// A wrapper widget that handles authentication state and determines which screen to show
 class AuthWrapper extends StatefulWidget {
@@ -17,20 +20,22 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   late AuthStateService _authStateService;
   AuthState? _currentState;
+  StreamSubscription<AuthState>? _subscription;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _authStateService = ServiceProvider.authStateOf(context);
 
-    // Listen for auth state changes
-    _authStateService.authStateStream.listen((state) {
-      setState(() {
-        _currentState = state;
-      });
+    _subscription?.cancel();
+    _subscription = _authStateService.authStateStream.listen((state) {
+      if (mounted) {
+        setState(() {
+          _currentState = state;
+        });
+      }
     });
 
-    // Set initial state
     setState(() {
       _currentState = AuthState(
         isLoggedIn: _authStateService.isLoggedIn,
@@ -38,6 +43,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
         hasSeenIntro: _authStateService.hasSeenIntro,
       );
     });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -68,12 +79,14 @@ class FeatureAuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use StreamBuilder to listen to Firebase auth changes directly
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Show loading while checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser != null) {
+            return child;
+          }
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -105,13 +118,13 @@ class FeatureAuthGate extends StatelessWidget {
                 children: [
                   const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Login Required',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  Text(
+                    'login_required'.tr(context),
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Please login to access this feature',
+                  Text(
+                    'please_login_to_access'.tr(context),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
@@ -126,7 +139,7 @@ class FeatureAuthGate extends StatelessWidget {
                         // No need to manually rebuild, StreamBuilder will handle it
                       }
                     },
-                    child: const Text('Login'),
+                    child: Text('login_button'.tr(context)),
                   ),
                 ],
               ),

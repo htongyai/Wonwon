@@ -2,7 +2,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
-import 'dart:html' as html;
+import 'package:wonwonw2/services/version_service_platform.dart' as platform;
 
 class VersionService {
   static final VersionService _instance = VersionService._internal();
@@ -34,7 +34,7 @@ class VersionService {
   /// Get the current build number
   Future<String> getBuildNumber() async {
     if (_buildNumber == null) {
-      await getCurrentVersion(); // This will set both version and build number
+      await getCurrentVersion();
     }
     return _buildNumber!;
   }
@@ -50,7 +50,7 @@ class VersionService {
   Future<bool> checkAndHandleVersionUpdate() async {
     try {
       final currentVersion = await getCurrentVersion();
-      final storedVersion = html.window.localStorage['app_version'];
+      final storedVersion = platform.getStoredVersion();
 
       appLog(
         'Version check - Current: $currentVersion, Stored: $storedVersion',
@@ -58,50 +58,20 @@ class VersionService {
 
       if (storedVersion == null || storedVersion != currentVersion) {
         appLog('New version detected, clearing cache...');
-        await _clearAppCache();
-        html.window.localStorage['app_version'] = currentVersion;
+        await platform.clearAppCache();
+        platform.storeVersion(currentVersion);
 
-        // Update user's app version in Firestore
         await _updateUserAppVersion(currentVersion);
 
-        return true; // Version was updated
+        return true;
       }
 
-      // Still update user version in case it wasn't recorded
       await _updateUserAppVersion(currentVersion);
 
-      return false; // No version update
+      return false;
     } catch (e) {
       appLog('Error in version check: $e');
       return false;
-    }
-  }
-
-  /// Clear all app caches
-  Future<void> _clearAppCache() async {
-    try {
-      // Clear service worker caches
-      final cacheNames = await html.window.caches?.keys();
-      if (cacheNames != null) {
-        for (final cacheName in cacheNames) {
-          await html.window.caches?.delete(cacheName);
-          appLog('Cleared cache: $cacheName');
-        }
-      }
-
-      // Clear localStorage (except version)
-      final version = html.window.localStorage['app_version'];
-      html.window.localStorage.clear();
-      if (version != null) {
-        html.window.localStorage['app_version'] = version;
-      }
-
-      // Clear sessionStorage
-      html.window.sessionStorage.clear();
-
-      appLog('App cache cleared successfully');
-    } catch (e) {
-      appLog('Error clearing cache: $e');
     }
   }
 
@@ -126,7 +96,7 @@ class VersionService {
 
   /// Force a hard reload of the application
   void forceReload() {
-    html.window.location.reload();
+    platform.forceReloadPage();
   }
 
   /// Get version info for display
@@ -152,11 +122,9 @@ class VersionService {
       return 'latest';
     }
 
-    // Simple version comparison (assumes semantic versioning)
     final userParts = userVersion.split('.').map(int.tryParse).toList();
     final currentParts = currentVersion.split('.').map(int.tryParse).toList();
 
-    // Pad shorter version with zeros
     while (userParts.length < 3) userParts.add(0);
     while (currentParts.length < 3) currentParts.add(0);
 
@@ -167,7 +135,7 @@ class VersionService {
       if (userPart < currentPart) {
         return 'outdated';
       } else if (userPart > currentPart) {
-        return 'newer'; // User somehow has a newer version
+        return 'newer';
       }
     }
 

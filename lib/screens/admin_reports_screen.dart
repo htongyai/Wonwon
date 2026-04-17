@@ -7,6 +7,7 @@ import '../utils/app_logger.dart';
 import '../utils/responsive_size.dart';
 import '../widgets/section_title.dart';
 import '../widgets/performance_loading_widget.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class AdminReportsScreen extends StatefulWidget {
   const AdminReportsScreen({super.key});
@@ -28,7 +29,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       backgroundColor: AppConstants.backgroundColor,
       appBar: AppBar(
         title: Text(
-          'User Reports',
+          'view_reports'.tr(context),
           style: GoogleFonts.montserrat(
             fontWeight: FontWeight.bold,
             color: AppConstants.darkColor,
@@ -44,13 +45,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Search and Filters Section
-            SectionTitle(text: 'Search & Filters'),
+            SectionTitle(text: 'search_filters'.tr(context)),
             SizedBox(height: ResponsiveSize.getHeight(2)),
             _buildSearchAndFilters(),
             SizedBox(height: ResponsiveSize.getHeight(3)),
 
             // Reports Section
-            SectionTitle(text: 'Reports'),
+            SectionTitle(text: 'reports'.tr(context)),
             SizedBox(height: ResponsiveSize.getHeight(2)),
 
             StreamBuilder<QuerySnapshot>(
@@ -206,7 +207,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                 });
               },
               decoration: InputDecoration(
-                hintText: 'Search reports...',
+                hintText: 'search_reports_hint'.tr(context),
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -234,27 +235,27 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                   child: DropdownButtonFormField<String>(
                     value: _statusFilter,
                     decoration: InputDecoration(
-                      labelText: 'Status',
+                      labelText: 'status_label_filter'.tr(context),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    items: const [
+                    items: [
                       DropdownMenuItem(
                         value: 'all',
-                        child: Text('All Statuses'),
+                        child: Text('all_statuses'.tr(context)),
                       ),
                       DropdownMenuItem(
                         value: 'pending',
-                        child: Text('Pending'),
+                        child: Text('pending_status'.tr(context)),
                       ),
                       DropdownMenuItem(
                         value: 'resolved',
-                        child: Text('Resolved'),
+                        child: Text('resolved_status'.tr(context)),
                       ),
                       DropdownMenuItem(
                         value: 'dismissed',
-                        child: Text('Dismissed'),
+                        child: Text('dismissed_status'.tr(context)),
                       ),
                     ],
                     onChanged: (value) {
@@ -270,21 +271,21 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                   child: DropdownButtonFormField<String>(
                     value: _sortBy,
                     decoration: InputDecoration(
-                      labelText: 'Sort By',
+                      labelText: 'sort_by_label'.tr(context),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    items: const [
+                    items: [
                       DropdownMenuItem(
                         value: 'createdAt',
-                        child: Text('Date Created'),
+                        child: Text('date_created'.tr(context)),
                       ),
-                      DropdownMenuItem(value: 'title', child: Text('Reason')),
-                      DropdownMenuItem(value: 'status', child: Text('Status')),
+                      DropdownMenuItem(value: 'title', child: Text('reason_label'.tr(context))),
+                      DropdownMenuItem(value: 'status', child: Text('status_label_filter'.tr(context))),
                       DropdownMenuItem(
                         value: 'reporterName',
-                        child: Text('Reporter'),
+                        child: Text('reporter_label'.tr(context)),
                       ),
                     ],
                     onChanged: (value) {
@@ -318,8 +319,11 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   }
 
   Widget _buildReportsList(List<dynamic> reports) {
-    return Column(
-      children: reports.map((report) => _buildReportCard(report)).toList(),
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: reports.length,
+      itemBuilder: (context, index) => _buildReportCard(reports[index]),
     );
   }
 
@@ -347,7 +351,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: _getStatusColor(status).withOpacity(0.1),
+                  color: _getStatusColor(status).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -407,7 +411,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               trailing: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(status).withOpacity(0.1),
+                  color: _getStatusColor(status).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -434,19 +438,19 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                     () => _viewReportDetails(report),
                   ),
                   _buildActionButton(
-                    'Resolve',
+                    'resolve'.tr(context),
                     Icons.check_circle,
                     Colors.green,
                     () => _resolveReport(report),
                   ),
                   _buildActionButton(
-                    'Dismiss',
+                    'dismiss'.tr(context),
                     Icons.cancel,
                     Colors.orange,
                     () => _dismissReport(report),
                   ),
                   _buildActionButton(
-                    'Delete',
+                    'delete'.tr(context),
                     Icons.delete,
                     Colors.red,
                     () => _deleteReport(report),
@@ -496,7 +500,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -532,7 +536,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Report Details'),
+            title: Text('report_details_dialog'.tr(context)),
             content: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -583,7 +587,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: Text('Close'),
+                child: Text('close_button'.tr(context)),
               ),
             ],
           ),
@@ -625,21 +629,21 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Delete Report'),
+            title: Text('delete_report_dialog'.tr(context)),
             content: Text(
               'Are you sure you want to delete this report? This action cannot be undone.',
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop();
                   _firestore.collection('report').doc(report['id']).delete();
                 },
-                child: Text('Delete', style: TextStyle(color: Colors.red)),
+                child: Text('delete'.tr(context), style: TextStyle(color: Colors.red)),
               ),
             ],
           ),
@@ -661,8 +665,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   }
 
   Widget _buildLoadingState() {
-    return const PerformanceLoadingWidget(
-      message: 'Loading reports...',
+    return PerformanceLoadingWidget(
+      message: 'loading_reports_msg'.tr(context),
       size: 50,
     );
   }
@@ -689,7 +693,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                 // Force rebuild
               });
             },
-            child: const Text('Try Again'),
+            child: Text('try_again'.tr(context)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppConstants.primaryColor,
             ),

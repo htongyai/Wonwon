@@ -4,6 +4,7 @@ import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/services/shop_service.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'unapproved_shop_detail_screen.dart';
+import 'package:wonwonw2/widgets/optimized_image.dart';
 
 class UnapprovedShopsScreen extends StatefulWidget {
   const UnapprovedShopsScreen({Key? key}) : super(key: key);
@@ -30,18 +31,20 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
 
     try {
       final shops = await _shopService.getUnapprovedShops();
+      if (!mounted) return;
       setState(() {
         _unapprovedShops = shops;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading unapproved shops: $e'),
+            content: Text('error_loading_unapproved_shops_msg'.tr(context).replaceAll('{error}', e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -52,6 +55,7 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
   Future<void> _approveShop(RepairShop shop) async {
     try {
       final success = await _shopService.approveShop(shop.id);
+      if (!mounted) return;
       if (success) {
         setState(() {
           _unapprovedShops.removeWhere((s) => s.id == shop.id);
@@ -59,7 +63,7 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${shop.name} has been approved'),
+              content: Text('admin_shop_approved'.tr(context).replaceAll('{shop_name}', shop.name)),
               backgroundColor: Colors.green,
             ),
           );
@@ -68,7 +72,7 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to approve ${shop.name}'),
+              content: Text('failed_approve_shop_msg'.tr(context).replaceAll('{shop_name}', shop.name)),
               backgroundColor: Colors.red,
             ),
           );
@@ -78,7 +82,7 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error approving shop: $e'),
+            content: Text('error_approving_shop_msg'.tr(context).replaceAll('{error}', e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -146,6 +150,7 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
                                       UnapprovedShopDetailScreen(shop: shop),
                             ),
                           );
+                          if (!mounted) return;
                           if (approved == true) {
                             _approveShop(shop);
                           }
@@ -170,14 +175,12 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
                                   ),
                                   child:
                                       shop.photos.isNotEmpty
-                                          ? Image.network(
-                                            shop.photos.first,
+                                          ? OptimizedImage(
+                                            imageUrl: shop.photos.first,
                                             fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) =>
-                                                    Container(
-                                                      color: Colors.grey[200],
-                                                    ),
+                                            errorWidget: Container(
+                                              color: Colors.grey[200],
+                                            ),
                                           )
                                           : Container(color: Colors.grey[200]),
                                 ),
@@ -249,7 +252,7 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
                                             ),
                                             decoration: BoxDecoration(
                                               color: AppConstants.primaryColor
-                                                  .withOpacity(0.13),
+                                                  .withValues(alpha: 0.13),
                                               borderRadius:
                                                   BorderRadius.circular(14),
                                             ),
@@ -350,6 +353,7 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
                                                     ),
                                           ),
                                         );
+                                        if (!mounted) return;
                                         if (approved == true) {
                                           _approveShop(shop);
                                         }
@@ -368,7 +372,7 @@ class _UnapprovedShopsScreenState extends State<UnapprovedShopsScreen> {
                                         elevation: 0,
                                       ),
                                       child: Text(
-                                        'View Details',
+                                        'view_details'.tr(context),
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.white,

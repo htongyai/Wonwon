@@ -1,0 +1,47 @@
+# Shop Import Template Instructions
+
+This file contains instructions for creating an Excel template for bulk importing shops.
+
+## Required Excel Format (.xlsx or .xls)
+
+Create an Excel file with the following columns:
+
+| Column | Field | Required | Description |
+|--------|-------|----------|-------------|
+| A | Name | Yes | Shop name |
+| B | Address | Yes | Full address |
+| C | Phone | No | Phone number |
+| D | Email | No | Email address |
+| E | Categories | No | Comma-separated categories (e.g., "Electronics,Phone Repair") |
+| F | Description | No | Shop description |
+| G | Latitude | No | Decimal latitude (e.g., 13.7563) |
+| H | Longitude | No | Decimal longitude (e.g., 100.5018) |
+
+## Example Data
+
+Row 1 (Headers):
+Name | Address | Phone | Email | Categories | Description | Latitude | Longitude
+
+Row 2 (Data):
+ABC Repair | 123 Main St, Bangkok | 0812345678 | abc@repair.com | Electronics,Phone Repair | Professional repair services | 13.7563 | 100.5018
+
+Row 3 (Data):
+XYZ Service | 456 Oak Ave, Bangkok | 0898765432 | xyz@service.com | Computer,Laptop | Expert computer repair | 13.7452 | 100.5347
+
+## Important Notes
+
+1. **First row must be headers** - The import will skip the first row
+2. **Name and Address are required** - Rows without these will be skipped
+3. **Categories format** - Use commas to separate multiple categories
+4. **Coordinates** - Use decimal format (not degrees/minutes/seconds)
+5. **Auto-approval** - All imported shops will be automatically approved
+6. **File format** - Use .xlsx or .xls format only
+
+## How to Use
+
+1. Create an Excel file following the format above
+2. Go to the Manage Shops page in the admin dashboard
+3. Click the "Import Excel" button
+4. Select your Excel file
+5. Wait for the import to complete
+6. Review the import results 

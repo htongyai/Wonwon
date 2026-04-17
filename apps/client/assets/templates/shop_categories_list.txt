@@ -1,0 +1,29 @@
+SHOP CATEGORIES LIST
+====================
+
+Use these exact category names in your Excel import file:
+
+1. clothing
+2. footwear
+3. watch
+4. bag
+5. electronics
+6. appliance
+
+MULTIPLE CATEGORIES:
+If a shop offers multiple categories, separate them with commas:
+Example: clothing,footwear,bag
+
+NOTES:
+- Use lowercase only
+- No spaces before or after commas
+- These are the exact category IDs used in the system
+- The system will automatically match these to the proper category names and icons
+
+CATEGORY DESCRIPTIONS:
+- clothing: Clothing repair services
+- footwear: Shoe and footwear repair  
+- watch: Watch repair services
+- bag: Bag repair services
+- electronics: Computer, phone and electronic device repair
+- appliance: Electrical appliance repair 

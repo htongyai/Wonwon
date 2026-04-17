@@ -1,29 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:wonwonw2/constants/app_colors.dart';
 import 'package:wonwonw2/constants/app_text_styles.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/screens/login_screen.dart';
-import 'package:wonwonw2/screens/unapproved_shops_screen.dart';
-import 'package:wonwonw2/screens/view_reports_screen.dart';
-import 'package:wonwonw2/screens/users_list_screen.dart';
-import 'package:wonwonw2/screens/admin_dashboard_main_screen.dart';
 import 'package:wonwonw2/screens/terms_of_use_screen.dart';
 import 'package:wonwonw2/screens/privacy_policy_screen.dart';
+import 'package:wonwonw2/screens/saved_locations_screen.dart';
 import 'package:wonwonw2/services/auth_service.dart';
-import 'package:wonwonw2/services/user_service.dart';
-import 'package:wonwonw2/services/app_localizations_service.dart' as service;
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:wonwonw2/localization/app_localizations.dart' as localization;
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:wonwonw2/utils/app_logger.dart';
-import 'package:wonwonw2/widgets/section_title.dart';
-import 'package:wonwonw2/utils/responsive_size.dart';
-import 'package:wonwonw2/config/web_config.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart' as excel;
-import 'package:wonwonw2/models/repair_shop.dart';
-import 'package:uuid/uuid.dart';
+import 'package:wonwonw2/services/analytics_service.dart';
+import 'package:wonwonw2/widgets/auth_gate.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -34,38 +24,27 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  String _selectedLanguage = 'en'; // Default language code
+  String _selectedLanguage = 'en';
   final AuthService _authService = AuthService();
   bool _isLoggedIn = false;
   String? _userEmail;
   final _auth = FirebaseAuth.instance;
-  final _firestore = FirebaseFirestore.instance;
-  bool _isAdmin = false;
   String _appVersion = '';
+  StreamSubscription<User?>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _checkLoginStatus();
     _loadSelectedLanguage();
-    _checkAdminStatus();
     _loadAppVersion();
 
-    // Listen for auth state changes
-    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) {
       if (mounted) {
         setState(() {
           _isLoggedIn = user != null;
           _userEmail = user?.email;
         });
-
-        if (user != null) {
-          _checkAdminStatus();
-        } else {
-          setState(() {
-            _isAdmin = false;
-          });
-        }
       }
     });
   }
@@ -89,439 +68,565 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (result == true) {
+      if (!mounted) return;
       _checkLoginStatus();
     }
   }
 
   Future<void> _handleLogout() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final loggedOutMsg = 'logged_out_message'.tr(context);
+
+    AnalyticsService.safeLog(() => AnalyticsService().logLogout());
     await _authService.logout();
     if (mounted) {
-      setState(() {
-        _isLoggedIn = false;
-        _userEmail = null;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
-          content: Text('logged_out_message'.tr(context)),
+          content: Text(loggedOutMsg),
           backgroundColor: Colors.green,
         ),
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const AuthGate()),
+        (route) => false,
       );
     }
   }
 
   Future<void> _loadSelectedLanguage() async {
-    final languageCode = await service.AppLocalizationsService.getLocale();
+    final locale = await localization.AppLocalizationsService.getLocale();
     if (mounted) {
       setState(() {
-        _selectedLanguage = languageCode; // 'en' or 'th'
+        _selectedLanguage = locale.languageCode;
       });
     }
   }
 
-  Future<void> _checkAdminStatus() async {
-    try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        final userDoc =
-            await _firestore.collection('users').doc(user.uid).get();
-        setState(() {
-          _isAdmin = userDoc.data()?['admin'] ?? false;
-        });
-      }
-    } catch (e) {
-      appLog('Error checking admin status', e);
-    }
-  }
+  // Admin status check disabled — admin is a separate app
 
   Future<void> _loadAppVersion() async {
     final packageInfo = await PackageInfo.fromPlatform();
+    if (!mounted) return;
     setState(() {
       _appVersion = packageInfo.version;
     });
   }
 
   @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // BUILD
+  // ---------------------------------------------------------------------------
+
+  @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF2F2F7),
       appBar: AppBar(
         title: Text(
           'settings'.tr(context),
-          style: AppTextStyles.heading.copyWith(color: AppColors.text),
+          style: AppTextStyles.heading.copyWith(color: AppColors.text, fontSize: 17),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF2F2F7),
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: ResponsiveSize.getScaledPadding(const EdgeInsets.all(16.0)),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Only show Features section if user is logged in
-                if (user != null) ...[
-                  SectionTitle(text: 'features'.tr(context)),
-                  SizedBox(height: ResponsiveSize.getHeight(2)),
-                  _buildSettingsCard(
-                    child: Column(
-                      children: [
-                        _buildFeatureTile(
-                          Icons.add,
-                          'add_new_place'.tr(context),
-                          onTap: () {},
-                        ),
-                        _buildFeatureTile(
-                          Icons.bookmark_border,
-                          'saved_locations'.tr(context),
-                          onTap: () {},
-                        ),
-                        if (_isAdmin) ...[
-                          _buildFeatureTile(
-                            Icons.admin_panel_settings,
-                            'Admin Dashboard',
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) =>
-                                          const AdminDashboardMainScreen(),
-                                ),
-                              );
-                            },
-                            color: Colors.red[600],
-                          ),
-                          _buildFeatureTile(
-                            Icons.access_time,
-                            'unapproved_shops'.tr(context),
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) =>
-                                          const UnapprovedShopsScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                        FutureBuilder<bool>(
-                          future: _isAdminUser(),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return SizedBox.shrink();
-                            }
-                            if (snapshot.data == true) {
-                              return Column(
-                                children: [
-                                  _buildFeatureTile(
-                                    Icons.report_problem,
-                                    'view_reports'.tr(context),
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) =>
-                                                  const ViewReportsScreen(),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  _buildFeatureTile(
-                                    Icons.people,
-                                    'Users List',
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) =>
-                                                  const UsersListScreen(),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                  _buildFeatureTile(
-                                    Icons.upload_file,
-                                    'Import from Excel',
-                                    onTap: _importShopsFromExcel,
-                                  ),
-                                ],
-                              );
-                            }
-                            return SizedBox.shrink();
-                          },
-                        ),
-                      ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 8),
+
+              // Profile / Sign-in card (top)
+              _isLoggedIn ? _buildProfileCard() : _buildSignInCard(),
+
+              // Features section (logged-in only)
+              if (user != null) ...[
+                _buildSectionHeader('features'.tr(context)),
+                _buildGroupedContainer(
+                  children: [
+                    _buildNavTile(
+                      icon: Icons.add_circle_outline,
+                      iconColor: AppConstants.primaryColor,
+                      title: 'add_new_place'.tr(context),
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('coming_soon'.tr(context))),
+                        );
+                      },
                     ),
-                  ),
-                  SizedBox(height: ResponsiveSize.getHeight(2)),
-                ],
-                // Account Section
-                SectionTitle(text: 'account'.tr(context)),
-                SizedBox(height: ResponsiveSize.getHeight(2)),
-                _isLoggedIn
-                    ? _buildSettingsCard(child: _buildProfileTile())
-                    : _buildSettingsCard(child: _buildLoginTile()),
-                SizedBox(height: ResponsiveSize.getHeight(2)),
-
-                // Language Section
-                _buildLanguageSection(),
-
-                // Profile Section - Only show if logged in
-                if (_isLoggedIn) ...[_buildProfileSection()],
-
-                // Legal Section
-                SectionTitle(text: 'legal'.tr(context)),
-                SizedBox(height: ResponsiveSize.getHeight(2)),
-                _buildSettingsCard(
-                  child: Column(
-                    children: [
-                      _buildLegalTile(
-                        'terms_of_use'.tr(context),
-                        FontAwesomeIcons.fileLines,
-                        AppConstants.primaryColor.withValues(alpha: 0.7),
-                        () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const TermsOfUseScreen(),
-                          ),
-                        ),
-                      ),
-                      const Divider(height: 1, thickness: 0.5),
-                      _buildLegalTile(
-                        'privacy_policy'.tr(context),
-                        FontAwesomeIcons.shieldHalved,
-                        AppConstants.primaryColor.withValues(alpha: 0.7),
-                        () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => const PrivacyPolicyScreen(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: ResponsiveSize.getHeight(2)),
-
-                // Account Actions Section - Only show if logged in
-                if (_isLoggedIn) ...[
-                  SectionTitle(text: 'account_actions'.tr(context)),
-                  SizedBox(height: ResponsiveSize.getHeight(2)),
-                  _buildSettingsCard(
-                    child: Column(
-                      children: [
-                        _buildActionTile(
-                          'logout',
-                          FontAwesomeIcons.rightFromBracket,
-                          Colors.red.shade700,
-                          onTap: () {
-                            _showLogoutConfirmation(context);
-                          },
-                        ),
-                        const Divider(height: 1, thickness: 0.5),
-                        _buildActionTile(
-                          'delete_account',
-                          FontAwesomeIcons.trash,
-                          Colors.red.shade700,
-                          onTap: () {
-                            _showDeleteAccountConfirmation(context);
-                          },
-                        ),
-                      ],
+                    const Divider(height: 0.5, indent: 56, endIndent: 0),
+                    _buildNavTile(
+                      icon: Icons.bookmark_outline,
+                      iconColor: AppConstants.primaryColor,
+                      title: 'saved_locations'.tr(context),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const SavedLocationsScreen()),
+                        );
+                      },
                     ),
-                  ),
-                  SizedBox(height: ResponsiveSize.getHeight(2)),
-                ],
-
-                // App Version
-                Center(
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.brown, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(30),
-                          child: Image.asset(
-                            'assets/rlogo.jpg',
-                            width: 60,
-                            height: 60,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: ResponsiveSize.getHeight(2)),
-                      Text(
-                        '${'version'.tr(context)} $_appVersion',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                      ),
-                    ],
-                  ),
+                    // Admin tiles (dashboard, unapproved shops) — disabled, admin is a separate app
+                    // Admin-only tiles (reports, users, import) — disabled, admin is a separate app
+                  ],
                 ),
-                SizedBox(height: ResponsiveSize.getHeight(2)),
               ],
-            ),
+
+              // Profile management section (logged-in only)
+              if (_isLoggedIn) ...[
+                _buildSectionHeader('profile'.tr(context)),
+                _buildGroupedContainer(
+                  children: [
+                    _buildNavTile(
+                      icon: Icons.key_outlined,
+                      iconColor: Colors.blue,
+                      title: 'change_password'.tr(context),
+                      onTap: () async {
+                        final email = _auth.currentUser?.email;
+                        if (email != null && email.isNotEmpty) {
+                          try {
+                            await _auth.sendPasswordResetEmail(email: email);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('reset_email_sent'.tr(context)),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('reset_failed'.tr(context)),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+
+              // Language section
+              _buildLanguageSection(),
+
+              // Legal section
+              _buildSectionHeader('legal'.tr(context)),
+              _buildGroupedContainer(
+                children: [
+                  _buildNavTile(
+                    icon: Icons.description_outlined,
+                    iconColor: AppConstants.primaryColor,
+                    title: 'terms_of_use'.tr(context),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const TermsOfUseScreen(),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 0.5, indent: 56, endIndent: 0),
+                  _buildNavTile(
+                    icon: Icons.shield_outlined,
+                    iconColor: AppConstants.primaryColor,
+                    title: 'privacy_policy'.tr(context),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const PrivacyPolicyScreen(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // Destructive actions (logged-in only)
+              if (_isLoggedIn) ...[
+                _buildSectionHeader('account_actions'.tr(context)),
+                _buildGroupedContainer(
+                  children: [
+                    _buildDestructiveTile(
+                      icon: Icons.logout,
+                      iconColor: Colors.grey.shade600,
+                      title: 'logout'.tr(context),
+                      titleColor: Colors.grey.shade800,
+                      onTap: () => _showLogoutConfirmation(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildGroupedContainer(
+                  children: [
+                    _buildDestructiveTile(
+                      icon: Icons.delete_outline,
+                      iconColor: Colors.red.shade600,
+                      title: 'delete_account'.tr(context),
+                      titleColor: Colors.red.shade600,
+                      onTap: () => _showDeleteAccountConfirmation(context),
+                    ),
+                  ],
+                ),
+              ],
+
+              // Version footer
+              const SizedBox(height: 32),
+              Center(
+                child: Text(
+                  'WonWon v$_appVersion',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade400,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 32),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSettingsCard({required Widget child}) {
+  // ---------------------------------------------------------------------------
+  // SECTION HEADER — iOS-style uppercase label
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 16, top: 24, bottom: 8),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey.shade600,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // GROUPED CONTAINER — rounded card for a group of tiles
+  // ---------------------------------------------------------------------------
+
+  Widget _buildGroupedContainer({required List<Widget> children}) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+        border: Border.all(color: Colors.grey.shade200, width: 0.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: children,
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // PROFILE CARD — logged-in state
+  // ---------------------------------------------------------------------------
+
+  Widget _buildProfileCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200, width: 0.5),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppConstants.primaryColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(Icons.person, color: AppConstants.primaryColor, size: 26),
           ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FutureBuilder<String?>(
+                  future: _authService.getUserName(),
+                  builder: (context, snapshot) {
+                    final name = snapshot.data ?? 'profile_label'.tr(context);
+                    return Text(
+                      name,
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                    );
+                  },
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _userEmail ?? 'user_label'.tr(context),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 22),
         ],
       ),
-      child: child,
     );
   }
 
-  Widget _buildLoginTile() {
-    return ListTile(
-      contentPadding: ResponsiveSize.getScaledPadding(
-        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      ),
-      leading: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.3),
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(Icons.person_outline, color: Colors.white, size: 30),
-      ),
-      title: Text(
-        'not_logged_in'.tr(context),
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-      ),
-      subtitle: Text(
-        'login_to_access'.tr(context),
-        style: const TextStyle(fontSize: 14, color: Colors.grey),
-      ),
-      trailing: ElevatedButton(
-        onPressed: _handleLogin,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppConstants.primaryColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        child: Text('login'.tr(context)),
-      ),
+  // ---------------------------------------------------------------------------
+  // SIGN-IN CARD — logged-out state
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSignInCard() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+      borderRadius: BorderRadius.circular(16),
       onTap: _handleLogin,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200, width: 0.5),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Icon(Icons.person_outline, color: Colors.grey.shade500, size: 26),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'not_logged_in'.tr(context),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'login_to_access'.tr(context),
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppConstants.primaryColor,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'login'.tr(context),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
     );
   }
 
-  Widget _buildProfileTile() {
-    return ListTile(
-      contentPadding: ResponsiveSize.getScaledPadding(
-        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      ),
-      leading: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: AppConstants.primaryColor.withValues(alpha: 0.3),
-          shape: BoxShape.circle,
+  // ---------------------------------------------------------------------------
+  // NAV TILE — standard navigation row
+  // ---------------------------------------------------------------------------
+
+  Widget _buildNavTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    String? subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Icon(icon, color: iconColor, size: 18),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
+          ],
         ),
-        child: const Icon(Icons.person, color: Colors.white, size: 30),
       ),
-      title: FutureBuilder<String?>(
-        future: _authService.getUserName(),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data != null) {
-            return Text(
-              snapshot.data!,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-            );
-          }
-          return Text(
-            'profile_label'.tr(context),
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-          );
-        },
-      ),
-      subtitle: Text(
-        _userEmail ?? 'user_label'.tr(context),
-        style: const TextStyle(fontSize: 14, color: Colors.grey),
-      ),
-      onTap: () {
-        // Navigate to profile screen
-      },
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // DESTRUCTIVE TILE — logout / delete rows
+  // ---------------------------------------------------------------------------
+
+  Widget _buildDestructiveTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required Color titleColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Icon(icon, color: iconColor, size: 18),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: titleColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // LANGUAGE SECTION
+  // ---------------------------------------------------------------------------
 
   Widget _buildLanguageSection() {
-    // Hide language section for admin users or admin deployments
-    if (_isAdmin || WebConfig.isAdminOnlyDeployment) {
-      return const SizedBox.shrink();
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionTitle(text: 'language'.tr(context)),
-        SizedBox(height: ResponsiveSize.getHeight(2)),
+        _buildSectionHeader('language'.tr(context)),
         Container(
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200, width: 0.5),
           ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedLanguage,
-              isExpanded: true,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              items: [
-                DropdownMenuItem(
-                  value: 'en',
-                  child: Text('english'.tr(context)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppConstants.primaryColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(
+                    child: Icon(Icons.language, color: AppConstants.primaryColor, size: 18),
+                  ),
                 ),
-                DropdownMenuItem(value: 'th', child: Text('thai'.tr(context))),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _selectedLanguage = value;
-                  });
-                  service.AppLocalizationsService.setLocale(value);
-                  // Refresh the app
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SettingsScreen(),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedLanguage,
+                      isExpanded: true,
+                      icon: Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'en',
+                          child: Text('english'.tr(context)),
+                        ),
+                        DropdownMenuItem(
+                          value: 'th',
+                          child: Text('thai'.tr(context)),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            _selectedLanguage = value;
+                          });
+                          localization.AppLocalizationsService.setLocale(value);
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(builder: (context) => const AuthGate()),
+                            (route) => false,
+                          );
+                        }
+                      },
                     ),
-                  );
-                }
-              },
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -529,103 +634,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildLegalTile(
-    String title,
-    IconData icon,
-    Color iconColor,
-    VoidCallback onTap,
-  ) {
-    return ListTile(
-      contentPadding: ResponsiveSize.getScaledPadding(
-        const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      ),
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: iconColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(child: FaIcon(icon, color: iconColor, size: 16)),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-      ),
-      trailing: const Icon(
-        Icons.arrow_forward_ios,
-        size: 14,
-        color: Colors.grey,
-      ),
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildActionTile(
-    String titleKey,
-    IconData icon,
-    Color iconColor, {
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      contentPadding: ResponsiveSize.getScaledPadding(
-        const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      ),
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: iconColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(child: FaIcon(icon, color: iconColor, size: 16)),
-      ),
-      title: Text(
-        titleKey.tr(context),
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: iconColor,
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildFeatureTile(
-    IconData icon,
-    String title, {
-    required VoidCallback onTap,
-    Color? color,
-  }) {
-    final tileColor = color ?? AppConstants.primaryColor;
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: tileColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Center(child: FaIcon(icon, color: tileColor, size: 16)),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
-      ),
-      trailing: const Icon(
-        Icons.arrow_forward_ios,
-        size: 14,
-        color: Colors.grey,
-      ),
-      onTap: onTap,
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // DIALOGS (unchanged functionality)
+  // ---------------------------------------------------------------------------
 
   void _showLogoutConfirmation(BuildContext context) {
     showDialog(
@@ -693,7 +704,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               child: Text("delete".tr(context)),
               onPressed: () {
-                // Implement delete account logic
                 Navigator.of(context).pop();
               },
             ),
@@ -703,358 +713,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<bool> _isAdminUser() async {
-    return await UserService.isCurrentUserAdmin();
-  }
+  // ---------------------------------------------------------------------------
+  // HELPERS (unchanged functionality)
+  // ---------------------------------------------------------------------------
 
-  Future<void> _importShopsFromExcel() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls'],
-      );
-      if (result == null || result.files.isEmpty) return;
-      final fileBytes = result.files.first.bytes;
-      if (fileBytes == null) throw Exception('File could not be read');
-      final excelFile = excel.Excel.decodeBytes(fileBytes);
-      int importedCount = 0;
-      int failedCount = 0;
-      List<String> failedRows = [];
-
-      for (final table in excelFile.tables.keys) {
-        final sheet = excelFile.tables[table]!;
-        if (sheet.maxRows < 2) continue; // skip if no data
-
-        // Get headers and validate required columns
-        final headers =
-            sheet.rows[0]
-                .map(
-                  (cell) => cell?.value?.toString().trim().toLowerCase() ?? '',
-                )
-                .toList();
-        final requiredColumns = [
-          'name',
-          'description',
-          'address',
-          'area',
-          'categories',
-          'latitude',
-          'longitude',
-          'rating',
-          'amenities',
-          'durationminutes',
-          'requirespurchase',
-          'pricerange',
-          'buildingnumber',
-          'buildingname',
-          'soi',
-          'district',
-          'province',
-          'landmark',
-          'lineid',
-          'facebookpage',
-          'othercontacts',
-          'cash',
-          'qr',
-          'credit',
-          'mon',
-          'tue',
-          'wed',
-          'thu',
-          'fri',
-          'sat',
-          'sun',
-          'instagrampage',
-          'phonenumber',
-          'buildingfloor',
-          'isapproved',
-          'verification_status',
-          'image_url',
-          'paymentmethods',
-          'tryonareaavailable',
-          'notesorconditions',
-          'usualopeningtime',
-          'gmap link',
-          'note',
-        ];
-
-        // Validate headers
-        final missingColumns =
-            requiredColumns
-                .where((col) => !headers.contains(col.toLowerCase()))
-                .toList();
-        if (missingColumns.isNotEmpty) {
-          final foundHeaders = headers.where((h) => h.isNotEmpty).join(', ');
-          throw Exception(
-            'Missing required columns: ${missingColumns.join(", ")}\n\nFound headers in file: $foundHeaders',
-          );
-        }
-
-        for (int i = 1; i < sheet.rows.length; i++) {
-          final row = sheet.rows[i];
-          // Skip row if all columns are empty or whitespace
-          if (row.every(
-            (cell) =>
-                cell == null ||
-                cell.value == null ||
-                cell.value.toString().trim().isEmpty,
-          )) {
-            continue;
-          }
-
-          try {
-            final Map<String, dynamic> data = {};
-            for (int j = 0; j < headers.length && j < row.length; j++) {
-              final value = row[j]?.value;
-              if (value != null && value.toString().trim().isNotEmpty) {
-                data[headers[j]] = value;
-              }
-            }
-
-            // Process opening hours
-            Map<String, String> hours = {};
-            final days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-            for (final day in days) {
-              final timeStr = data[day]?.toString().trim() ?? '';
-              if (timeStr.isEmpty || timeStr.toLowerCase() == 'closed') {
-                hours[day] = 'Closed';
-              } else {
-                // Convert periods to colons
-                final normalized = timeStr.replaceAll('.', ':');
-                final parts = normalized.split('-');
-                if (parts.length == 2) {
-                  final openingTime = parts[0].trim();
-                  final closingTime = parts[1].trim();
-                  hours[day] = '$openingTime - $closingTime';
-                } else {
-                  hours[day] = 'Closed';
-                }
-              }
-            }
-
-            // Process payment methods - check both individual columns and combined column
-            List<String> paymentMethods = [];
-
-            // Check individual payment method columns
-            if (data['cash']?.toString().toLowerCase() == 'true') {
-              paymentMethods.add('cash');
-            }
-            if (data['qr']?.toString().toLowerCase() == 'true') {
-              paymentMethods.add('qr');
-            }
-            if (data['credit']?.toString().toLowerCase() == 'true') {
-              paymentMethods.add('card');
-            }
-
-            // If no individual methods found, try the combined column
-            if (paymentMethods.isEmpty && data['paymentmethods'] != null) {
-              paymentMethods =
-                  data['paymentmethods']
-                      .toString()
-                      .split(',')
-                      .map((e) => e.trim())
-                      .where((e) => e.isNotEmpty)
-                      .toList();
-            }
-
-            // Generate a unique ID for the shop
-            final shopId = const Uuid().v4();
-
-            // Get verification status from Excel or verify coordinates
-            String verificationStatus =
-                data['verification_status']?.toString() ?? '';
-            if (verificationStatus.isEmpty) {
-              final lat =
-                  double.tryParse(data['latitude']?.toString() ?? '0') ?? 0.0;
-              final lng =
-                  double.tryParse(data['longitude']?.toString() ?? '0') ?? 0.0;
-              verificationStatus = _verifyGeocoding(
-                lat,
-                lng,
-                data['address']?.toString() ?? '',
-              );
-            }
-
-            // Process image URL
-            String? imageUrl = data['image_url']?.toString();
-            if (imageUrl == null || imageUrl.trim().isEmpty) {
-              imageUrl = null;
-            }
-
-            final shop = RepairShop(
-              id: shopId,
-              name: data['name']?.toString() ?? '',
-              description: data['description']?.toString() ?? '',
-              address: data['address']?.toString() ?? '',
-              area: data['area']?.toString() ?? '',
-              categories:
-                  (data['categories'] is String)
-                      ? (data['categories'] as String)
-                          .split(',')
-                          .map((e) => e.trim())
-                          .toList()
-                      : [],
-              rating: double.tryParse(data['rating']?.toString() ?? '0') ?? 0.0,
-              amenities:
-                  (data['amenities'] is String)
-                      ? (data['amenities'] as String)
-                          .split(',')
-                          .map((e) => e.trim())
-                          .toList()
-                      : [],
-              hours: hours,
-              closingDays: [],
-              latitude:
-                  double.tryParse(data['latitude']?.toString() ?? '0') ?? 0.0,
-              longitude:
-                  double.tryParse(data['longitude']?.toString() ?? '0') ?? 0.0,
-              durationMinutes:
-                  int.tryParse(data['durationminutes']?.toString() ?? '0') ?? 0,
-              requiresPurchase:
-                  (data['requirespurchase']?.toString().toLowerCase() ==
-                      'true'),
-              photos: imageUrl != null ? [imageUrl] : [],
-              priceRange: data['pricerange']?.toString() ?? '₿',
-              features: {},
-              approved:
-                  (data['isapproved']?.toString().toLowerCase() == 'true'),
-              irregularHours: false,
-              subServices: {},
-              buildingNumber: data['buildingnumber']?.toString(),
-              buildingName: data['buildingname']?.toString(),
-              soi: data['soi']?.toString(),
-              district: data['district']?.toString(),
-              province: data['province']?.toString(),
-              landmark: data['landmark']?.toString(),
-              lineId: data['lineid']?.toString(),
-              facebookPage: data['facebookpage']?.toString(),
-              otherContacts: data['othercontacts']?.toString(),
-              paymentMethods: paymentMethods.isNotEmpty ? paymentMethods : null,
-              tryOnAreaAvailable:
-                  (data['tryonareaavailable']?.toString().toLowerCase() ==
-                      'true'),
-              notesOrConditions: data['notesorconditions']?.toString(),
-              usualOpeningTime: data['usualopeningtime']?.toString(),
-              instagramPage: data['instagrampage']?.toString(),
-              phoneNumber: data['phonenumber']?.toString(),
-              buildingFloor: data['buildingfloor']?.toString(),
-            );
-
-            // Add to Firestore with verification status and additional data
-            await FirebaseFirestore.instance
-                .collection('shops')
-                .doc(shopId)
-                .set({
-                  ...shop.toMap(),
-                  'verification_status': verificationStatus,
-                  'gMap_link': data['gmap link']?.toString(),
-                  'note': data['note']?.toString(),
-                });
-
-            importedCount++;
-          } catch (e) {
-            failedCount++;
-            failedRows.add('Row ${i + 1}: ${e.toString()}');
-          }
-        }
-      }
-
-      // Show import results
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder:
-              (context) => AlertDialog(
-                title: const Text('Import Complete'),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Successfully imported $importedCount shops.'),
-                    if (failedCount > 0) ...[
-                      const SizedBox(height: 8),
-                      Text('Failed to import $failedCount shops:'),
-                      const SizedBox(height: 4),
-                      ...failedRows.map(
-                        (error) => Text(
-                          error,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder:
-              (context) => AlertDialog(
-                title: const Text('Import Failed'),
-                content: Text('Error: ${e.toString()}'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
-        );
-      }
-    }
-  }
-
-  String _verifyGeocoding(double lat, double lng, String address) {
-    // Basic validation of coordinates
-    if (lat == 0.0 && lng == 0.0) {
-      return 'Invalid coordinates';
-    }
-
-    // Check if coordinates are within reasonable bounds (Thailand)
-    if (lat < 5.0 || lat > 20.0 || lng < 97.0 || lng > 106.0) {
-      return 'Coordinates outside Thailand';
-    }
-
-    // If we have both coordinates and address, mark as verified
-    if (address.isNotEmpty) {
-      return 'Verified (Simulated)';
-    }
-
-    return 'Unverified';
-  }
-
-  Widget _buildProfileSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionTitle(text: 'profile'.tr(context)),
-        SizedBox(height: ResponsiveSize.getHeight(2)),
-        _buildSettingsCard(
-          child: Column(
-            children: [
-              _buildProfileTile(),
-              const Divider(height: 1, thickness: 0.5),
-              _buildActionTile(
-                'change_password',
-                FontAwesomeIcons.key,
-                Colors.blue,
-                onTap: () {
-                  // Navigate to change password screen
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  // Admin-only methods (_isAdminUser, _importShopsFromExcel, _verifyGeocoding)
+  // removed — admin will be a separate app
 }

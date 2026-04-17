@@ -13,7 +13,10 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:wonwonw2/widgets/section_title.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class EditShopScreen extends StatefulWidget {
   final RepairShop shop;
@@ -101,10 +104,39 @@ class _EditShopScreenState extends State<EditShopScreen> {
   // Other options
   bool _requiresPurchase = false;
   bool _tryOnAreaAvailable = false;
-  String _priceRange = '₿';
+  String _priceRange = '฿';
 
   bool _isLoading = false;
   bool _isSaving = false;
+  bool _savedSuccessfully = false;
+
+  // Store initial values for comparison
+  late String _initialName;
+  late String _initialDescription;
+  late String _initialAddress;
+  late String _initialArea;
+  late String _initialLatitude;
+  late String _initialLongitude;
+  late String _initialPhone;
+  late String _initialBuildingNumber;
+  late String _initialBuildingName;
+  late String _initialSoi;
+  late String _initialDistrict;
+  late String _initialLandmark;
+  late String _initialLineId;
+  late String _initialFacebookPage;
+  late String _initialOtherContacts;
+  late String _initialNotesOrConditions;
+  late String _initialInstagramPage;
+  late String _initialBuildingFloor;
+  late List<String> _initialCategories;
+  late bool _initialAcceptsCash;
+  late bool _initialAcceptsQR;
+  late bool _initialAcceptsCredit;
+  late bool _initialRequiresPurchase;
+  late bool _initialTryOnAreaAvailable;
+  late String _initialPriceRange;
+  late List<String> _initialExistingPhotos;
 
   @override
   void initState() {
@@ -158,6 +190,34 @@ class _EditShopScreenState extends State<EditShopScreen> {
 
     // Photos
     _existingPhotos = List.from(shop.photos);
+
+    // Store initial values
+    _initialName = _nameController.text;
+    _initialDescription = _descriptionController.text;
+    _initialAddress = _addressController.text;
+    _initialArea = _areaController.text;
+    _initialLatitude = _latitudeController.text;
+    _initialLongitude = _longitudeController.text;
+    _initialPhone = _phoneController.text;
+    _initialBuildingNumber = _buildingNumberController.text;
+    _initialBuildingName = _buildingNameController.text;
+    _initialSoi = _soiController.text;
+    _initialDistrict = _districtController.text;
+    _initialLandmark = _landmarkController.text;
+    _initialLineId = _lineIdController.text;
+    _initialFacebookPage = _facebookPageController.text;
+    _initialOtherContacts = _otherContactsController.text;
+    _initialNotesOrConditions = _notesOrConditionsController.text;
+    _initialInstagramPage = _instagramPageController.text;
+    _initialBuildingFloor = _buildingFloorController.text;
+    _initialCategories = List.from(_selectedCategories);
+    _initialAcceptsCash = _acceptsCash;
+    _initialAcceptsQR = _acceptsQR;
+    _initialAcceptsCredit = _acceptsCredit;
+    _initialRequiresPurchase = _requiresPurchase;
+    _initialTryOnAreaAvailable = _tryOnAreaAvailable;
+    _initialPriceRange = _priceRange;
+    _initialExistingPhotos = List.from(_existingPhotos);
   }
 
   void _initializeHours() {
@@ -220,13 +280,111 @@ class _EditShopScreenState extends State<EditShopScreen> {
     super.dispose();
   }
 
+  bool get _hasUnsavedChanges {
+    if (_savedSuccessfully) return false;
+    return _nameController.text != _initialName ||
+        _descriptionController.text != _initialDescription ||
+        _addressController.text != _initialAddress ||
+        _areaController.text != _initialArea ||
+        _latitudeController.text != _initialLatitude ||
+        _longitudeController.text != _initialLongitude ||
+        _phoneController.text != _initialPhone ||
+        _buildingNumberController.text != _initialBuildingNumber ||
+        _buildingNameController.text != _initialBuildingName ||
+        _soiController.text != _initialSoi ||
+        _districtController.text != _initialDistrict ||
+        _landmarkController.text != _initialLandmark ||
+        _lineIdController.text != _initialLineId ||
+        _facebookPageController.text != _initialFacebookPage ||
+        _otherContactsController.text != _initialOtherContacts ||
+        _notesOrConditionsController.text != _initialNotesOrConditions ||
+        _instagramPageController.text != _initialInstagramPage ||
+        _buildingFloorController.text != _initialBuildingFloor ||
+        !_listEquals(_selectedCategories, _initialCategories) ||
+        _acceptsCash != _initialAcceptsCash ||
+        _acceptsQR != _initialAcceptsQR ||
+        _acceptsCredit != _initialAcceptsCredit ||
+        _requiresPurchase != _initialRequiresPurchase ||
+        _tryOnAreaAvailable != _initialTryOnAreaAvailable ||
+        _priceRange != _initialPriceRange ||
+        !_listEquals(_existingPhotos, _initialExistingPhotos) ||
+        _selectedImageBytes != null;
+  }
+
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  Future<bool> _showDiscardDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'discard_changes'.tr(context),
+          style: GoogleFonts.montserrat(
+            fontWeight: FontWeight.bold,
+            color: AppConstants.primaryColor,
+          ),
+        ),
+        content: Text(
+          'discard_changes_message'.tr(context),
+          style: GoogleFonts.montserrat(),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'keep_editing'.tr(context),
+              style: TextStyle(color: AppConstants.primaryColor),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'discard'.tr(context),
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<void> _handleBackButton() async {
+    if (_hasUnsavedChanges) {
+      final shouldDiscard = await _showDiscardDialog();
+      if (shouldDiscard && mounted) {
+        Navigator.pop(context);
+      }
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldDiscard = await _showDiscardDialog();
+        if (shouldDiscard && mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
-          'Edit Shop',
+          'admin_edit_shop'.tr(context),
           style: AppTextStyles.heading.copyWith(color: AppColors.text),
         ),
         centerTitle: true,
@@ -234,7 +392,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: _handleBackButton,
         ),
         actions: [
           if (_isSaving)
@@ -250,7 +408,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
             TextButton(
               onPressed: _saveShop,
               child: Text(
-                'Save',
+                'save'.tr(context),
                 style: TextStyle(
                   color: AppConstants.primaryColor,
                   fontWeight: FontWeight.bold,
@@ -263,39 +421,45 @@ class _EditShopScreenState extends State<EditShopScreen> {
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : SafeArea(
-                child: Padding(
-                  padding: ResponsiveSize.getScaledPadding(
-                    const EdgeInsets.all(16.0),
-                  ),
-                  child: Form(
-                    key: _formKey,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildBasicInformationSection(),
-                          SizedBox(height: ResponsiveSize.getHeight(2)),
-                          _buildLocationSection(),
-                          SizedBox(height: ResponsiveSize.getHeight(2)),
-                          _buildContactSection(),
-                          SizedBox(height: ResponsiveSize.getHeight(2)),
-                          _buildCategoriesSection(),
-                          SizedBox(height: ResponsiveSize.getHeight(2)),
-                          _buildHoursSection(),
-                          SizedBox(height: ResponsiveSize.getHeight(2)),
-                          _buildPaymentSection(),
-                          SizedBox(height: ResponsiveSize.getHeight(2)),
-                          _buildPhotosSection(),
-                          SizedBox(height: ResponsiveSize.getHeight(2)),
-                          _buildOptionsSection(),
-                          SizedBox(height: ResponsiveSize.getHeight(4)),
-                          _buildSaveButton(),
-                        ],
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 700),
+                    child: Padding(
+                      padding: ResponsiveSize.getScaledPadding(
+                        const EdgeInsets.all(16.0),
+                      ),
+                      child: Form(
+                        key: _formKey,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildBasicInformationSection(),
+                              SizedBox(height: ResponsiveSize.getHeight(2)),
+                              _buildLocationSection(),
+                              SizedBox(height: ResponsiveSize.getHeight(2)),
+                              _buildContactSection(),
+                              SizedBox(height: ResponsiveSize.getHeight(2)),
+                              _buildCategoriesSection(),
+                              SizedBox(height: ResponsiveSize.getHeight(2)),
+                              _buildHoursSection(),
+                              SizedBox(height: ResponsiveSize.getHeight(2)),
+                              _buildPaymentSection(),
+                              SizedBox(height: ResponsiveSize.getHeight(2)),
+                              _buildPhotosSection(),
+                              SizedBox(height: ResponsiveSize.getHeight(2)),
+                              _buildOptionsSection(),
+                              SizedBox(height: ResponsiveSize.getHeight(4)),
+                              _buildSaveButton(),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
+    ),
     );
   }
 
@@ -304,14 +468,14 @@ class _EditShopScreenState extends State<EditShopScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionTitle(text: 'Basic Information'),
+          SectionTitle(text: 'basic_information'.tr(context)),
           SizedBox(height: ResponsiveSize.getHeight(2)),
           _buildTextField(
             controller: _nameController,
-            label: 'Shop Name',
+            label: 'shop_name_field'.tr(context),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'Please enter shop name';
+                return 'please_enter_shop_name'.tr(context);
               }
               return null;
             },
@@ -319,16 +483,16 @@ class _EditShopScreenState extends State<EditShopScreen> {
           SizedBox(height: ResponsiveSize.getHeight(1)),
           _buildTextField(
             controller: _descriptionController,
-            label: 'Description',
+            label: 'description_field'.tr(context),
             maxLines: 3,
           ),
           SizedBox(height: ResponsiveSize.getHeight(1)),
           _buildTextField(
             controller: _addressController,
-            label: 'Address',
+            label: 'address_field'.tr(context),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'Please enter address';
+                return 'please_enter_address'.tr(context);
               }
               return null;
             },
@@ -336,7 +500,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
           SizedBox(height: ResponsiveSize.getHeight(1)),
           _buildTextField(
             controller: _areaController,
-            label: 'Area/Neighborhood',
+            label: 'area_field'.tr(context),
           ),
         ],
       ),
@@ -348,7 +512,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionTitle(text: 'Location'),
+          SectionTitle(text: 'location_section'.tr(context)),
           SizedBox(height: ResponsiveSize.getHeight(2)),
           Row(
             children: [
@@ -356,7 +520,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
                 child: TextField(
                   controller: _latitudeController,
                   decoration: InputDecoration(
-                    labelText: 'Latitude',
+                    labelText: 'latitude_label_short'.tr(context),
                     hintText: '13.7563',
                     prefixIcon: Icon(
                       Icons.location_on,
@@ -366,7 +530,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    helperText: 'e.g., 13.7563 (you can paste coordinates)',
+                    helperText: 'coord_helper_lat_full'.tr(context),
                   ),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -379,7 +543,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
                 child: TextField(
                   controller: _longitudeController,
                   decoration: InputDecoration(
-                    labelText: 'Longitude',
+                    labelText: 'longitude_label_short'.tr(context),
                     hintText: '100.5018',
                     prefixIcon: Icon(
                       Icons.location_on,
@@ -389,7 +553,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    helperText: 'e.g., 100.5018 (you can paste coordinates)',
+                    helperText: 'coord_helper_lng_full'.tr(context),
                   ),
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -405,7 +569,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
             child: ElevatedButton.icon(
               onPressed: _pickLocation,
               icon: const Icon(Icons.map),
-              label: const Text('Pick Location on Map'),
+              label: Text('pick_location_on_map'.tr(context)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppConstants.primaryColor,
                 foregroundColor: Colors.white,
@@ -422,24 +586,24 @@ class _EditShopScreenState extends State<EditShopScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionTitle(text: 'Contact Information'),
+          SectionTitle(text: 'contact_information'.tr(context)),
           SizedBox(height: ResponsiveSize.getHeight(2)),
           _buildTextField(
             controller: _phoneController,
-            label: 'Phone Number',
+            label: 'phone_field'.tr(context),
             keyboardType: TextInputType.phone,
           ),
           SizedBox(height: ResponsiveSize.getHeight(1)),
-          _buildTextField(controller: _lineIdController, label: 'Line ID'),
+          _buildTextField(controller: _lineIdController, label: 'line_field'.tr(context)),
           SizedBox(height: ResponsiveSize.getHeight(1)),
           _buildTextField(
             controller: _facebookPageController,
-            label: 'Facebook Page',
+            label: 'facebook_field'.tr(context),
           ),
           SizedBox(height: ResponsiveSize.getHeight(1)),
           _buildTextField(
             controller: _instagramPageController,
-            label: 'Instagram Page',
+            label: 'instagram_field'.tr(context),
           ),
         ],
       ),
@@ -451,7 +615,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionTitle(text: 'Service Categories'),
+          SectionTitle(text: 'service_categories_title'.tr(context)),
           SizedBox(height: ResponsiveSize.getHeight(2)),
           Wrap(
             spacing: 8,
@@ -471,7 +635,9 @@ class _EditShopScreenState extends State<EditShopScreen> {
                         }
                       });
                     },
-                    selectedColor: AppConstants.primaryColor.withOpacity(0.2),
+                    selectedColor: AppConstants.primaryColor.withValues(
+                      alpha: 0.2,
+                    ),
                     checkmarkColor: AppConstants.primaryColor,
                   );
                 }).toList(),
@@ -486,7 +652,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionTitle(text: 'Opening Hours'),
+          SectionTitle(text: 'opening_hours'.tr(context)),
           SizedBox(height: ResponsiveSize.getHeight(2)),
           ...[
             'Monday',
@@ -502,6 +668,19 @@ class _EditShopScreenState extends State<EditShopScreen> {
     );
   }
 
+  String _localizedDay(String day) {
+    switch (day) {
+      case 'Monday': return 'monday'.tr(context);
+      case 'Tuesday': return 'tuesday'.tr(context);
+      case 'Wednesday': return 'wednesday'.tr(context);
+      case 'Thursday': return 'thursday'.tr(context);
+      case 'Friday': return 'friday'.tr(context);
+      case 'Saturday': return 'saturday'.tr(context);
+      case 'Sunday': return 'sunday'.tr(context);
+      default: return day;
+    }
+  }
+
   Widget _buildDayHours(String day) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -510,7 +689,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
           SizedBox(
             width: 80,
             child: Text(
-              day,
+              _localizedDay(day),
               style: const TextStyle(fontWeight: FontWeight.w500),
             ),
           ),
@@ -520,7 +699,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
                 Expanded(
                   child: _buildTextField(
                     controller: _openingTimeControllers[day]!,
-                    label: 'Open',
+                    label: 'open_label'.tr(context),
                     hintText: '09:00',
                   ),
                 ),
@@ -530,7 +709,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
                 Expanded(
                   child: _buildTextField(
                     controller: _closingTimeControllers[day]!,
-                    label: 'Close',
+                    label: 'close_label'.tr(context),
                     hintText: '18:00',
                   ),
                 ),
@@ -547,10 +726,10 @@ class _EditShopScreenState extends State<EditShopScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionTitle(text: 'Payment Methods'),
+          SectionTitle(text: 'payment_methods'.tr(context)),
           SizedBox(height: ResponsiveSize.getHeight(2)),
           CheckboxListTile(
-            title: const Text('Cash'),
+            title: Text('cash_payment'.tr(context)),
             value: _acceptsCash,
             onChanged: (value) {
               setState(() {
@@ -559,7 +738,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
             },
           ),
           CheckboxListTile(
-            title: const Text('QR Payment'),
+            title: Text('qr_payment'.tr(context)),
             value: _acceptsQR,
             onChanged: (value) {
               setState(() {
@@ -568,7 +747,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
             },
           ),
           CheckboxListTile(
-            title: const Text('Credit Card'),
+            title: Text('credit_card_payment'.tr(context)),
             value: _acceptsCredit,
             onChanged: (value) {
               setState(() {
@@ -586,10 +765,10 @@ class _EditShopScreenState extends State<EditShopScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionTitle(text: 'Photos'),
+          SectionTitle(text: 'photos'.tr(context)),
           SizedBox(height: ResponsiveSize.getHeight(2)),
           if (_existingPhotos.isNotEmpty) ...[
-            Text('Existing Photos:'),
+            Text('existing_photos'.tr(context)),
             SizedBox(height: ResponsiveSize.getHeight(1)),
             Wrap(
               spacing: 8,
@@ -604,7 +783,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
                             image: DecorationImage(
-                              image: NetworkImage(photo),
+                              image: CachedNetworkImageProvider(photo),
                               fit: BoxFit.cover,
                             ),
                           ),
@@ -643,7 +822,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
             child: ElevatedButton.icon(
               onPressed: _pickImage,
               icon: const Icon(Icons.add_a_photo),
-              label: const Text('Add Photo'),
+              label: Text('add_photo'.tr(context)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppConstants.primaryColor,
                 foregroundColor: Colors.white,
@@ -660,10 +839,10 @@ class _EditShopScreenState extends State<EditShopScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SectionTitle(text: 'Options'),
+          SectionTitle(text: 'options'.tr(context)),
           SizedBox(height: ResponsiveSize.getHeight(2)),
           CheckboxListTile(
-            title: const Text('Requires Purchase'),
+            title: Text('requires_purchase'.tr(context)),
             value: _requiresPurchase,
             onChanged: (value) {
               setState(() {
@@ -672,7 +851,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
             },
           ),
           CheckboxListTile(
-            title: const Text('Try-on Area Available'),
+            title: Text('try_on_area_checkbox'.tr(context)),
             value: _tryOnAreaAvailable,
             onChanged: (value) {
               setState(() {
@@ -683,17 +862,17 @@ class _EditShopScreenState extends State<EditShopScreen> {
           SizedBox(height: ResponsiveSize.getHeight(1)),
           DropdownButtonFormField<String>(
             value: _priceRange,
-            decoration: const InputDecoration(
-              labelText: 'Price Range',
+            decoration: InputDecoration(
+              labelText: 'price_range_label'.tr(context),
               border: OutlineInputBorder(),
             ),
             items:
-                ['₿', '₿₿', '₿₿₿'].map((range) {
+                ['฿', '฿฿', '฿฿฿'].map((range) {
                   return DropdownMenuItem(value: range, child: Text(range));
                 }).toList(),
             onChanged: (value) {
               setState(() {
-                _priceRange = value ?? '₿';
+                _priceRange = value ?? '฿';
               });
             },
           ),
@@ -732,7 +911,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -770,6 +949,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
       MaterialPageRoute(builder: (context) => const MapPickerScreen()),
     );
 
+    if (!mounted) return;
     if (result != null && result is LatLng) {
       setState(() {
         _latitudeController.text = result.latitude.toString();
@@ -798,14 +978,14 @@ class _EditShopScreenState extends State<EditShopScreen> {
           );
         }
 
+        if (!mounted) return;
         setState(() {
           _selectedImageBytes = compressedImage;
         });
       }
     } catch (e) {
-      setState(() {
-        // Error picking image: $e
-      });
+      if (!mounted) return;
+      debugPrint('Error picking image: $e');
     }
   }
 
@@ -907,20 +1087,21 @@ class _EditShopScreenState extends State<EditShopScreen> {
           .update(updatedShop.toMap());
 
       if (mounted) {
+        _savedSuccessfully = true;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Shop updated successfully!'),
+          SnackBar(
+            content: Text('shop_updated_success'.tr(context)),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true); // Return true to indicate success
+        Navigator.pop(context, true);
       }
     } catch (e) {
       appLog('Error updating shop: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error updating shop: $e'),
+            content: Text('error_updating_shop_msg'.tr(context).replaceAll('{error}', e.toString())),
             backgroundColor: Colors.red,
           ),
         );

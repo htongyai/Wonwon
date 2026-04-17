@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
 import 'package:wonwonw2/models/notification.dart';
 import 'package:wonwonw2/screens/forum_topic_detail_screen.dart';
 import 'package:wonwonw2/screens/shop_detail_screen.dart';
 import 'package:wonwonw2/services/notification_service.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class NotificationSidebar extends StatefulWidget {
   final bool isOpen;
@@ -26,6 +29,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
   late AnimationController _animationController;
   late Animation<double> _slideAnimation;
   late Animation<double> _fadeAnimation;
+  bool _isMarkingAllRead = false;
 
   @override
   void initState() {
@@ -70,7 +74,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
       await NotificationService.markAllAsRead();
     } catch (e) {
       // Silently handle errors to avoid disrupting user experience
-      print('Error marking notifications as read on open: $e');
+      appLog('Error marking notifications as read on open: $e');
     }
   }
 
@@ -83,22 +87,24 @@ class _NotificationSidebarState extends State<NotificationSidebar>
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 600;
-    final isMediumScreen = screenWidth >= 600 && screenWidth < 1024;
+    final isSmallPhone = ResponsiveBreakpoints.isSmallPhone(screenWidth);
+    final isMobile = ResponsiveBreakpoints.isMobile(screenWidth);
+    final isTablet = ResponsiveBreakpoints.isTablet(screenWidth);
 
-    // Hide notification sidebar on very small screens
-    if (isSmallScreen && screenWidth < 400) {
-      return const SizedBox.shrink();
-    }
-
-    // Calculate responsive sidebar width
+    // Calculate responsive sidebar width:
+    // Small phones (<400px): full screen width
+    // Other mobile: 85% of screen width
+    // Tablet: fixed 350px
+    // Desktop: fixed 400px
     double sidebarWidth;
-    if (isSmallScreen) {
+    if (isSmallPhone) {
+      sidebarWidth = screenWidth; // Full width on small phones
+    } else if (isMobile) {
       sidebarWidth = screenWidth * 0.85; // 85% of screen width on small screens
-    } else if (isMediumScreen) {
+    } else if (isTablet) {
       sidebarWidth = 350; // Fixed width for medium screens
     } else {
-      sidebarWidth = 400; // Full width for large screens
+      sidebarWidth = 400; // Fixed width for desktop
     }
 
     return AnimatedBuilder(
@@ -112,7 +118,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                 child: GestureDetector(
                   onTap: widget.onClose,
                   child: Container(
-                    color: Colors.black.withOpacity(_fadeAnimation.value),
+                    color: Colors.black.withValues(alpha: _fadeAnimation.value),
                   ),
                 ),
               ),
@@ -123,7 +129,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
               bottom: 0,
               child: Transform.translate(
                 offset: Offset(
-                  sidebarWidth * _slideAnimation.value, // Use calculated width
+                  sidebarWidth * _slideAnimation.value,
                   0,
                 ),
                 child: Container(
@@ -132,17 +138,19 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 20,
                         offset: const Offset(-5, 0),
                       ),
                     ],
                   ),
-                  child: Column(
-                    children: [
-                      _buildHeader(),
-                      Expanded(child: _buildNotificationsList()),
-                    ],
+                  child: SafeArea(
+                    child: Column(
+                      children: [
+                        _buildHeader(),
+                        Expanded(child: _buildNotificationsList()),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -159,7 +167,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(
-          bottom: BorderSide(color: Colors.grey.withOpacity(0.2), width: 1),
+          bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2), width: 1),
         ),
       ),
       child: Row(
@@ -171,7 +179,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
           ),
           const SizedBox(width: 12),
           Text(
-            'Notifications',
+            'notifications_title'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -184,25 +192,35 @@ class _NotificationSidebarState extends State<NotificationSidebar>
             builder: (context, snapshot) {
               final unreadCount = snapshot.hasError ? 0 : (snapshot.data ?? 0);
               if (unreadCount > 0) {
-                return GestureDetector(
-                  onTap: () async {
-                    await NotificationService.markAllAsRead();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppConstants.primaryColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Mark all read',
-                      style: GoogleFonts.montserrat(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                return SizedBox(
+                  height: 44,
+                  child: GestureDetector(
+                    onTap: _isMarkingAllRead ? null : () async {
+                      setState(() => _isMarkingAllRead = true);
+                      try {
+                        await NotificationService.markAllAsRead();
+                      } finally {
+                        if (mounted) setState(() => _isMarkingAllRead = false);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppConstants.primaryColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'mark_all_read'.tr(context),
+                          style: GoogleFonts.montserrat(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -241,7 +259,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                 Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
                 const SizedBox(height: 16),
                 Text(
-                  'No notifications available',
+                  'no_notifications_available'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 16,
                     color: Colors.grey[600],
@@ -249,7 +267,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Notifications will appear here when\nthere\'s activity related to you',
+                  'notifications_appear_here'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 12,
                     color: Colors.grey[500],
@@ -275,7 +293,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No notifications yet',
+                  'no_notifications_yet'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -284,7 +302,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'You\'ll see notifications here when\nthere\'s activity related to you',
+                  'notifications_appear_here'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 14,
                     color: Colors.grey[500],
@@ -317,13 +335,13 @@ class _NotificationSidebarState extends State<NotificationSidebar>
         border: Border.all(
           color:
               notification.isRead
-                  ? Colors.grey.withOpacity(0.1)
-                  : notification.color.withOpacity(0.2),
+                  ? Colors.grey.withValues(alpha: 0.1)
+                  : notification.color.withValues(alpha: 0.2),
           width: notification.isRead ? 1 : 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -333,6 +351,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _handleNotificationTap(notification),
+          mouseCursor: SystemMouseCursors.click,
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -344,7 +363,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: notification.color.withOpacity(0.1),
+                    color: notification.color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(
@@ -417,25 +436,25 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                   itemBuilder:
                       (context) => [
                         if (!notification.isRead)
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'mark_read',
                             child: Row(
                               children: [
-                                Icon(Icons.check, size: 16),
-                                SizedBox(width: 8),
-                                Text('Mark as read'),
+                                const Icon(Icons.check, size: 16),
+                                const SizedBox(width: 8),
+                                Text('mark_as_read'.tr(context)),
                               ],
                             ),
                           ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'delete',
                           child: Row(
                             children: [
-                              Icon(Icons.delete, size: 16, color: Colors.red),
-                              SizedBox(width: 8),
+                              const Icon(Icons.delete, size: 16, color: Colors.red),
+                              const SizedBox(width: 8),
                               Text(
-                                'Delete',
-                                style: TextStyle(color: Colors.red),
+                                'delete_button'.tr(context),
+                                style: const TextStyle(color: Colors.red),
                               ),
                             ],
                           ),
@@ -456,10 +475,16 @@ class _NotificationSidebarState extends State<NotificationSidebar>
   }
 
   void _handleNotificationTap(NotificationModel notification) async {
-    // Mark as read if not already read
-    if (!notification.isRead) {
-      await NotificationService.markAsRead(notification.id);
+    try {
+      // Mark as read if not already read
+      if (!notification.isRead) {
+        await NotificationService.markAsRead(notification.id);
+      }
+    } catch (e) {
+      debugPrint('Error marking notification as read: $e');
     }
+
+    if (!mounted) return;
 
     // Navigate based on notification type
     switch (notification.type) {
@@ -512,13 +537,17 @@ class _NotificationSidebarState extends State<NotificationSidebar>
     String action,
     NotificationModel notification,
   ) async {
-    switch (action) {
-      case 'mark_read':
-        await NotificationService.markAsRead(notification.id);
-        break;
-      case 'delete':
-        await NotificationService.deleteNotification(notification.id);
-        break;
+    try {
+      switch (action) {
+        case 'mark_read':
+          await NotificationService.markAsRead(notification.id);
+          break;
+        case 'delete':
+          await NotificationService.deleteNotification(notification.id);
+          break;
+      }
+    } catch (e) {
+      debugPrint('Error handling notification action: $e');
     }
   }
 
@@ -563,7 +592,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
+                child: Text('close_button'.tr(context)),
               ),
             ],
           ),

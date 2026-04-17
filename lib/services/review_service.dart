@@ -16,6 +16,7 @@ class ReviewService {
               .doc(shopId)
               .collection('review')
               .orderBy('createdAt', descending: true)
+              .limit(100)
               .get();
 
       return snapshot.docs.map((doc) {
@@ -48,7 +49,16 @@ class ReviewService {
   Future<void> addReview(Review review) async {
     try {
       final shopRef = _firestore.collection('shops').doc(review.shopId);
-      final reviewRef = shopRef.collection('review').doc(review.id);
+      // Validate review data
+      if (review.rating < 0 || review.rating > 5) {
+        throw ArgumentError('Rating must be between 0 and 5');
+      }
+      if (review.comment.trim().isEmpty) {
+        throw ArgumentError('Review comment cannot be empty');
+      }
+      final reviewRef = review.id.isNotEmpty
+          ? shopRef.collection('review').doc(review.id)
+          : shopRef.collection('review').doc();
       await reviewRef.set({
         'shopId': review.shopId,
         'userId': review.userId,
@@ -59,20 +69,22 @@ class ReviewService {
         'isAnonymous': review.isAnonymous,
       });
 
-      // Update average rating and review count
-      final reviewsSnapshot = await shopRef.collection('review').get();
-      final reviews = reviewsSnapshot.docs;
-      if (reviews.isNotEmpty) {
-        double total = 0;
-        for (var doc in reviews) {
-          final data = doc.data();
-          if (data['rating'] != null) {
-            total += (data['rating'] as num).toDouble();
+      // Update average rating atomically
+      await _firestore.runTransaction((transaction) async {
+        final reviewsSnapshot = await shopRef.collection('review').get();
+        final reviews = reviewsSnapshot.docs;
+        if (reviews.isNotEmpty) {
+          double total = 0;
+          for (var doc in reviews) {
+            final data = doc.data();
+            if (data['rating'] != null) {
+              total += (data['rating'] as num).toDouble();
+            }
           }
+          final avg = total / reviews.length;
+          transaction.update(shopRef, {'rating': avg, 'reviewCount': reviews.length});
         }
-        final avg = total / reviews.length;
-        await shopRef.update({'rating': avg, 'reviewCount': reviews.length});
-      }
+      });
 
       // Log review activity
       try {
@@ -134,35 +146,31 @@ class ReviewService {
           .doc(reviewId)
           .delete();
 
-      // Update average rating and review count
-      final reviewsSnapshot =
-          await _firestore
-              .collection('shops')
-              .doc(shopId)
-              .collection('review')
-              .get();
+      // Update average rating atomically
+      await _firestore.runTransaction((transaction) async {
+        final reviewsSnapshot =
+            await _firestore
+                .collection('shops')
+                .doc(shopId)
+                .collection('review')
+                .get();
 
-      final reviews = reviewsSnapshot.docs;
-      if (reviews.isNotEmpty) {
-        double total = 0;
-        for (var doc in reviews) {
-          final data = doc.data();
-          if (data['rating'] != null) {
-            total += (data['rating'] as num).toDouble();
+        final shopRef = _firestore.collection('shops').doc(shopId);
+        final reviews = reviewsSnapshot.docs;
+        if (reviews.isNotEmpty) {
+          double total = 0;
+          for (var doc in reviews) {
+            final data = doc.data();
+            if (data['rating'] != null) {
+              total += (data['rating'] as num).toDouble();
+            }
           }
+          final avg = total / reviews.length;
+          transaction.update(shopRef, {'rating': avg, 'reviewCount': reviews.length});
+        } else {
+          transaction.update(shopRef, {'rating': 0.0, 'reviewCount': 0});
         }
-        final avg = total / reviews.length;
-        await _firestore.collection('shops').doc(shopId).update({
-          'rating': avg,
-          'reviewCount': reviews.length,
-        });
-      } else {
-        // No reviews left, reset to default values
-        await _firestore.collection('shops').doc(shopId).update({
-          'rating': 0.0,
-          'reviewCount': 0,
-        });
-      }
+      });
 
       appLog('Review deleted successfully: $reviewId');
       return true;

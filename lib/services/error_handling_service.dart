@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wonwonw2/theme/app_theme.dart';
 import 'package:wonwonw2/utils/error_logger.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/screens/login_screen.dart';
 
 class ErrorHandlingService {
   static String getErrorMessage(Object error, BuildContext context) {
@@ -138,11 +141,20 @@ class ErrorHandlingService {
   }
 
   static Future<void> _clearAuthData() async {
-    // TODO: Implement auth data clearing
+    try {
+      await FirebaseAuth.instance.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+    } catch (e) {
+      debugPrint('Error clearing auth data: $e');
+    }
   }
 
   static void _navigateToLogin(BuildContext context) {
-    // TODO: Implement navigation to login
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
   }
 
   static void _showAccountLockedDialog(BuildContext context) {

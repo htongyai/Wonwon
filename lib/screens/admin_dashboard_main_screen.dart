@@ -12,9 +12,11 @@ import 'package:wonwonw2/screens/admin_user_management_screen.dart';
 import 'package:wonwonw2/screens/admin_reports_management_screen.dart';
 import 'package:wonwonw2/screens/activity_log_screen.dart';
 import 'package:wonwonw2/screens/admin_settings_screen.dart';
+import 'package:wonwonw2/widgets/auth_gate.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class AdminDashboardMainScreen extends OptimizedScreen {
   const AdminDashboardMainScreen({Key? key}) : super(key: key);
@@ -35,39 +37,39 @@ class _AdminDashboardMainScreenState
   String? _userEmail;
   String _appVersion = '';
 
-  final List<AdminMenuItem> _menuItems = [
+  List<AdminMenuItem> _getMenuItems(BuildContext context) => [
     AdminMenuItem(
-      title: 'Dashboard',
+      title: 'dashboard_label'.tr(context),
       icon: FontAwesomeIcons.chartLine,
       route: '/admin/dashboard',
     ),
     AdminMenuItem(
-      title: 'Analytics',
+      title: 'analytics_label'.tr(context),
       icon: FontAwesomeIcons.chartPie,
       route: '/admin/analytics',
     ),
     AdminMenuItem(
-      title: 'Shop Management',
+      title: 'shop_management_label'.tr(context),
       icon: FontAwesomeIcons.store,
       route: '/admin/shops',
     ),
     AdminMenuItem(
-      title: 'User Management',
+      title: 'user_management_label'.tr(context),
       icon: FontAwesomeIcons.users,
       route: '/admin/users',
     ),
     AdminMenuItem(
-      title: 'Reports & Issues',
+      title: 'reports_issues_label'.tr(context),
       icon: FontAwesomeIcons.flag,
       route: '/admin/reports',
     ),
     AdminMenuItem(
-      title: 'Activity Log',
+      title: 'activity_log_label'.tr(context),
       icon: FontAwesomeIcons.clockRotateLeft,
       route: '/admin/activity-log',
     ),
     AdminMenuItem(
-      title: 'Settings',
+      title: 'settings_label'.tr(context),
       icon: FontAwesomeIcons.cog,
       route: '/admin/settings',
     ),
@@ -85,11 +87,13 @@ class _AdminDashboardMainScreenState
 
   @override
   void onAuthStateChanged(bool isLoggedIn) {
+    if (!mounted) return;
     if (!isLoggedIn) {
-      // User logged out, redirect to login
-      Navigator.of(context).pushReplacementNamed('/');
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const AuthGate()),
+        (route) => false,
+      );
     } else {
-      // User logged in, check admin status
       _checkAdminAccess();
     }
   }
@@ -357,7 +361,7 @@ class _AdminDashboardMainScreenState
                               ),
                             ),
                             Text(
-                              'Repair Finder',
+                              'repair_finder'.tr(context),
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: const Color(0xFF64748B),
@@ -422,9 +426,9 @@ class _AdminDashboardMainScreenState
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: _menuItems.length,
+                    itemCount: _getMenuItems(context).length,
                     itemBuilder: (context, index) {
-                      final item = _menuItems[index];
+                      final item = _getMenuItems(context)[index];
                       final isSelected = index == _selectedIndex;
 
                       return Container(
@@ -449,7 +453,7 @@ class _AdminDashboardMainScreenState
                               decoration: BoxDecoration(
                                 color:
                                     isSelected
-                                        ? AppConstants.primaryColor.withOpacity(
+                                        ? AppConstants.primaryColor.withValues(alpha: 
                                           0.1,
                                         )
                                         : null,
@@ -544,7 +548,10 @@ class _AdminDashboardMainScreenState
                           onPressed: () async {
                             await _authManager.logout();
                             if (mounted) {
-                              Navigator.of(context).pushReplacementNamed('/');
+                              Navigator.of(context).pushAndRemoveUntil(
+                                MaterialPageRoute(builder: (context) => const AuthGate()),
+                                (route) => false,
+                              );
                             }
                           },
                           icon: const FaIcon(
@@ -648,49 +655,49 @@ class _AdminDashboardMainScreenState
   Widget _buildStatsGrid() {
     final stats = [
       DashboardStat(
-        title: 'Total Shops',
+        title: 'total_shops'.tr(context),
         value: _dashboardStats['totalShops']?.toString() ?? '0',
-        subtitle: '${_dashboardStats['recentShops'] ?? 0} new this week',
+        subtitle: 'n_new_this_week'.tr(context).replaceAll('{count}', '${_dashboardStats['recentShops'] ?? 0}'),
         icon: FontAwesomeIcons.store,
         color: const Color(0xFF3B82F6),
         trend: (_dashboardStats['recentShops'] ?? 0) > 0 ? 'up' : 'neutral',
       ),
       DashboardStat(
-        title: 'Pending Approvals',
+        title: 'pending_approvals'.tr(context),
         value: _dashboardStats['pendingShops']?.toString() ?? '0',
-        subtitle: 'Shops awaiting approval',
+        subtitle: 'shops_awaiting_approval'.tr(context),
         icon: FontAwesomeIcons.clock,
         color: const Color(0xFFF59E0B),
         trend: 'neutral',
       ),
       DashboardStat(
-        title: 'Total Users',
+        title: 'admin_users_count'.tr(context).replaceAll('{count}', ''),
         value: _dashboardStats['totalUsers']?.toString() ?? '0',
-        subtitle: '${_dashboardStats['recentUsers'] ?? 0} new this week',
+        subtitle: 'n_new_this_week'.tr(context).replaceAll('{count}', '${_dashboardStats['recentUsers'] ?? 0}'),
         icon: FontAwesomeIcons.users,
         color: const Color(0xFF10B981),
         trend: (_dashboardStats['recentUsers'] ?? 0) > 0 ? 'up' : 'neutral',
       ),
       DashboardStat(
-        title: 'Open Reports',
+        title: 'open_reports'.tr(context),
         value: _dashboardStats['pendingReports']?.toString() ?? '0',
-        subtitle: 'Issues to resolve',
+        subtitle: 'issues_to_resolve'.tr(context),
         icon: FontAwesomeIcons.flag,
         color: const Color(0xFFEF4444),
         trend: 'neutral',
       ),
       DashboardStat(
-        title: 'Average Rating',
+        title: 'average_rating'.tr(context),
         value: (_dashboardStats['averageRating'] ?? 0.0).toStringAsFixed(1),
-        subtitle: 'From ${_dashboardStats['totalReviews'] ?? 0} reviews',
+        subtitle: 'from_n_reviews'.tr(context).replaceAll('{count}', '${_dashboardStats['totalReviews'] ?? 0}'),
         icon: FontAwesomeIcons.star,
         color: const Color(0xFF8B5CF6),
         trend: 'neutral',
       ),
       DashboardStat(
-        title: 'Active Users',
+        title: 'active_users'.tr(context),
         value: _dashboardStats['activeUsers']?.toString() ?? '0',
-        subtitle: 'Currently active',
+        subtitle: 'currently_active'.tr(context),
         icon: FontAwesomeIcons.userCheck,
         color: const Color(0xFF06B6D4),
         trend: 'neutral',
@@ -720,7 +727,7 @@ class _AdminDashboardMainScreenState
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -735,7 +742,7 @@ class _AdminDashboardMainScreenState
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: stat.color.withOpacity(0.1),
+                  color: stat.color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
@@ -750,7 +757,7 @@ class _AdminDashboardMainScreenState
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withOpacity(0.1),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const FaIcon(
@@ -795,46 +802,46 @@ class _AdminDashboardMainScreenState
   Widget _buildQuickActions() {
     final actions = [
       QuickAction(
-        title: 'Approve Shops',
-        subtitle: '${_dashboardStats['pendingShops'] ?? 0} pending',
+        title: 'approve_shops'.tr(context),
+        subtitle: 'n_pending'.tr(context).replaceAll('{count}', '${_dashboardStats['pendingShops'] ?? 0}'),
         icon: FontAwesomeIcons.check,
         color: const Color(0xFF10B981),
         onTap: () {
           safeSetState(() {
-            _selectedIndex = 2; // Shop Management
+            _selectedIndex = 2;
           });
         },
       ),
       QuickAction(
-        title: 'Review Reports',
-        subtitle: '${_dashboardStats['pendingReports'] ?? 0} open',
+        title: 'review_reports'.tr(context),
+        subtitle: 'n_open'.tr(context).replaceAll('{count}', '${_dashboardStats['pendingReports'] ?? 0}'),
         icon: FontAwesomeIcons.flag,
         color: const Color(0xFFEF4444),
         onTap: () {
           safeSetState(() {
-            _selectedIndex = 4; // Reports Management
+            _selectedIndex = 4;
           });
         },
       ),
       QuickAction(
-        title: 'User Management',
-        subtitle: 'Manage user accounts',
+        title: 'user_management_label'.tr(context),
+        subtitle: 'manage_users'.tr(context),
         icon: FontAwesomeIcons.userCog,
         color: const Color(0xFF3B82F6),
         onTap: () {
           safeSetState(() {
-            _selectedIndex = 3; // User Management
+            _selectedIndex = 3;
           });
         },
       ),
       QuickAction(
-        title: 'View Analytics',
-        subtitle: 'Detailed insights',
+        title: 'view_analytics'.tr(context),
+        subtitle: 'detailed_insights'.tr(context),
         icon: FontAwesomeIcons.chartLine,
         color: const Color(0xFF8B5CF6),
         onTap: () {
           safeSetState(() {
-            _selectedIndex = 1; // Analytics
+            _selectedIndex = 1;
           });
         },
       ),
@@ -883,7 +890,7 @@ class _AdminDashboardMainScreenState
             border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
+                color: Colors.black.withValues(alpha: 0.02),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -895,7 +902,7 @@ class _AdminDashboardMainScreenState
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: action.color.withOpacity(0.1),
+                  color: action.color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
@@ -942,98 +949,58 @@ class _AdminDashboardMainScreenState
         ),
         const SizedBox(height: 16),
         Container(
-          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color(0xFFE2E8F0)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.02),
+                color: Colors.black.withValues(alpha: 0.02),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: Column(
-            children: [
-              _buildActivityItem(
-                'New shop registration',
-                'A new repair shop has been submitted for approval',
-                FontAwesomeIcons.store,
-                const Color(0xFF3B82F6),
-                '2 hours ago',
+          child: ListTile(
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
-              const Divider(height: 32),
-              _buildActivityItem(
-                'User report submitted',
-                'A user has reported an issue with a shop listing',
-                FontAwesomeIcons.flag,
-                const Color(0xFFEF4444),
-                '4 hours ago',
-              ),
-              const Divider(height: 32),
-              _buildActivityItem(
-                'New user registration',
-                '3 new users have joined the platform',
-                FontAwesomeIcons.userPlus,
-                const Color(0xFF10B981),
-                '6 hours ago',
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActivityItem(
-    String title,
-    String subtitle,
-    IconData icon,
-    Color color,
-    String time,
-  ) {
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(child: FaIcon(icon, color: color, size: 16)),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF1E293B),
+              child: const Center(
+                child: FaIcon(
+                  FontAwesomeIcons.clockRotateLeft,
+                  color: Color(0xFF3B82F6),
+                  size: 16,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: const Color(0xFF64748B),
-                ),
+            ),
+            title: Text(
+              'View Activity Log',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1E293B),
               ),
-            ],
-          ),
-        ),
-        Text(
-          time,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            color: const Color(0xFF64748B),
+            ),
+            subtitle: Text(
+              'View all platform activity and events',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+            trailing: const Icon(
+              Icons.chevron_right,
+              color: Color(0xFF64748B),
+            ),
+            onTap: () {
+              safeSetState(() {
+                _selectedIndex = 5;
+              });
+            },
           ),
         ),
       ],

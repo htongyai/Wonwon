@@ -1,0 +1,492 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared/constants/app_constants.dart';
+import 'package:shared/models/repair_shop.dart';
+import 'package:shared/services/shop_service.dart';
+import 'package:wonwon_dashboard/screens/shop_detail_screen.dart';
+import 'package:intl/intl.dart';
+import 'package:shared/utils/app_logger.dart';
+import 'package:wonwon_dashboard/localization/app_localizations_wrapper.dart';
+
+class AdminUnapprovePagesScreen extends StatefulWidget {
+  const AdminUnapprovePagesScreen({Key? key}) : super(key: key);
+
+  @override
+  _AdminUnapprovePagesScreenState createState() =>
+      _AdminUnapprovePagesScreenState();
+}
+
+class _AdminUnapprovePagesScreenState extends State<AdminUnapprovePagesScreen> {
+  final ShopService _shopService = ShopService();
+
+  List<RepairShop> _unapprovedShops = [];
+  List<RepairShop> _filteredShops = [];
+  bool _isLoading = true;
+  bool _hasError = false;
+  // Removed unused _searchQuery field
+  String _sortBy = 'name';
+  bool _sortAscending = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnapprovedShops();
+  }
+
+  Future<void> _loadUnapprovedShops() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+
+    try {
+      final unapprovedShops = await _shopService.getUnapprovedShops();
+
+      setState(() {
+        _unapprovedShops = unapprovedShops;
+        _filteredShops = unapprovedShops;
+        _isLoading = false;
+      });
+      _applySorting();
+    } catch (e) {
+      appLog('Error loading unapproved shops: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+      });
+    }
+  }
+
+  void _applySearch(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredShops = _unapprovedShops;
+      } else {
+        _filteredShops =
+            _unapprovedShops.where((shop) {
+              final nameMatch = shop.name.toLowerCase().contains(
+                query.toLowerCase(),
+              );
+              final addressMatch = shop.address.toLowerCase().contains(
+                query.toLowerCase(),
+              );
+              final categoryMatch = shop.categories.any(
+                (category) =>
+                    category.toLowerCase().contains(query.toLowerCase()),
+              );
+              return nameMatch || addressMatch || categoryMatch;
+            }).toList();
+      }
+    });
+    _applySorting();
+  }
+
+  void _applySorting() {
+    _filteredShops.sort((a, b) {
+      int comparison = 0;
+      switch (_sortBy) {
+        case 'name':
+          comparison = a.name.compareTo(b.name);
+          break;
+        case 'address':
+          comparison = a.address.compareTo(b.address);
+          break;
+        case 'submittedDate':
+          comparison = (a.timestamp ?? DateTime.now()).compareTo(
+            b.timestamp ?? DateTime.now(),
+          );
+          break;
+        default:
+          comparison = a.name.compareTo(b.name);
+      }
+      return _sortAscending ? comparison : -comparison;
+    });
+  }
+
+  void _sortByColumn(String column) {
+    setState(() {
+      if (_sortBy == column) {
+        _sortAscending = !_sortAscending;
+      } else {
+        _sortBy = column;
+        _sortAscending = true;
+      }
+    });
+    _applySorting();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F9FA),
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.grey.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                FaIcon(
+                  FontAwesomeIcons.clock,
+                  color: AppConstants.primaryColor,
+                  size: 24,
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  'admin_unapproved_pages'.tr(context),
+                  style: GoogleFonts.montserrat(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppConstants.darkColor,
+                  ),
+                ),
+                const Spacer(),
+                // Refresh button
+                IconButton(
+                  onPressed: _loadUnapprovedShops,
+                  icon: Icon(Icons.refresh, color: AppConstants.primaryColor),
+                  tooltip: 'refresh'.tr(context),
+                ),
+              ],
+            ),
+          ),
+
+          // Search and controls
+          Container(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    onChanged: _applySearch,
+                    decoration: InputDecoration(
+                      hintText: 'admin_search_unapproved_shops'.tr(context),
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  'admin_pending_count'.tr(context).replaceAll('{count}', '${_filteredShops.length}'),
+                  style: GoogleFonts.montserrat(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Table
+          Expanded(
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _hasError
+                    ? _buildErrorState()
+                    : _filteredShops.isEmpty
+                    ? _buildEmptyState()
+                    : _buildUnapprovedShopsTable(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+          const SizedBox(height: 16),
+          Text(
+            'admin_error_loading_shops'.tr(context),
+            style: GoogleFonts.montserrat(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppConstants.darkColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadUnapprovedShops,
+            child: Text('try_again'.tr(context)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.primaryColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle_outline, size: 64, color: Colors.green[400]),
+          const SizedBox(height: 16),
+          Text(
+            'admin_no_unapproved_shops'.tr(context),
+            style: GoogleFonts.montserrat(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppConstants.darkColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'admin_all_shops_approved'.tr(context),
+            style: GoogleFonts.montserrat(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUnapprovedShopsTable() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        columns: [
+          _buildSortableColumn('shop_name'.tr(context), 'name'),
+          _buildSortableColumn('address'.tr(context), 'address'),
+          _buildSortableColumn('admin_submitted'.tr(context), 'submittedDate'),
+          DataColumn(label: Text('categories'.tr(context))),
+          DataColumn(label: Text('services'.tr(context))),
+          DataColumn(label: Text('admin_actions'.tr(context))),
+        ],
+        rows:
+            _filteredShops
+                .map((shop) => _buildUnapprovedShopRow(shop))
+                .toList(),
+      ),
+    );
+  }
+
+  DataColumn _buildSortableColumn(String label, String sortKey) {
+    return DataColumn(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          if (_sortBy == sortKey)
+            Icon(
+              _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+              size: 16,
+              color: AppConstants.primaryColor,
+            ),
+        ],
+      ),
+      onSort: (columnIndex, ascending) => _sortByColumn(sortKey),
+    );
+  }
+
+  DataRow _buildUnapprovedShopRow(RepairShop shop) {
+    return DataRow(
+      cells: [
+        DataCell(
+          Text(
+            shop.name,
+            style: GoogleFonts.montserrat(fontWeight: FontWeight.w600),
+          ),
+        ),
+        DataCell(
+          SizedBox(
+            width: 200,
+            child: Text(
+              shop.address,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
+          ),
+        ),
+        DataCell(
+          Text(
+            DateFormat('MMM dd, yyyy').format(shop.timestamp ?? DateTime.now()),
+            style: GoogleFonts.montserrat(fontSize: 12),
+          ),
+        ),
+        DataCell(
+          SizedBox(
+            width: 150,
+            child: Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children:
+                  shop.categories
+                      .take(3)
+                      .map(
+                        (category) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppConstants.primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            category,
+                            style: GoogleFonts.montserrat(
+                              fontSize: 10,
+                              color: AppConstants.primaryColor,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+            ),
+          ),
+        ),
+        DataCell(
+          Text(
+            shop.subServices.isNotEmpty && shop.subServices.values.expand((s) => s).isNotEmpty
+                ? 'admin_services_count'.tr(context).replaceAll('{count}', '${shop.subServices.values.expand((s) => s).length}')
+                : 'admin_no_services'.tr(context),
+            style: GoogleFonts.montserrat(fontSize: 12),
+          ),
+        ),
+        DataCell(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: () => _viewShopDetails(shop),
+                icon: const Icon(Icons.visibility, size: 16),
+                tooltip: 'view_details'.tr(context),
+              ),
+              IconButton(
+                onPressed: () => _approveShop(shop),
+                icon: const Icon(
+                  Icons.check_circle,
+                  size: 16,
+                  color: Colors.green,
+                ),
+                tooltip: 'admin_approve_shop'.tr(context),
+              ),
+              IconButton(
+                onPressed: () => _rejectShop(shop),
+                icon: const Icon(Icons.cancel, size: 16, color: Colors.red),
+                tooltip: 'admin_reject_shop'.tr(context),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _viewShopDetails(RepairShop shop) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ShopDetailScreen(shopId: shop.id),
+      ),
+    );
+  }
+
+  void _approveShop(RepairShop shop) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('admin_approve_shop'.tr(context)),
+            content: Text('admin_approve_shop_confirm'.tr(context).replaceAll('{shop_name}', shop.name)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('cancel'.tr(context)),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  try {
+                    await FirebaseFirestore.instance.collection('shops').doc(shop.id).update({
+                      'approved': true,
+                      'approvedAt': FieldValue.serverTimestamp(),
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('shop_approved_msg'.tr(this.context).replaceAll('{name}', shop.name))),
+                      );
+                      _loadUnapprovedShops();
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('error_approving_shop_msg'.tr(this.context).replaceAll('{error}', e.toString())), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.green),
+                child: Text('admin_approve'.tr(context)),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _rejectShop(RepairShop shop) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('admin_reject_shop'.tr(context)),
+            content: Text('admin_reject_shop_confirm'.tr(context).replaceAll('{shop_name}', shop.name)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('cancel'.tr(context)),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  try {
+                    await FirebaseFirestore.instance.collection('shops').doc(shop.id).delete();
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('shop_rejected_msg'.tr(this.context).replaceAll('{name}', shop.name))),
+                      );
+                      _loadUnapprovedShops();
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(content: Text('error_rejecting_shop_msg'.tr(this.context).replaceAll('{error}', e.toString())), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: Text('admin_reject'.tr(context)),
+              ),
+            ],
+          ),
+    );
+  }
+}

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:wonwonw2/providers/service_category_provider.dart';
 import 'package:wonwonw2/models/service_category.dart';
 import 'package:wonwonw2/widgets/lazy_loading_image.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class ServiceCategoryScreen extends StatelessWidget {
   const ServiceCategoryScreen({super.key});
@@ -14,7 +15,7 @@ class ServiceCategoryScreen extends StatelessWidget {
         return Scaffold(
           appBar: AppBar(
             title: Text(
-              provider.currentLanguage == 'th' ? 'บริการ' : 'Services',
+              'services'.tr(context),
             ),
             actions: [
               IconButton(

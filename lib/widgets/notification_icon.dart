@@ -18,15 +18,18 @@ class NotificationIcon extends StatelessWidget {
       builder: (context, snapshot) {
         final unreadCount = snapshot.hasError ? 0 : (snapshot.data ?? 0);
 
-        return GestureDetector(
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
           onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Colors.grey[100],
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: AppConstants.primaryColor.withOpacity(0.2),
+                color: AppConstants.primaryColor.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -69,6 +72,7 @@ class NotificationIcon extends StatelessWidget {
               ],
             ),
           ),
+        ),
         );
       },
     );

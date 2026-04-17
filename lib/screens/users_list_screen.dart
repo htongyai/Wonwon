@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/constants/app_colors.dart';
 import 'package:wonwonw2/constants/app_text_styles.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
@@ -32,11 +33,13 @@ class _UsersListScreenState extends State<UsersListScreen> {
   Future<void> _checkAdminStatus() async {
     try {
       final isAdmin = await UserService.isCurrentUserAdmin();
+      if (!mounted) return;
       setState(() {
         _isAdmin = isAdmin;
       });
     } catch (e) {
-      print('Error checking admin status: $e');
+      appLog('Error checking admin status: $e');
+      if (!mounted) return;
       setState(() {
         _isAdmin = false;
       });
@@ -50,12 +53,14 @@ class _UsersListScreenState extends State<UsersListScreen> {
 
     try {
       final users = await UserService.getAllUsers();
+      if (!mounted) return;
       setState(() {
         _users = users;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading users: $e');
+      appLog('Error loading users: $e');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -84,8 +89,8 @@ class _UsersListScreenState extends State<UsersListScreen> {
         user.id,
         newAccountType,
       );
+      if (!mounted) return;
       if (success) {
-        // Update local state
         setState(() {
           final index = _users.indexWhere((u) => u.id == user.id);
           if (index != -1) {
@@ -96,7 +101,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Account type updated successfully'),
+              content: Text('account_type_updated'.tr(context)),
               backgroundColor: Colors.green,
             ),
           );
@@ -105,7 +110,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to update account type'),
+              content: Text('failed_update_account_type'.tr(context)),
               backgroundColor: Colors.red,
             ),
           );
@@ -116,7 +121,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error updating account type'),
+            content: Text('error_updating_account_type'.tr(context)),
             backgroundColor: Colors.red,
           ),
         );
@@ -127,8 +132,8 @@ class _UsersListScreenState extends State<UsersListScreen> {
   Future<void> _updateUserStatus(User user, String newStatus) async {
     try {
       final success = await UserService.updateUserStatus(user.id, newStatus);
+      if (!mounted) return;
       if (success) {
-        // Update local state
         setState(() {
           final index = _users.indexWhere((u) => u.id == user.id);
           if (index != -1) {
@@ -139,7 +144,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('User status updated successfully'),
+              content: Text('user_status_updated'.tr(context)),
               backgroundColor: Colors.green,
             ),
           );
@@ -148,7 +153,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to update user status'),
+              content: Text('failed_update_user_status'.tr(context)),
               backgroundColor: Colors.red,
             ),
           );
@@ -159,7 +164,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error updating user status'),
+            content: Text('error_updating_user_status'.tr(context)),
             backgroundColor: Colors.red,
           ),
         );
@@ -201,7 +206,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
         backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text(
-            'Users List',
+            'users_list'.tr(context),
             style: AppTextStyles.heading.copyWith(color: AppColors.text),
           ),
           centerTitle: true,
@@ -222,7 +227,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
         backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text(
-            'Users List',
+            'users_list'.tr(context),
             style: AppTextStyles.heading.copyWith(color: AppColors.text),
           ),
           centerTitle: true,
@@ -233,7 +238,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
             onPressed: () => Navigator.pop(context),
           ),
         ),
-        body: const Center(child: Text('Access Denied')),
+        body: Center(child: Text('access_denied_title'.tr(context))),
       );
     }
 
@@ -241,7 +246,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
-          'Users List',
+          'users_list'.tr(context),
           style: AppTextStyles.heading.copyWith(color: AppColors.text),
         ),
         centerTitle: true,
@@ -266,7 +271,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
                 // Search bar
                 TextField(
                   decoration: InputDecoration(
-                    hintText: 'Search users...',
+                    hintText: 'search_users_short'.tr(context),
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -289,7 +294,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
                       child: DropdownButtonFormField<String>(
                         value: _filterAccountType,
                         decoration: InputDecoration(
-                          labelText: 'Account Type',
+                          labelText: 'account_type_label'.tr(context),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -299,17 +304,17 @@ class _UsersListScreenState extends State<UsersListScreen> {
                         items: [
                           DropdownMenuItem(
                             value: 'all',
-                            child: Text('All Types'),
+                            child: Text('all_types'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'admin',
-                            child: Text('Admin'),
+                            child: Text('admin_role_label'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'moderator',
-                            child: Text('Moderator'),
+                            child: Text('moderator_role'.tr(context)),
                           ),
-                          DropdownMenuItem(value: 'user', child: Text('User')),
+                          DropdownMenuItem(value: 'user', child: Text('user_role'.tr(context))),
                         ],
                         onChanged: (value) {
                           setState(() {
@@ -323,7 +328,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
                       child: DropdownButtonFormField<String>(
                         value: _filterStatus,
                         decoration: InputDecoration(
-                          labelText: 'Status',
+                          labelText: 'admin_status'.tr(context),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -333,19 +338,19 @@ class _UsersListScreenState extends State<UsersListScreen> {
                         items: [
                           DropdownMenuItem(
                             value: 'all',
-                            child: Text('All Status'),
+                            child: Text('all_status'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'active',
-                            child: Text('Active'),
+                            child: Text('active_status'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'suspended',
-                            child: Text('Suspended'),
+                            child: Text('suspended_status'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'pending',
-                            child: Text('Pending'),
+                            child: Text('pending_status_label'.tr(context)),
                           ),
                         ],
                         onChanged: (value) {
@@ -378,7 +383,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'No users found',
+                            'admin_no_users_found'.tr(context),
                             style: TextStyle(
                               fontSize: 18,
                               color: Colors.grey[600],
@@ -429,7 +434,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
           ),
         ),
         title: Text(
-          user.name.isNotEmpty ? user.name : 'No Name',
+          user.name.isNotEmpty ? user.name : 'no_information'.tr(context),
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Column(
@@ -498,12 +503,12 @@ class _UsersListScreenState extends State<UsersListScreen> {
               children: [
                 // User details
                 _buildInfoRow(
-                  'Created',
+                  'admin_created'.tr(context),
                   DateFormat('MMM dd, yyyy').format(user.createdAt),
                 ),
                 if (user.lastLoginAt != null)
                   _buildInfoRow(
-                    'Last Login',
+                    'last_active_sort'.tr(context),
                     DateFormat('MMM dd, yyyy HH:mm').format(user.lastLoginAt!),
                   ),
 
@@ -511,7 +516,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
 
                 // Account type selector
                 Text(
-                  'Account Type',
+                  'account_type_label'.tr(context),
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
@@ -527,12 +532,12 @@ class _UsersListScreenState extends State<UsersListScreen> {
                     ),
                   ),
                   items: [
-                    DropdownMenuItem(value: 'user', child: Text('User')),
+                    DropdownMenuItem(value: 'user', child: Text('user_role'.tr(context))),
                     DropdownMenuItem(
                       value: 'moderator',
-                      child: Text('Moderator'),
+                      child: Text('moderator_role'.tr(context)),
                     ),
-                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                    DropdownMenuItem(value: 'admin', child: Text('admin_role_label'.tr(context))),
                   ],
                   onChanged: (newType) {
                     if (newType != null && newType != user.accountType) {
@@ -545,7 +550,7 @@ class _UsersListScreenState extends State<UsersListScreen> {
 
                 // Status selector
                 Text(
-                  'Status',
+                  'admin_status'.tr(context),
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
@@ -561,12 +566,12 @@ class _UsersListScreenState extends State<UsersListScreen> {
                     ),
                   ),
                   items: [
-                    DropdownMenuItem(value: 'active', child: Text('Active')),
+                    DropdownMenuItem(value: 'active', child: Text('active_status'.tr(context))),
                     DropdownMenuItem(
                       value: 'suspended',
-                      child: Text('Suspended'),
+                      child: Text('suspended_status'.tr(context)),
                     ),
-                    DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                    DropdownMenuItem(value: 'pending', child: Text('pending_status_label'.tr(context))),
                   ],
                   onChanged: (newStatus) {
                     if (newStatus != null && newStatus != user.status) {

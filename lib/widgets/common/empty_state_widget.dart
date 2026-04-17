@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 /// Widget for displaying empty states
 class EmptyStateWidget extends StatelessWidget {
@@ -38,7 +39,7 @@ class EmptyStateWidget extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: AppConstants.primaryColor.withOpacity(0.1),
+              color: AppConstants.primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(40),
             ),
             child: Center(
@@ -121,16 +122,16 @@ class NoShopsFoundWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return EmptyStateWidget(
-      title: searchQuery != null ? 'No shops found' : 'No shops available',
+      title: searchQuery != null ? 'no_shops_found'.tr(context) : 'no_shops_available'.tr(context),
       subtitle: searchQuery != null 
-          ? 'Try adjusting your search criteria or location'
-          : 'There are no repair shops in your area yet',
+          ? 'try_adjusting_search'.tr(context)
+          : 'no_shops_in_area'.tr(context),
       faIcon: const FaIcon(
         FontAwesomeIcons.screwdriverWrench,
         size: 40,
         color: AppConstants.primaryColor,
       ),
-      buttonText: 'Refresh',
+      buttonText: 'refresh'.tr(context),
       onButtonPressed: onRefresh,
     );
   }
@@ -148,10 +149,10 @@ class NoReviewsFoundWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return EmptyStateWidget(
-      title: 'No reviews yet',
-      subtitle: 'Be the first to share your experience with this shop',
+      title: 'no_reviews_empty'.tr(context),
+      subtitle: 'be_first_review_msg'.tr(context),
       icon: Icons.rate_review_outlined,
-      buttonText: 'Write Review',
+      buttonText: 'write_review'.tr(context),
       onButtonPressed: onAddReview,
     );
   }
@@ -169,10 +170,10 @@ class NoSavedLocationsWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return EmptyStateWidget(
-      title: 'No saved locations',
-      subtitle: 'Start exploring and save your favorite repair shops',
+      title: 'no_saved_empty'.tr(context),
+      subtitle: 'start_exploring_msg'.tr(context),
       icon: Icons.bookmark_border,
-      buttonText: 'Explore Shops',
+      buttonText: 'explore_shops'.tr(context),
       onButtonPressed: onExplore,
     );
   }
@@ -190,10 +191,10 @@ class NoForumTopicsWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return EmptyStateWidget(
-      title: 'No discussions yet',
-      subtitle: 'Start a conversation with the community',
+      title: 'no_discussions_empty'.tr(context),
+      subtitle: 'start_conversation_msg'.tr(context),
       icon: Icons.forum_outlined,
-      buttonText: 'Create Topic',
+      buttonText: 'create_topic'.tr(context),
       onButtonPressed: onCreateTopic,
     );
   }
@@ -213,10 +214,10 @@ class NoSearchResultsWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return EmptyStateWidget(
-      title: 'No results for "$searchQuery"',
-      subtitle: 'Try different keywords or check your spelling',
+      title: 'no_results_for'.tr(context).replaceAll('{query}', searchQuery),
+      subtitle: 'try_different_keywords'.tr(context),
       icon: Icons.search_off,
-      buttonText: 'Clear Search',
+      buttonText: 'clear_search'.tr(context),
       onButtonPressed: onClearSearch,
     );
   }
@@ -234,10 +235,10 @@ class NetworkErrorWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return EmptyStateWidget(
-      title: 'Connection Error',
-      subtitle: 'Please check your internet connection and try again',
+      title: 'connection_error'.tr(context),
+      subtitle: 'check_connection'.tr(context),
       icon: Icons.wifi_off,
-      buttonText: 'Retry',
+      buttonText: 'retry'.tr(context),
       onButtonPressed: onRetry,
     );
   }
@@ -257,8 +258,8 @@ class PermissionDeniedWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return EmptyStateWidget(
-      title: 'Permission Required',
-      subtitle: 'Please grant $permission permission to continue',
+      title: 'permission_required_title'.tr(context),
+      subtitle: 'grant_permission_msg'.tr(context).replaceAll('{permission}', permission),
       icon: Icons.lock_outline,
       buttonText: 'Grant Permission',
       onButtonPressed: onRequestPermission,

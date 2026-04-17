@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wonwonw2/models/notification.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 class NotificationService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -19,9 +20,14 @@ class NotificationService {
     Map<String, dynamic> data = const {},
     String? relatedId,
   }) async {
+    if (title.trim().isEmpty || message.trim().isEmpty || userId.trim().isEmpty) {
+      appLog('Skipping notification: title, message, and userId are required');
+      return;
+    }
+
     try {
       final notification = NotificationModel(
-        id: '', // Will be set by Firestore
+        id: '',
         title: title,
         message: message,
         userId: userId,
@@ -33,7 +39,7 @@ class NotificationService {
 
       await _getNotificationsCollection(userId).add(notification.toMap());
     } catch (e) {
-      print('Error creating notification: $e');
+      appLog('Error creating notification: $e');
       rethrow;
     }
   }
@@ -60,7 +66,7 @@ class NotificationService {
               .toList();
         })
         .handleError((error) {
-          print('Error getting user notifications: $error');
+          appLog('Error getting user notifications: $error');
           return <NotificationModel>[];
         });
   }
@@ -77,7 +83,7 @@ class NotificationService {
         .snapshots()
         .map((snapshot) => snapshot.docs.length)
         .handleError((error) {
-          print('Error getting unread count: $error');
+          appLog('Error getting unread count: $error');
           return 0;
         });
   }
@@ -92,7 +98,7 @@ class NotificationService {
         currentUser.uid,
       ).doc(notificationId).update({'isRead': true});
     } catch (e) {
-      print('Error marking notification as read: $e');
+      appLog('Error marking notification as read: $e');
       rethrow;
     }
   }
@@ -103,19 +109,22 @@ class NotificationService {
     if (currentUser == null) return;
 
     try {
-      final batch = _firestore.batch();
       final unreadNotifications =
           await _getNotificationsCollection(
             currentUser.uid,
           ).where('isRead', isEqualTo: false).get();
 
-      for (final doc in unreadNotifications.docs) {
-        batch.update(doc.reference, {'isRead': true});
+      final docs = unreadNotifications.docs;
+      for (int i = 0; i < docs.length; i += 500) {
+        final batch = _firestore.batch();
+        final end = (i + 500 < docs.length) ? i + 500 : docs.length;
+        for (int j = i; j < end; j++) {
+          batch.update(docs[j].reference, {'isRead': true});
+        }
+        await batch.commit();
       }
-
-      await batch.commit();
     } catch (e) {
-      print('Error marking all notifications as read: $e');
+      appLog('Error marking all notifications as read: $e');
       rethrow;
     }
   }
@@ -130,7 +139,7 @@ class NotificationService {
         currentUser.uid,
       ).doc(notificationId).delete();
     } catch (e) {
-      print('Error deleting notification: $e');
+      appLog('Error deleting notification: $e');
       rethrow;
     }
   }
@@ -171,7 +180,7 @@ class NotificationService {
         }
       }
     } catch (e) {
-      print('Error creating forum reply notification: $e');
+      appLog('Error creating forum reply notification: $e');
     }
   }
 
@@ -209,7 +218,7 @@ class NotificationService {
         }
       }
     } catch (e) {
-      print('Error creating forum like notification: $e');
+      appLog('Error creating forum like notification: $e');
     }
   }
 
@@ -228,7 +237,7 @@ class NotificationService {
           await _firestore
               .collection('shops')
               .doc(shopId)
-              .collection('reviews')
+              .collection('review')
               .doc(reviewId)
               .get();
 
@@ -256,7 +265,7 @@ class NotificationService {
         }
       }
     } catch (e) {
-      print('Error creating review reply notification: $e');
+      appLog('Error creating review reply notification: $e');
     }
   }
 
@@ -290,7 +299,7 @@ class NotificationService {
         relatedId: shopId,
       );
     } catch (e) {
-      print('Error creating shop approval notification: $e');
+      appLog('Error creating shop approval notification: $e');
     }
   }
 
@@ -301,21 +310,30 @@ class NotificationService {
     Map<String, dynamic> data = const {},
   }) async {
     try {
-      // Get all users
       final usersSnapshot = await _firestore.collection('users').get();
+      final docs = usersSnapshot.docs;
 
-      for (final userDoc in usersSnapshot.docs) {
-        final userId = userDoc.id;
-        await createNotification(
-          title: title,
-          message: message,
-          userId: userId,
-          type: NotificationType.announcement,
-          data: data,
-        );
+      // Batch writes for better performance (Firestore limit: 500 per batch)
+      for (int i = 0; i < docs.length; i += 500) {
+        final batch = _firestore.batch();
+        final end = (i + 500 < docs.length) ? i + 500 : docs.length;
+        for (int j = i; j < end; j++) {
+          final userId = docs[j].id;
+          final notifRef = _getNotificationsCollection(userId).doc();
+          batch.set(notifRef, {
+            'title': title,
+            'message': message,
+            'userId': userId,
+            'type': NotificationType.announcement.name,
+            'isRead': false,
+            'createdAt': FieldValue.serverTimestamp(),
+            'data': data,
+          });
+        }
+        await batch.commit();
       }
     } catch (e) {
-      print('Error creating announcement notification: $e');
+      appLog('Error creating announcement notification: $e');
     }
   }
 
@@ -335,7 +353,7 @@ class NotificationService {
         data: data,
       );
     } catch (e) {
-      print('Error creating system message notification: $e');
+      appLog('Error creating system message notification: $e');
     }
   }
 }

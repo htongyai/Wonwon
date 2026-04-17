@@ -10,6 +10,9 @@ import 'package:wonwonw2/services/auth_service.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:wonwonw2/screens/login_screen.dart';
+import 'package:wonwonw2/screens/forum_screen.dart';
+import 'package:wonwonw2/services/analytics_service.dart';
 
 class ForumTopicDetailScreen extends StatefulWidget {
   final String topicId;
@@ -25,14 +28,20 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     with TickerProviderStateMixin {
   final TextEditingController _replyController = TextEditingController();
   final TextEditingController _nestedReplyController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   bool _isSubmittingReply = false;
   String? _replyingToId;
   bool _showNestedReply = false;
+  bool _isSubmittingNestedReply = false;
   late AnimationController _fadeController;
   late AnimationController _slideController;
   final ContentManagementService _contentService = ContentManagementService();
   final AuthService _authService = AuthService();
   bool _isAdmin = false;
+  ForumTopic? _topic;
+  bool _isLoadingTopic = true;
+  String? _topicError;
+  int _replyCharCount = 0;
 
   @override
   void initState() {
@@ -50,6 +59,8 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     _fadeController.forward();
     _slideController.forward();
 
+    _loadTopic();
+
     // Check admin status
     _checkAdminStatus();
 
@@ -57,10 +68,33 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     ForumService.incrementTopicViews(widget.topicId);
   }
 
+  Future<void> _loadTopic() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingTopic = true;
+      _topicError = null;
+    });
+    try {
+      final topic = await ForumService.getTopic(widget.topicId);
+      if (!mounted) return;
+      setState(() {
+        _topic = topic;
+        _isLoadingTopic = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _topicError = e.toString();
+        _isLoadingTopic = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _replyController.dispose();
     _nestedReplyController.dispose();
+    _scrollController.dispose();
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
@@ -80,7 +114,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         ),
         backgroundColor: Colors.white,
         elevation: 0,
-        shadowColor: Colors.black.withOpacity(0.1),
+        shadowColor: Colors.black.withValues(alpha: 0.1),
         iconTheme: const IconThemeData(color: AppConstants.darkColor),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -92,168 +126,203 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
               onPressed: () {
                 // Get the current topic to show moderator dialog
                 ForumService.getTopic(widget.topicId).then((topic) {
+                  if (!mounted) return;
                   if (topic != null) {
                     _showModeratorDialog(topic);
                   }
                 });
               },
               icon: const Icon(Icons.admin_panel_settings),
-              tooltip: 'Moderate Topic',
+              tooltip: 'moderate_topic_tooltip'.tr(context),
             ),
-          IconButton(
-            onPressed: () {
-              // TODO: Add share functionality
-            },
-            icon: const Icon(Icons.share),
-            tooltip: 'Share',
-          ),
+          if (_topic != null && _topic!.authorId == FirebaseAuth.instance.currentUser?.uid)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                if (value == 'delete') {
+                  _showDeleteTopicDialog();
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'delete_topic'.tr(context),
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
       body: FadeTransition(
         opacity: _fadeController,
-        child: Column(
-          children: [
-            Expanded(
-              child: StreamBuilder<ForumTopic?>(
-                stream: Stream.fromFuture(
-                  ForumService.getTopic(widget.topicId),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: Column(
+              children: [
+                Expanded(
+                  child: _buildTopicBody(),
                 ),
-                builder: (context, topicSnapshot) {
-                  if (topicSnapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: AppConstants.primaryColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 3,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppConstants.primaryColor,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Loading topic...',
-                            style: GoogleFonts.montserrat(
-                              fontSize: 16,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  if (topicSnapshot.hasError) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(40),
-                            ),
-                            child: Icon(
-                              Icons.error_outline,
-                              size: 40,
-                              color: Colors.red[400],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Error loading topic',
-                            style: GoogleFonts.montserrat(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Please try again later',
-                            style: GoogleFonts.montserrat(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  final topic = topicSnapshot.data;
-                  if (topic == null) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(40),
-                            ),
-                            child: Icon(
-                              Icons.forum_outlined,
-                              size: 40,
-                              color: Colors.grey[400],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Topic not found',
-                            style: GoogleFonts.montserrat(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return Column(
-                    children: [
-                      // Topic content
-                      SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, -0.3),
-                          end: Offset.zero,
-                        ).animate(
-                          CurvedAnimation(
-                            parent: _slideController,
-                            curve: Curves.easeOutCubic,
+                if (_topic != null && !_topic!.isLocked)
+                  _buildReplyInput()
+                else if (_topic != null && _topic!.isLocked)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.2))),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock, size: 16, color: Colors.grey[500]),
+                        const SizedBox(width: 8),
+                        Text(
+                          'topic_locked_no_replies'.tr(context),
+                          style: GoogleFonts.montserrat(
+                            fontSize: 14,
+                            color: Colors.grey[600],
                           ),
                         ),
-                        child: _buildTopicContent(topic),
-                      ),
-                      const SizedBox(height: 16),
-                      // Replies section
-                      Expanded(child: _buildRepliesSection(topic)),
-                    ],
-                  );
-                },
-              ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
-            // Reply input section
-            _buildReplyInput(),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildTopicBody() {
+    if (_isLoadingTopic) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: AppConstants.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: const CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  AppConstants.primaryColor,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'loading'.tr(context),
+              style: GoogleFonts.montserrat(
+                fontSize: 16,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_topicError != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Icon(
+                Icons.error_outline,
+                size: 40,
+                color: Colors.red[400],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'error_loading_topic'.tr(context),
+              style: GoogleFonts.montserrat(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'please_try_again'.tr(context),
+              style: GoogleFonts.montserrat(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadTopic,
+              icon: const Icon(Icons.refresh, size: 16),
+              label: Text('retry'.tr(context)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConstants.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final topic = _topic;
+    if (topic == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(40),
+              ),
+              child: Icon(
+                Icons.forum_outlined,
+                size: 40,
+                color: Colors.grey[400],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'topic_not_found'.tr(context),
+              style: GoogleFonts.montserrat(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _buildRepliesSection(topic);
   }
 
   Widget _buildTopicContent(ForumTopic topic) {
@@ -265,7 +334,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -296,7 +365,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                       const Icon(Icons.push_pin, size: 12, color: Colors.white),
                       const SizedBox(width: 4),
                       Text(
-                        'PINNED',
+                        'forum_pinned'.tr(context).toUpperCase(),
                         style: GoogleFonts.montserrat(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -325,7 +394,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                       const Icon(Icons.lock, size: 12, color: Colors.white),
                       const SizedBox(width: 4),
                       Text(
-                        'LOCKED',
+                        'forum_locked'.tr(context).toUpperCase(),
                         style: GoogleFonts.montserrat(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -355,7 +424,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
             decoration: BoxDecoration(
               color: Colors.grey[50],
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.withOpacity(0.1)),
+              border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
             ),
             child: Row(
               children: [
@@ -366,13 +435,13 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                     gradient: LinearGradient(
                       colors: [
                         AppConstants.primaryColor,
-                        AppConstants.primaryColor.withOpacity(0.8),
+                        AppConstants.primaryColor.withValues(alpha: 0.8),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: AppConstants.primaryColor.withOpacity(0.3),
+                        color: AppConstants.primaryColor.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -436,20 +505,21 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                    border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
                   ),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       _buildStatItem(
                         Icons.reply,
                         '${topic.replies}',
-                        'Replies',
+                        'forum_replies_label'.tr(context),
                       ),
                       const SizedBox(width: 16),
                       _buildStatItem(
                         Icons.visibility,
                         '${topic.views}',
-                        'Views',
+                        'forum_views_label'.tr(context),
                       ),
                     ],
                   ),
@@ -462,9 +532,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.grey[25],
+              color: Colors.grey[50],
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.withOpacity(0.1)),
+              border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
             ),
             child: Text(
               topic.content,
@@ -484,41 +554,54 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
               children:
                   topic.tags
                       .map(
-                        (tag) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                AppConstants.primaryColor.withOpacity(0.1),
-                                AppConstants.primaryColor.withOpacity(0.05),
-                              ],
-                            ),
+                        (tag) => Material(
+                          color: Colors.transparent,
+                          child: InkWell(
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: AppConstants.primaryColor.withOpacity(0.3),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.tag,
-                                size: 14,
-                                color: AppConstants.primaryColor,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => ForumScreen(initialSearchTag: tag),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                tag,
-                                style: GoogleFonts.montserrat(
-                                  fontSize: 13,
-                                  color: AppConstants.primaryColor,
-                                  fontWeight: FontWeight.w600,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppConstants.primaryColor.withValues(alpha: 0.1),
+                                    AppConstants.primaryColor.withValues(alpha: 0.05),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: AppConstants.primaryColor.withValues(alpha: 0.3),
                                 ),
                               ),
-                            ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.tag,
+                                    size: 14,
+                                    color: AppConstants.primaryColor,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    tag,
+                                    style: GoogleFonts.montserrat(
+                                      fontSize: 13,
+                                      color: AppConstants.primaryColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       )
@@ -532,11 +615,13 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
 
   Widget _buildStatItem(IconData icon, String value, String label) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 16, color: Colors.grey[600]),
         const SizedBox(width: 4),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               value,
@@ -545,6 +630,8 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                 fontWeight: FontWeight.w700,
                 color: Colors.grey[800],
               ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
             Text(
               label,
@@ -552,6 +639,8 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                 fontSize: 10,
                 color: Colors.grey[500],
               ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ],
         ),
@@ -563,150 +652,214 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     return StreamBuilder<List<ForumReply>>(
       stream: ForumService.getReplies(widget.topicId),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppConstants.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
+        final replies = snapshot.data ?? [];
+        final isWaiting = snapshot.connectionState == ConnectionState.waiting;
+        final hasError = snapshot.hasError;
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            await _loadTopic();
+          },
+          color: AppConstants.primaryColor,
+          child: ListView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 16),
+            children: [
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, -0.3),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: _slideController,
+                    curve: Curves.easeOutCubic,
                   ),
-                  child: const CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppConstants.primaryColor,
+                ),
+                child: _buildTopicContent(topic),
+              ),
+              const SizedBox(height: 16),
+              if (isWaiting)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppConstants.primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppConstants.primaryColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'loading_replies'.tr(context),
+                          style: GoogleFonts.montserrat(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                )
+              else if (hasError)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          child: Icon(
+                            Icons.error_outline,
+                            size: 30,
+                            color: Colors.red[400],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'error_loading_replies'.tr(context),
+                          style: GoogleFonts.montserrat(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'please_try_again'.tr(context),
+                          style: GoogleFonts.montserrat(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _loadTopic,
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: Text('retry'.tr(context)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppConstants.primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else if (replies.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(40),
+                          ),
+                          child: Icon(
+                            Icons.chat_bubble_outline,
+                            size: 40,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'no_replies_yet'.tr(context),
+                          style: GoogleFonts.montserrat(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'be_first_to_reply'.tr(context),
+                          style: GoogleFonts.montserrat(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: AppConstants.primaryColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'forum_reply_count'.tr(context).replaceAll('{count}', '${replies.length}'),
+                        style: GoogleFonts.montserrat(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(Icons.sort, size: 18, color: Colors.grey[500]),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  'Loading replies...',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
+                ...replies.map((reply) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _buildReplyItem(reply, topic),
+                )),
               ],
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Icon(
-                    Icons.error_outline,
-                    size: 30,
-                    color: Colors.red[400],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Error loading replies',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Please try again',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => setState(() {}),
-                  icon: const Icon(Icons.refresh, size: 16),
-                  label: const Text('Retry'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConstants.primaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        final replies = snapshot.data ?? [];
-
-        if (replies.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(40),
-                  ),
-                  child: Icon(
-                    Icons.chat_bubble_outline,
-                    size: 40,
-                    color: Colors.grey[400],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'No replies yet',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Be the first to share your thoughts!',
-                  style: GoogleFonts.montserrat(
-                    fontSize: 14,
-                    color: Colors.grey[500],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: replies.length,
-          itemBuilder: (context, index) {
-            final reply = replies[index];
-            return _buildReplyItem(reply, topic);
-          },
+            ],
+          ),
         );
       },
     );
+  }
+
+  String _formatRelativeTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+    if (diff.inSeconds < 60) return 'forum_just_now'.tr(context);
+    if (diff.inMinutes < 60) return 'time_minutes_ago'.tr(context).replaceAll('{count}', '${diff.inMinutes}');
+    if (diff.inHours < 24) return 'time_hours_ago'.tr(context).replaceAll('{count}', '${diff.inHours}');
+    if (diff.inDays < 7) return 'time_short_days_ago'.tr(context).replaceAll('{count}', '${diff.inDays}');
+    return DateFormat('MMM dd, yyyy').format(dateTime);
   }
 
   Widget _buildReplyItem(ForumReply reply, ForumTopic topic) {
     final currentUser = FirebaseAuth.instance.currentUser;
     final isAuthor = currentUser?.uid == reply.authorId;
     final isTopicAuthor = currentUser?.uid == topic.authorId;
+    final isOP = reply.authorId == topic.authorId;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -715,7 +868,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 12,
             offset: const Offset(0, 2),
           ),
@@ -723,8 +876,8 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         border: Border.all(
           color:
               reply.isSolution
-                  ? Colors.green.withOpacity(0.3)
-                  : Colors.grey.withOpacity(0.1),
+                  ? Colors.green.withValues(alpha: 0.3)
+                  : Colors.grey.withValues(alpha: 0.1),
           width: reply.isSolution ? 2 : 1,
         ),
       ),
@@ -736,7 +889,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
             decoration: BoxDecoration(
               color:
                   reply.isSolution
-                      ? Colors.green.withOpacity(0.05)
+                      ? Colors.green.withValues(alpha: 0.05)
                       : Colors.grey[50],
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
@@ -755,7 +908,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                               ? [Colors.green, Colors.greenAccent]
                               : [
                                 AppConstants.primaryColor,
-                                AppConstants.primaryColor.withOpacity(0.8),
+                                AppConstants.primaryColor.withValues(alpha: 0.8),
                               ],
                     ),
                     borderRadius: BorderRadius.circular(20),
@@ -764,7 +917,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                         color: (reply.isSolution
                                 ? Colors.green
                                 : AppConstants.primaryColor)
-                            .withOpacity(0.3),
+                            .withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -790,14 +943,37 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                     children: [
                       Row(
                         children: [
-                          Text(
-                            reply.authorName,
-                            style: GoogleFonts.montserrat(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[800],
+                          Flexible(
+                            child: Text(
+                              reply.authorName,
+                              style: GoogleFonts.montserrat(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[800],
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          if (isOP) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppConstants.primaryColor.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppConstants.primaryColor.withValues(alpha: 0.4)),
+                              ),
+                              child: Text(
+                                'OP',
+                                style: GoogleFonts.montserrat(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppConstants.primaryColor,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
                           if (reply.isSolution) ...[
                             const SizedBox(width: 8),
                             Container(
@@ -821,7 +997,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'SOLUTION',
+                                    'forum_solution'.tr(context).toUpperCase(),
                                     style: GoogleFonts.montserrat(
                                       fontSize: 9,
                                       fontWeight: FontWeight.w700,
@@ -835,24 +1011,12 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.schedule,
-                            size: 12,
-                            color: Colors.grey[500],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormat(
-                              'MMM dd, yyyy • HH:mm',
-                            ).format(reply.createdAt),
-                            style: GoogleFonts.montserrat(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
+                      Text(
+                        _formatRelativeTime(reply.createdAt),
+                        style: GoogleFonts.montserrat(
+                          fontSize: 12,
+                          color: Colors.grey[500],
+                        ),
                       ),
                     ],
                   ),
@@ -861,16 +1025,16 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                 Row(
                   children: [
                     // Like button
-                    StreamBuilder<bool>(
-                      stream: Stream.fromFuture(_isReplyLiked(reply.id)),
-                      builder: (context, likeSnapshot) {
-                        final isLiked = likeSnapshot.data ?? false;
+                    Builder(
+                      builder: (context) {
+                        final isLiked = currentUser != null &&
+                            reply.likedBy.contains(currentUser.uid);
                         return Container(
                           decoration: BoxDecoration(
                             color:
                                 isLiked
-                                    ? Colors.red.withOpacity(0.1)
-                                    : Colors.grey.withOpacity(0.1),
+                                    ? Colors.red.withValues(alpha: 0.1)
+                                    : Colors.grey.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: IconButton(
@@ -880,7 +1044,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                               size: 18,
                               color: isLiked ? Colors.red : Colors.grey[600],
                             ),
-                            tooltip: 'Like',
+                            tooltip: 'like_tooltip'.tr(context),
                           ),
                         );
                       },
@@ -908,7 +1072,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                     if (!topic.isLocked)
                       Container(
                         decoration: BoxDecoration(
-                          color: AppConstants.primaryColor.withOpacity(0.1),
+                          color: AppConstants.primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: IconButton(
@@ -918,69 +1082,71 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                             size: 18,
                             color: AppConstants.primaryColor,
                           ),
-                          tooltip: 'Reply',
+                          tooltip: 'reply_tooltip'.tr(context),
                         ),
                       ),
-                    const SizedBox(width: 8),
-                    // More options
-                    PopupMenuButton<String>(
-                      onSelected:
-                          (value) => _handleReplyAction(value, reply, topic),
-                      itemBuilder:
-                          (context) => [
-                            if (isTopicAuthor && !reply.isSolution)
-                              const PopupMenuItem(
-                                value: 'mark_solution',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text('Mark as Solution'),
-                                  ],
+                    if (isTopicAuthor || isAuthor || _isAdmin) ...[
+                      const SizedBox(width: 8),
+                      // More options
+                      PopupMenuButton<String>(
+                        onSelected:
+                            (value) => _handleReplyAction(value, reply, topic),
+                        itemBuilder:
+                            (context) => [
+                              if (isTopicAuthor && !reply.isSolution)
+                                PopupMenuItem(
+                                  value: 'mark_solution',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('mark_as_solution'.tr(context)),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            if (isTopicAuthor && reply.isSolution)
-                              const PopupMenuItem(
-                                value: 'unmark_solution',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.cancel, color: Colors.orange),
-                                    SizedBox(width: 8),
-                                    Text('Unmark as Solution'),
-                                  ],
+                              if (isTopicAuthor && reply.isSolution)
+                                PopupMenuItem(
+                                  value: 'unmark_solution',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.cancel, color: Colors.orange),
+                                      SizedBox(width: 8),
+                                      Text('unmark_as_solution'.tr(context)),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            if (isAuthor)
-                              const PopupMenuItem(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.delete, color: Colors.red),
-                                    SizedBox(width: 8),
-                                    Text('Delete'),
-                                  ],
+                              if (isAuthor)
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete, color: Colors.red),
+                                      SizedBox(width: 8),
+                                      Text('delete_action'.tr(context)),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            if (_isAdmin)
-                              const PopupMenuItem(
-                                value: 'moderate',
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.admin_panel_settings,
-                                      color: Colors.blue,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text('Moderate'),
-                                  ],
+                              if (_isAdmin)
+                                PopupMenuItem(
+                                  value: 'moderate',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.admin_panel_settings,
+                                        color: Colors.blue,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('moderate_action'.tr(context)),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                          ],
-                      icon: Icon(Icons.more_vert, color: Colors.grey[600]),
-                    ),
+                            ],
+                        icon: Icon(Icons.more_vert, color: Colors.grey[600]),
+                      ),
+                    ],
                   ],
                 ),
               ],
@@ -1021,9 +1187,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                 ),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[25],
+                  color: Colors.grey[50],
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
                 ),
                 child: Column(
                   children:
@@ -1036,7 +1202,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: Colors.grey.withOpacity(0.1),
+                                  color: Colors.grey.withValues(alpha: 0.1),
                                 ),
                               ),
                               child: Column(
@@ -1048,7 +1214,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                                         radius: 14,
                                         backgroundColor: AppConstants
                                             .primaryColor
-                                            .withOpacity(0.1),
+                                            .withValues(alpha: 0.1),
                                         child: Text(
                                           nestedReply.authorName.isNotEmpty
                                               ? nestedReply.authorName[0]
@@ -1100,7 +1266,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                                             size: 16,
                                             color: Colors.red,
                                           ),
-                                          tooltip: 'Delete',
+                                          tooltip: 'delete_tooltip'.tr(context),
                                         ),
                                     ],
                                   ),
@@ -1136,87 +1302,102 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
 
   Widget _buildReplyInput() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.1))),
+        border: Border(top: BorderSide(color: Colors.grey.withValues(alpha: 0.15))),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, -3),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.grey.withOpacity(0.2)),
-              ),
-              child: TextField(
-                controller: _replyController,
-                decoration: InputDecoration(
-                  hintText: 'Write a thoughtful reply...',
-                  hintStyle: GoogleFonts.montserrat(
-                    fontSize: 14,
-                    color: Colors.grey[500],
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
-                  ),
-                ),
-                maxLines: null,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _submitReply(),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
           Container(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppConstants.primaryColor,
-                  AppConstants.primaryColor.withOpacity(0.8),
-                ],
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _replyCharCount > 0
+                    ? AppConstants.primaryColor.withValues(alpha: 0.3)
+                    : Colors.grey.withValues(alpha: 0.2),
               ),
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: AppConstants.primaryColor.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
             ),
-            child: ElevatedButton(
-              onPressed: _isSubmittingReply ? null : _submitReply,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                foregroundColor: Colors.white,
-                shadowColor: Colors.transparent,
-                shape: const CircleBorder(),
-                padding: const EdgeInsets.all(16),
-              ),
-              child:
-                  _isSubmittingReply
-                      ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
+            child: Column(
+              children: [
+                TextField(
+                  controller: _replyController,
+                  onChanged: (text) {
+                    setState(() {
+                      _replyCharCount = text.trim().length;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'write_reply_hint'.tr(context),
+                    hintStyle: GoogleFonts.montserrat(
+                      fontSize: 14,
+                      color: Colors.grey[400],
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                  ),
+                  maxLines: 4,
+                  minLines: 1,
+                  maxLength: 5000,
+                  buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+                  textInputAction: TextInputAction.newline,
+                  style: GoogleFonts.montserrat(fontSize: 14, height: 1.5),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+                  child: Row(
+                    children: [
+                      if (_replyCharCount > 0)
+                        Text(
+                          '$_replyCharCount / 5000',
+                          style: GoogleFonts.montserrat(
+                            fontSize: 11,
+                            color: _replyCharCount > 4500 ? Colors.orange : Colors.grey[400],
                           ),
                         ),
-                      )
-                      : const Icon(Icons.send, size: 20),
+                      const Spacer(),
+                      Material(
+                        color: _replyCharCount > 0
+                            ? AppConstants.primaryColor
+                            : Colors.grey[300],
+                        borderRadius: BorderRadius.circular(20),
+                        child: InkWell(
+                          onTap: _isSubmittingReply || _replyCharCount == 0
+                              ? null
+                              : _submitReply,
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            child: _isSubmittingReply
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.send_rounded,
+                                    size: 18,
+                                    color: _replyCharCount > 0 ? Colors.white : Colors.grey[500],
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1229,9 +1410,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[25],
+        color: Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppConstants.primaryColor.withOpacity(0.2)),
+        border: Border.all(color: AppConstants.primaryColor.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -1239,18 +1420,18 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
             child: TextField(
               controller: _nestedReplyController,
               decoration: InputDecoration(
-                hintText: 'Write a reply...',
+                hintText: 'write_reply_short'.tr(context),
                 hintStyle: GoogleFonts.montserrat(
                   fontSize: 13,
                   color: Colors.grey[500],
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                  borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide(color: Colors.grey.withOpacity(0.3)),
+                  borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(20),
@@ -1275,6 +1456,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
             child: IconButton(
               onPressed: () => _submitNestedReply(parentReplyId),
               icon: const Icon(Icons.send, size: 18, color: Colors.white),
+              tooltip: 'send'.tr(context),
             ),
           ),
           const SizedBox(width: 8),
@@ -1292,6 +1474,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                 });
               },
               icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+              tooltip: 'cancel'.tr(context),
             ),
           ),
         ],
@@ -1310,6 +1493,18 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
   Future<void> _submitReply() async {
     if (_replyController.text.trim().isEmpty) return;
 
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+      if (result != true || !mounted) return;
+      // Re-check after login
+      if (FirebaseAuth.instance.currentUser == null) return;
+    }
+
+    if (!mounted) return;
     setState(() {
       _isSubmittingReply = true;
     });
@@ -1319,7 +1514,22 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         topicId: widget.topicId,
         content: _replyController.text.trim(),
       );
+      AnalyticsService.safeLog(() => AnalyticsService().logReplyToTopic(widget.topicId));
+      if (!mounted) return;
       _replyController.clear();
+      setState(() { _replyCharCount = 0; });
+      _loadTopic();
+      // Auto-scroll to the bottom to show the new reply
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!mounted) return;
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOut,
+          );
+        }
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -1327,7 +1537,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
               const Icon(Icons.check_circle, color: Colors.white),
               const SizedBox(width: 8),
               Text(
-                'Reply posted successfully!',
+                'reply_posted'.tr(context),
                 style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
               ),
             ],
@@ -1338,15 +1548,18 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
               const Icon(Icons.error, color: Colors.white),
               const SizedBox(width: 8),
-              Text(
-                'Error posting reply: $e',
-                style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+              Expanded(
+                child: Text(
+                  'error_posting_reply'.tr(context),
+                  style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+                ),
               ),
             ],
           ),
@@ -1356,26 +1569,43 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         ),
       );
     } finally {
-      setState(() {
-        _isSubmittingReply = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmittingReply = false;
+        });
+      }
     }
   }
 
   Future<void> _submitNestedReply(String parentReplyId) async {
     if (_nestedReplyController.text.trim().isEmpty) return;
+    if (_isSubmittingNestedReply) return;
 
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+      if (result != true || !mounted) return;
+      if (FirebaseAuth.instance.currentUser == null) return;
+    }
+
+    setState(() => _isSubmittingNestedReply = true);
     try {
       await ForumService.createReply(
         topicId: widget.topicId,
         content: _nestedReplyController.text.trim(),
         parentReplyId: parentReplyId,
       );
+      if (!mounted) return;
       _nestedReplyController.clear();
       setState(() {
         _showNestedReply = false;
         _replyingToId = null;
+        _isSubmittingNestedReply = false;
       });
+      _loadTopic();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -1383,7 +1613,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
               const Icon(Icons.check_circle, color: Colors.white),
               const SizedBox(width: 8),
               Text(
-                'Reply posted successfully!',
+                'reply_posted'.tr(context),
                 style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
               ),
             ],
@@ -1394,21 +1624,77 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         ),
       );
     } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmittingNestedReply = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
               const Icon(Icons.error, color: Colors.white),
               const SizedBox(width: 8),
-              Text(
-                'Error posting reply: $e',
-                style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+              Expanded(
+                child: Text(
+                  'error_posting_reply'.tr(context),
+                  style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+                ),
               ),
             ],
           ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showDeleteTopicDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'delete_topic'.tr(context),
+          style: GoogleFonts.montserrat(fontWeight: FontWeight.bold, color: Colors.red),
+        ),
+        content: Text(
+          'delete_topic_confirm'.tr(context),
+          style: GoogleFonts.montserrat(),
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('cancel'.tr(context)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'delete'.tr(context),
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ForumService.deleteTopic(widget.topicId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('topic_deleted'.tr(context)),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_deleting_topic'.tr(context)),
+          backgroundColor: Colors.red,
         ),
       );
     }
@@ -1418,15 +1704,18 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     try {
       await ForumService.toggleReplyLike(widget.topicId, replyId);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
               const Icon(Icons.error, color: Colors.white),
               const SizedBox(width: 8),
-              Text(
-                'Error toggling like: $e',
-                style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+              Expanded(
+                child: Text(
+                  'error_generic'.tr(context),
+                  style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+                ),
               ),
             ],
           ),
@@ -1438,18 +1727,6 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     }
   }
 
-  Future<bool> _isReplyLiked(String replyId) async {
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) return false;
-
-    try {
-      // getReply method removed - we'll handle this differently
-      // For now, we'll just return false
-      return false;
-    } catch (e) {
-      return false;
-    }
-  }
 
   void _handleReplyAction(
     String action,
@@ -1479,6 +1756,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         replyId,
         isSolution,
       );
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -1489,7 +1767,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
               ),
               const SizedBox(width: 8),
               Text(
-                isSolution ? 'Marked as solution!' : 'Unmarked as solution!',
+                isSolution
+                    ? 'marked_as_solution'.tr(context)
+                    : 'unmarked_as_solution'.tr(context),
                 style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
               ),
             ],
@@ -1500,15 +1780,18 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
               const Icon(Icons.error, color: Colors.white),
               const SizedBox(width: 8),
-              Text(
-                'Error marking solution: $e',
-                style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+              Expanded(
+                child: Text(
+                  'error_generic'.tr(context),
+                  style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+                ),
               ),
             ],
           ),
@@ -1521,8 +1804,8 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
   }
 
   Future<void> _deleteReply(String replyId, String replyAuthorId) async {
-    // Check if user has permission to delete this reply
     final canDelete = await _contentService.canDeleteContent(replyAuthorId);
+    if (!mounted) return;
     if (!canDelete) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1530,9 +1813,11 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
             children: [
               const Icon(Icons.error, color: Colors.white),
               const SizedBox(width: 8),
-              Text(
-                'You do not have permission to delete this reply.',
-                style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+              Expanded(
+                child: Text(
+                  'no_permission_delete'.tr(context),
+                  style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+                ),
               ),
             ],
           ),
@@ -1547,31 +1832,31 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder:
-          (context) => AlertDialog(
+          (ctx) => AlertDialog(
             title: Row(
               children: [
                 const Icon(Icons.warning, color: Colors.orange),
                 const SizedBox(width: 8),
                 Text(
-                  'Delete Reply',
+                  'delete_reply_title'.tr(context),
                   style: GoogleFonts.montserrat(fontWeight: FontWeight.w600),
                 ),
               ],
             ),
             content: Text(
-              'Are you sure you want to delete this reply? This action cannot be undone.',
+              'delete_reply_confirm'.tr(context),
               style: GoogleFonts.montserrat(fontSize: 14),
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
+                onPressed: () => Navigator.of(ctx).pop(false),
                 child: Text(
-                  'Cancel',
+                  'cancel'.tr(context),
                   style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
                 ),
               ),
               ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
+                onPressed: () => Navigator.of(ctx).pop(true),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
@@ -1580,7 +1865,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                   ),
                 ),
                 child: Text(
-                  'Delete',
+                  'delete_button'.tr(context),
                   style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
                 ),
               ),
@@ -1591,6 +1876,8 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     if (confirmed == true) {
       try {
         await ForumService.deleteReply(widget.topicId, replyId);
+        if (!mounted) return;
+        _loadTopic();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
@@ -1598,7 +1885,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 8),
                 Text(
-                  'Reply deleted successfully!',
+                  'reply_deleted'.tr(context),
                   style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
                 ),
               ],
@@ -1611,15 +1898,18 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
           ),
         );
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
                 const Icon(Icons.error, color: Colors.white),
                 const SizedBox(width: 8),
-                Text(
-                  'Error deleting reply: $e',
-                  style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+                Expanded(
+                  child: Text(
+                    'error_generic'.tr(context),
+                    style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
+                  ),
                 ),
               ],
             ),
@@ -1653,16 +1943,16 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
     showDialog(
       context: context,
       builder:
-          (context) => AlertDialog(
+          (ctx) => AlertDialog(
             title: Text(
-              'Moderate Topic',
+              'moderate_topic'.tr(context),
               style: GoogleFonts.montserrat(fontWeight: FontWeight.w600),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Topic: ${topic.title}',
+                  topic.title,
                   style: GoogleFonts.montserrat(fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 16),
@@ -1672,7 +1962,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
             ],
           ),
@@ -1684,48 +1974,48 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
       children: [
         if (topic.isPinned)
           _buildModeratorButton(
-            'Unpin Topic',
+            'mod_unpin_topic'.tr(context),
             Icons.push_pin_outlined,
             Colors.orange,
             () => _moderateTopic(topic.id, 'unpin'),
           )
         else
           _buildModeratorButton(
-            'Pin Topic',
+            'mod_pin_topic'.tr(context),
             Icons.push_pin,
             Colors.orange,
             () => _moderateTopic(topic.id, 'pin'),
           ),
         if (topic.isLocked)
           _buildModeratorButton(
-            'Unlock Topic',
+            'mod_unlock_topic'.tr(context),
             Icons.lock_open,
             Colors.green,
             () => _moderateTopic(topic.id, 'unlock'),
           )
         else
           _buildModeratorButton(
-            'Lock Topic',
+            'mod_lock_topic'.tr(context),
             Icons.lock,
             Colors.red,
             () => _moderateTopic(topic.id, 'lock'),
           ),
         if (topic.isHidden)
           _buildModeratorButton(
-            'Unhide Topic',
+            'mod_unhide_topic'.tr(context),
             Icons.visibility,
             Colors.green,
             () => _moderateTopic(topic.id, 'unhide'),
           )
         else
           _buildModeratorButton(
-            'Hide Topic',
+            'mod_hide_topic'.tr(context),
             Icons.visibility_off,
             Colors.orange,
             () => _moderateTopic(topic.id, 'hide'),
           ),
         _buildModeratorButton(
-          'Delete Topic',
+          'mod_delete_topic'.tr(context),
           Icons.delete_forever,
           Colors.red,
           () => _moderateTopic(topic.id, 'delete'),
@@ -1758,12 +2048,12 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
   }
 
   Future<void> _moderateTopic(String topicId, String action) async {
-    Navigator.pop(context); // Close dialog
+    Navigator.pop(context);
 
     String? reason;
     if (action == 'hide' || action == 'lock' || action == 'delete') {
       reason = await _showReasonDialog(action);
-      if (reason == null) return;
+      if (reason == null || !mounted) return;
     }
 
     try {
@@ -1792,10 +2082,17 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
           break;
       }
 
+      if (!mounted) return;
+
       if (success) {
+        if (action == 'delete') {
+          Navigator.of(context).pop();
+        } else {
+          _loadTopic();
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Topic ${action}d successfully'),
+            content: Text('topic_action_success'.tr(context).replaceAll('{action}', action)),
             backgroundColor: Colors.green,
           ),
         );
@@ -1803,23 +2100,24 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         throw Exception('Failed to $action topic');
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('error_generic'.tr(context)), backgroundColor: Colors.red),
       );
     }
   }
 
   Future<String?> _showReasonDialog(String action) async {
     final controller = TextEditingController();
-    return showDialog<String>(
+    final result = await showDialog<String>(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Reason for ${action}ing'),
+            title: Text('reason_for_action'.tr(context).replaceAll('{action}', action)),
             content: TextField(
               controller: controller,
               decoration: InputDecoration(
-                hintText: 'Enter reason for ${action}ing this content...',
+                hintText: 'enter_reason_hint'.tr(context).replaceAll('{action}', action),
                 border: OutlineInputBorder(),
               ),
               maxLines: 3,
@@ -1827,15 +2125,17 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, controller.text.trim()),
-                child: Text('Confirm'),
+                child: Text('confirm_button'.tr(context)),
               ),
             ],
           ),
     );
+    controller.dispose();
+    return result;
   }
 
   void _showReplyModeratorDialog(ForumReply reply) {
@@ -1843,11 +2143,11 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('Moderate Reply'),
+            title: Text('moderate_reply_dialog'.tr(context)),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Reply by: ${reply.authorName}'),
+                Text('reply_by'.tr(context).replaceAll('{name}', reply.authorName)),
                 const SizedBox(height: 16),
                 _buildReplyModeratorButtons(reply),
               ],
@@ -1855,7 +2155,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
             ],
           ),
@@ -1867,20 +2167,20 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
       children: [
         if (reply.isHidden)
           _buildModeratorButton(
-            'Unhide Reply',
+            'mod_unhide_reply'.tr(context),
             Icons.visibility,
             Colors.green,
             () => _moderateReply(reply, 'unhide'),
           )
         else
           _buildModeratorButton(
-            'Hide Reply',
+            'mod_hide_reply'.tr(context),
             Icons.visibility_off,
             Colors.orange,
             () => _moderateReply(reply, 'hide'),
           ),
         _buildModeratorButton(
-          'Delete Reply',
+          'mod_delete_reply'.tr(context),
           Icons.delete_forever,
           Colors.red,
           () => _moderateReply(reply, 'delete'),
@@ -1890,12 +2190,12 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
   }
 
   Future<void> _moderateReply(ForumReply reply, String action) async {
-    Navigator.pop(context); // Close dialog
+    Navigator.pop(context);
 
     String? reason;
     if (action == 'hide' || action == 'delete') {
       reason = await _showReasonDialog(action);
-      if (reason == null) return;
+      if (reason == null || !mounted) return;
     }
 
     try {
@@ -1920,10 +2220,13 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
           break;
       }
 
+      if (!mounted) return;
+
       if (success) {
+        _loadTopic();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Reply ${action}d successfully'),
+            content: Text('reply_action_success'.tr(context).replaceAll('{action}', action)),
             backgroundColor: Colors.green,
           ),
         );
@@ -1931,8 +2234,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen>
         throw Exception('Failed to $action reply');
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('error_generic'.tr(context)), backgroundColor: Colors.red),
       );
     }
   }

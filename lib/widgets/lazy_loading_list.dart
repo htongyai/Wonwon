@@ -1,4 +1,6 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class LazyLoadingList<T> extends StatefulWidget {
   final List<T> items;
@@ -47,6 +49,7 @@ class _LazyLoadingListState<T> extends State<LazyLoadingList<T>> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_scrollListener);
     if (widget.scrollController == null) {
       _scrollController.dispose();
     }
@@ -57,10 +60,19 @@ class _LazyLoadingListState<T> extends State<LazyLoadingList<T>> {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       _loadMore();
+      _fetchMore();
     }
   }
 
-  Future<void> _loadMore() async {
+  void _loadMore() {
+    if (_currentCount < widget.items.length) {
+      setState(() {
+        _currentCount = math.min(_currentCount + widget.loadMoreCount, widget.items.length);
+      });
+    }
+  }
+
+  Future<void> _fetchMore() async {
     if (!_isLoading && widget.hasMore && widget.onLoadMore != null) {
       setState(() {
         _isLoading = true;
@@ -70,7 +82,7 @@ class _LazyLoadingListState<T> extends State<LazyLoadingList<T>> {
 
       if (mounted) {
         setState(() {
-          _currentCount += widget.loadMoreCount;
+          _currentCount = math.min(_currentCount + widget.loadMoreCount, widget.items.length);
           _isLoading = false;
         });
       }
@@ -80,14 +92,14 @@ class _LazyLoadingListState<T> extends State<LazyLoadingList<T>> {
   @override
   Widget build(BuildContext context) {
     if (widget.items.isEmpty) {
-      return widget.emptyWidget ?? const Center(child: Text('No items found'));
+      return widget.emptyWidget ?? Center(child: Text('no_items_found'.tr(context)));
     }
 
     return ListView.builder(
       controller: _scrollController,
       padding: widget.padding,
       physics: widget.physics,
-      itemCount: _currentCount + (widget.hasMore ? 1 : 0),
+      itemCount: math.min(_currentCount, widget.items.length) + (widget.hasMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= widget.items.length) {
           return widget.loadingWidget ??

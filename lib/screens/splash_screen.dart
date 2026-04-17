@@ -5,6 +5,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/screens/main_navigation.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -18,9 +19,10 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  String _selectedLanguage = 'en';
+  String _selectedLanguage = 'th';
   bool _languageSelected = false;
   bool _isTransitioning = false;
+  Timer? _transitionTimer;
 
   @override
   void initState() {
@@ -57,6 +59,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _transitionTimer?.cancel();
     _animationController.dispose();
     super.dispose();
   }
@@ -64,13 +67,15 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _checkExistingLanguage() async {
     try {
       final locale = await AppLocalizationsService.getLocale();
+      if (!mounted) return;
       if (locale.languageCode.isNotEmpty) {
         setState(() {
           _selectedLanguage = locale.languageCode;
           _languageSelected = true;
         });
         // If language is already set, transition after a short delay
-        Timer(const Duration(seconds: 1), () {
+        _transitionTimer?.cancel();
+        _transitionTimer = Timer(const Duration(seconds: 1), () {
           if (mounted && !_isTransitioning) {
             _transitionToHome();
           }
@@ -78,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen>
       }
     } catch (e) {
       // If no language is set, wait for user selection
-      print('No language set, waiting for user selection');
+      appLog('No language set, waiting for user selection');
     }
   }
 
@@ -171,12 +176,13 @@ class _SplashScreenState extends State<SplashScreen>
                     ElevatedButton(
                       onPressed: () async {
                         await AppLocalizationsService.setLocale('en');
+                        if (!mounted) return;
                         setState(() {
                           _selectedLanguage = 'en';
                           _languageSelected = true;
                         });
-                        // Transition to home after language selection
-                        Timer(const Duration(milliseconds: 500), () {
+                        _transitionTimer?.cancel();
+                        _transitionTimer = Timer(const Duration(milliseconds: 500), () {
                           if (mounted && !_isTransitioning) {
                             _transitionToHome();
                           }
@@ -186,7 +192,7 @@ class _SplashScreenState extends State<SplashScreen>
                         backgroundColor:
                             _selectedLanguage == 'en'
                                 ? Colors.white
-                                : Colors.white.withOpacity(0.5),
+                                : Colors.white.withValues(alpha: 0.5),
                         foregroundColor: AppConstants.primaryColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -202,12 +208,13 @@ class _SplashScreenState extends State<SplashScreen>
                     ElevatedButton(
                       onPressed: () async {
                         await AppLocalizationsService.setLocale('th');
+                        if (!mounted) return;
                         setState(() {
                           _selectedLanguage = 'th';
                           _languageSelected = true;
                         });
-                        // Transition to home after language selection
-                        Timer(const Duration(milliseconds: 500), () {
+                        _transitionTimer?.cancel();
+                        _transitionTimer = Timer(const Duration(milliseconds: 500), () {
                           if (mounted && !_isTransitioning) {
                             _transitionToHome();
                           }
@@ -217,7 +224,7 @@ class _SplashScreenState extends State<SplashScreen>
                         backgroundColor:
                             _selectedLanguage == 'th'
                                 ? Colors.white
-                                : Colors.white.withOpacity(0.5),
+                                : Colors.white.withValues(alpha: 0.5),
                         foregroundColor: AppConstants.primaryColor,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),

@@ -57,7 +57,7 @@ class RepairShop {
     this.durationMinutes = 0,
     this.requiresPurchase = false,
     this.photos = const [],
-    this.priceRange = '₿',
+    this.priceRange = '฿',
     this.features = const {},
     this.approved = false,
     this.irregularHours = false,
@@ -84,6 +84,7 @@ class RepairShop {
 
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'name': name,
       'description': description,
       'address': address,
@@ -203,7 +204,7 @@ class RepairShop {
               ? map['requiresPurchase'] as bool
               : false,
       photos: safeStringList(map['photos']),
-      priceRange: map['priceRange']?.toString() ?? '₿',
+      priceRange: map['priceRange']?.toString() ?? '฿',
       features: safeBoolMap(map['features']),
       approved: map['approved'] is bool ? map['approved'] as bool : false,
       irregularHours:
@@ -220,10 +221,9 @@ class RepairShop {
       lineId: map['lineId'],
       facebookPage: map['facebookPage'],
       otherContacts: map['otherContacts'],
-      paymentMethods:
-          map['paymentMethods'] != null
-              ? List<String>.from(map['paymentMethods'])
-              : null,
+      paymentMethods: map['paymentMethods'] != null
+          ? (map['paymentMethods'] as List<dynamic>).map((e) => e.toString()).toList()
+          : null,
       tryOnAreaAvailable: map['tryOnAreaAvailable'],
       notesOrConditions: map['notesOrConditions'],
       usualOpeningTime: map['usualOpeningTime'],

@@ -1,10 +1,12 @@
+import 'dart:math' show min;
 import 'package:flutter/material.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/constants/map_constants.dart';
 
 class LocationPickerDialog extends StatefulWidget {
   final double? initialLatitude;
@@ -24,7 +26,7 @@ class LocationPickerDialog extends StatefulWidget {
 
 class _LocationPickerDialogState extends State<LocationPickerDialog> {
   GoogleMapController? _mapController;
-  LatLng _selectedLocation = const LatLng(13.7563, 100.5018); // Default to Bangkok
+  LatLng _selectedLocation = MapConstants.defaultLocation;
   String _selectedAddress = '';
   bool _isLoading = false;
   bool _isLoadingAddress = false;
@@ -38,6 +40,12 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
     }
     _updateMarker();
     _getAddressFromCoordinates(_selectedLocation);
+  }
+
+  @override
+  void dispose() {
+    _mapController?.dispose();
+    super.dispose();
   }
 
   void _updateMarker() {
@@ -68,6 +76,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         position.latitude,
         position.longitude,
       );
+      if (!mounted) return;
 
       if (placemarks.isNotEmpty) {
         final placemark = placemarks.first;
@@ -84,13 +93,16 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _selectedAddress = 'Address not found';
       });
     } finally {
-      setState(() {
-        _isLoadingAddress = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingAddress = false;
+        });
+      }
     }
   }
 
@@ -100,24 +112,29 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
     });
 
     try {
-      // Check location permission
-      final permission = await Permission.location.request();
-      if (permission != PermissionStatus.granted) {
-        _showSnackBar('Location permission denied', Colors.red);
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (!mounted) return;
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (!mounted) return;
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showSnackBar('location_permission_denied'.tr(context), Colors.red);
         return;
       }
 
-      // Check if location services are enabled
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!mounted) return;
       if (!serviceEnabled) {
-        _showSnackBar('Location services are disabled', Colors.red);
+        _showSnackBar('location_services_disabled'.tr(context), Colors.red);
         return;
       }
 
-      // Get current position
       Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
+      if (!mounted) return;
 
       final newLocation = LatLng(position.latitude, position.longitude);
       
@@ -128,18 +145,20 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
       _updateMarker();
       _getAddressFromCoordinates(newLocation);
 
-      // Move camera to current location
       if (_mapController != null) {
         await _mapController!.animateCamera(
           CameraUpdate.newLatLngZoom(newLocation, 16.0),
         );
       }
     } catch (e) {
-      _showSnackBar('Failed to get current location: $e', Colors.red);
+      if (!mounted) return;
+      _showSnackBar('failed_get_location'.tr(context).replaceAll('{error}', e.toString()), Colors.red);
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -169,15 +188,15 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Container(
-        width: 800,
-        height: 700,
+        width: min(800, MediaQuery.of(context).size.width - 32),
+        height: min(700, MediaQuery.of(context).size.height - 64),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -384,7 +403,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: Text(
-                    'Cancel',
+                    'cancel'.tr(context),
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -411,7 +430,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                     ),
                   ),
                   child: Text(
-                    'Select Location',
+                    'select_location'.tr(context),
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,

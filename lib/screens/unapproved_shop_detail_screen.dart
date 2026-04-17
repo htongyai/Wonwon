@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/utils/hours_formatter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/utils/asset_helpers.dart';
+import 'package:wonwonw2/widgets/optimized_image.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class UnapprovedShopDetailScreen extends StatelessWidget {
@@ -29,16 +31,14 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                   tag: 'shop-image-${shop.id}',
                   child:
                       shop.photos.isNotEmpty
-                          ? Image.network(
-                            shop.photos.first,
+                          ? OptimizedImage(
+                            imageUrl: shop.photos.first,
                             fit: BoxFit.cover,
-                            errorBuilder:
-                                (context, error, stackTrace) =>
-                                    AssetHelpers.getShopPlaceholder(
-                                    shop.name,
-                                    containerWidth: MediaQuery.of(context).size.width,
-                                    containerHeight: 250,
-                                  ),
+                            errorWidget: AssetHelpers.getShopPlaceholder(
+                              shop.name,
+                              containerWidth: MediaQuery.of(context).size.width,
+                              containerHeight: 250,
+                            ),
                           )
                           : AssetHelpers.getShopPlaceholder(
                                     shop.name,
@@ -50,7 +50,7 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                   top: 32,
                   left: 16,
                   child: CircleAvatar(
-                    backgroundColor: Colors.white.withOpacity(0.7),
+                    backgroundColor: Colors.white.withValues(alpha: 0.7),
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.black),
                       onPressed: () => Navigator.of(context).pop(),
@@ -79,7 +79,7 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                             Icons.check_circle_outline,
                             color: Colors.white,
                           ),
-                          label: const Text('Approve'),
+                          label: Text('approve'.tr(context)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
                             shape: RoundedRectangleBorder(
@@ -97,7 +97,7 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                             Icons.cancel_outlined,
                             color: Colors.white,
                           ),
-                          label: const Text('Reject'),
+                          label: Text('reject'.tr(context)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,
                             shape: RoundedRectangleBorder(
@@ -163,7 +163,7 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: AppConstants.primaryColor.withOpacity(
+                              color: AppConstants.primaryColor.withValues(alpha: 
                                 0.13,
                               ),
                               borderRadius: BorderRadius.circular(14),
@@ -201,7 +201,7 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                                           3
                                       ? '...'
                                       : '')
-                              : 'No subservices',
+                              : 'no_subservices'.tr(context),
                           style: GoogleFonts.montserrat(
                             fontSize: 14,
                             color: Colors.grey[800],
@@ -273,7 +273,7 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Payment Methods',
+                          'payment_methods'.tr(context),
                           style: GoogleFonts.montserrat(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -317,9 +317,11 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                                     icon = Icons.payment;
                                     color = Colors.grey;
                                 }
+                                final paymentKey = 'payment_${method.toLowerCase()}';
+                                final localizedMethod = paymentKey.tr(context);
                                 return Chip(
                                   avatar: Icon(icon, color: color, size: 18),
-                                  label: Text(method),
+                                  label: Text(localizedMethod != paymentKey ? localizedMethod : method),
                                   backgroundColor: Colors.grey[100],
                                   labelStyle: GoogleFonts.montserrat(
                                     fontSize: 13,
@@ -336,7 +338,7 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Opening Hours',
+                          'opening_hours'.tr(context),
                           style: GoogleFonts.montserrat(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -378,22 +380,22 @@ class UnapprovedShopDetailScreen extends StatelessWidget {
                     ),
                   // Additional info (optional fields)
                   if (shop.soi != null && shop.soi!.isNotEmpty)
-                    _infoRow('Soi', shop.soi!),
+                    _infoRow('soi'.tr(context), shop.soi!),
                   if (shop.district != null && shop.district!.isNotEmpty)
-                    _infoRow('District', shop.district!),
+                    _infoRow('district'.tr(context), shop.district!),
                   if (shop.province != null && shop.province!.isNotEmpty)
-                    _infoRow('Province', shop.province!),
+                    _infoRow('province'.tr(context), shop.province!),
                   if (shop.lineId != null && shop.lineId!.isNotEmpty)
-                    _infoRow('Line ID', shop.lineId!),
+                    _infoRow('line_id_label'.tr(context), shop.lineId!),
                   if (shop.facebookPage != null &&
                       shop.facebookPage!.isNotEmpty)
-                    _infoRow('Facebook', shop.facebookPage!),
+                    _infoRow('facebook_page'.tr(context), shop.facebookPage!),
                   if (shop.instagramPage != null &&
                       shop.instagramPage!.isNotEmpty)
-                    _infoRow('Instagram', shop.instagramPage!),
+                    _infoRow('instagram'.tr(context), shop.instagramPage!),
                   if (shop.otherContacts != null &&
                       shop.otherContacts!.isNotEmpty)
-                    _infoRow('Other Contacts', shop.otherContacts!),
+                    _infoRow('other_contacts'.tr(context), shop.otherContacts!),
                 ],
               ),
             ),

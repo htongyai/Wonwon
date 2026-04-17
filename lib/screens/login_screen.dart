@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-// Removed go_router import - using basic navigation
+import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/constants/responsive_breakpoints.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/services/auth_service.dart';
-import 'package:wonwonw2/screens/admin_dashboard_main_screen.dart';
-import 'package:wonwonw2/screens/main_navigation.dart';
+import 'package:wonwonw2/services/analytics_service.dart';
 import 'package:wonwonw2/screens/signup_screen.dart';
 import 'package:wonwonw2/screens/forgot_password_screen.dart';
-import 'package:wonwonw2/screens/forgot_password_screen_safe.dart';
 
 class LoginScreen extends StatefulWidget {
   final bool isAdminFlow;
@@ -22,6 +20,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
   final _authService = AuthService();
 
   bool _isLoading = false;
@@ -31,7 +31,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    // Set admin flow from constructor parameter
     _isAdminFlow = widget.isAdminFlow;
   }
 
@@ -39,32 +38,33 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop =
-        ResponsiveBreakpoints.isTablet(screenWidth) ||
-        ResponsiveBreakpoints.isDesktop(screenWidth);
+    final isWide = screenWidth >= ResponsiveBreakpoints.mobile;
+    final formWidth = screenWidth >= ResponsiveBreakpoints.desktop ? 440.0 : 400.0;
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
-            // Header with admin button
             _buildHeader(),
-
-            // Main content
             Expanded(
               child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
                 child: Center(
                   child: Container(
-                    width: isDesktop ? 400 : double.infinity,
+                    width: isWide ? formWidth : double.infinity,
                     padding: EdgeInsets.symmetric(
-                      horizontal: isDesktop ? 0 : 24,
+                      horizontal: isWide ? 0 : 24,
                       vertical: 32,
                     ),
                     child: _buildLoginForm(),
@@ -87,16 +87,16 @@ class _LoginScreenState extends State<LoginScreen> {
           // Back button
           TextButton.icon(
             onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back, color: Colors.brown),
+            icon: const Icon(Icons.arrow_back, color: AppConstants.primaryColor),
             label: Text(
               'back'.tr(context),
               style: const TextStyle(
-                color: Colors.brown,
+                color: AppConstants.primaryColor,
                 fontWeight: FontWeight.w600,
                 fontSize: 16,
               ),
             ),
-            style: TextButton.styleFrom(foregroundColor: Colors.brown),
+            style: TextButton.styleFrom(foregroundColor: AppConstants.primaryColor),
           ),
 
           const Spacer(),
@@ -106,9 +106,9 @@ class _LoginScreenState extends State<LoginScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.brown.withOpacity(0.1),
+                color: AppConstants.primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.brown.withOpacity(0.3)),
+                border: Border.all(color: AppConstants.primaryColor.withValues(alpha: 0.3)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -116,13 +116,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Icon(
                     Icons.admin_panel_settings,
                     size: 16,
-                    color: Colors.brown,
+                    color: AppConstants.primaryColor,
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'Admin Login',
+                    'admin_login'.tr(context),
                     style: TextStyle(
-                      color: Colors.brown,
+                      color: AppConstants.primaryColor,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                     ),
@@ -161,11 +161,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
           // Title
           Text(
-            _isAdminFlow ? 'Admin Login' : 'welcome_back'.tr(context),
+            _isAdminFlow ? 'admin_access'.tr(context) : 'welcome_back'.tr(context),
             style: const TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: Colors.brown,
+              color: AppConstants.primaryColor,
             ),
             textAlign: TextAlign.center,
           ),
@@ -175,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
           // Subtitle
           Text(
             _isAdminFlow
-                ? 'Sign in with your admin credentials'
+                ? 'admin_access_description'.tr(context)
                 : 'login_description'.tr(context),
             style: TextStyle(fontSize: 16, color: Colors.grey[600]),
             textAlign: TextAlign.center,
@@ -184,64 +184,86 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 40),
 
           // Email field
-          TextFormField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              labelText: 'email'.tr(context),
-              prefixIcon: const Icon(Icons.email_outlined),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.brown, width: 2),
-              ),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter your email';
-              }
-              if (!AuthService.isValidEmail(value)) {
-                return 'Please enter a valid email';
-              }
-              return null;
-            },
-          ),
-
-          const SizedBox(height: 20),
-
-          // Password field
-          TextFormField(
-            controller: _passwordController,
-            obscureText: _obscurePassword,
-            decoration: InputDecoration(
-              labelText: 'password'.tr(context),
-              prefixIcon: const Icon(Icons.lock_outline),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
+          AutofillGroup(
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _emailController,
+                  focusNode: _emailFocusNode,
+                  autofocus: true,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
+                  onFieldSubmitted: (_) => _passwordFocusNode.requestFocus(),
+                  decoration: InputDecoration(
+                    labelText: 'email'.tr(context),
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'email_required'.tr(context);
+                    }
+                    if (!AuthService.isValidEmail(value)) {
+                      return 'valid_email_required'.tr(context);
+                    }
+                    return null;
+                  },
                 ),
-                onPressed: () {
-                  setState(() {
-                    _obscurePassword = !_obscurePassword;
-                  });
-                },
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.brown, width: 2),
-              ),
+
+                const SizedBox(height: 20),
+
+                // Password field
+                TextFormField(
+                  controller: _passwordController,
+                  focusNode: _passwordFocusNode,
+                  obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.password],
+                  onFieldSubmitted: (_) {
+                    if (!_isLoading) _handleLogin();
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'password'.tr(context),
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      tooltip: 'toggle_password_visibility'.tr(context),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppConstants.primaryColor, width: 2),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'password_required'.tr(context);
+                    }
+                    return null;
+                  },
+                ),
+              ],
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter your password';
-              }
-              return null;
-            },
           ),
 
           const SizedBox(height: 16),
@@ -251,30 +273,22 @@ class _LoginScreenState extends State<LoginScreen> {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: () {
-                try {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ForgotPasswordScreen(),
-                    ),
-                  );
-                } catch (e) {
-                  // Fallback to safe version if localization fails
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ForgotPasswordScreenSafe(),
-                    ),
-                  );
-                }
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ForgotPasswordScreen(),
+                  ),
+                );
               },
               style: TextButton.styleFrom(
-                foregroundColor: Colors.brown,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                foregroundColor: AppConstants.primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               child: Text(
                 'forgot_password'.tr(context),
                 style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.underline,
                 ),
               ),
             ),
@@ -285,14 +299,6 @@ class _LoginScreenState extends State<LoginScreen> {
           // Login button
           ElevatedButton(
             onPressed: _isLoading ? null : _handleLogin,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.brown,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
             child:
                 _isLoading
                     ? const SizedBox(
@@ -318,9 +324,12 @@ class _LoginScreenState extends State<LoginScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'dont_have_account'.tr(context),
-                style: TextStyle(color: Colors.grey[600]),
+              Flexible(
+                child: Text(
+                  'dont_have_account'.tr(context),
+                  style: TextStyle(color: Colors.grey[600]),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               TextButton(
                 onPressed: () {
@@ -331,7 +340,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   );
                 },
                 style: TextButton.styleFrom(
-                  foregroundColor: Colors.brown,
+                  foregroundColor: AppConstants.primaryColor,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
                 child: Text(
@@ -351,6 +360,9 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    // Capture ScaffoldMessenger before async gap so it stays valid after navigation
+    final messenger = ScaffoldMessenger.of(context);
+
     setState(() {
       _isLoading = true;
     });
@@ -361,50 +373,24 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text,
       );
 
-      if (mounted) {
-        if (result.success) {
-          _showSnackBar('login_successful'.tr(context), Colors.green);
+      if (!mounted) return;
 
-          // Check if this is admin flow and user is admin
-          if (_isAdminFlow) {
-            print('=== ADMIN FLOW DETECTED ===');
-            final isAdmin = await _authService.isAdmin();
-            print('Admin flow detected. Is user admin? $isAdmin');
-            if (isAdmin) {
-              print('User is admin, navigating to admin dashboard...');
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => const AdminDashboardMainScreen(),
-                ),
-              );
-              print('Navigated to admin dashboard successfully');
-            } else {
-              print('User is not admin, showing error and logging out');
-              _showSnackBar('Admin privileges required', Colors.red);
-              await _authService.logout(); // Log out non-admin user
-            }
-          } else {
-            print('=== REGULAR USER FLOW ===');
-            print('Regular user login, navigating to home...');
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => const MainNavigation(child: SizedBox()),
-              ),
-            );
-            print('Navigated to home successfully');
-          }
-        } else {
-          _showSnackBar(
-            result.message.isNotEmpty
-                ? result.message
-                : 'login_failed'.tr(context),
-            Colors.red,
-          );
-        }
+      if (result.success) {
+        AnalyticsService.safeLog(() => AnalyticsService().logLogin());
+        _showMessage(messenger, 'login_successful'.tr(context), Colors.green);
+
+        // Admin flow disabled — admin will be a separate app
+        Navigator.of(context).pop(true);
+        return;
+      } else {
+        _showMessage(messenger, result.message.tr(context), Colors.red);
       }
     } catch (e) {
+      debugPrint('Login error: $e');
       if (mounted) {
-        _showSnackBar('login_failed'.tr(context), Colors.red);
+        _showMessage(messenger, 'login_failed'.tr(context), Colors.red);
+      } else {
+        _showMessage(messenger, 'Login failed. Please try again.', Colors.red);
       }
     } finally {
       if (mounted) {
@@ -415,8 +401,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
+  void _showMessage(ScaffoldMessengerState messenger, String message, Color color) {
+    messenger.showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: color,

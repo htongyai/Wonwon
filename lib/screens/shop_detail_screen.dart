@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/services.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:wonwonw2/constants/responsive_breakpoints.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
@@ -25,6 +27,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wonwonw2/mixins/widget_disposal_mixin.dart';
 import 'package:wonwonw2/services/optimized_image_cache_manager.dart';
 import 'package:wonwonw2/services/unified_memory_manager.dart';
+import 'package:wonwonw2/services/analytics_service.dart';
 
 /// Screen that displays detailed information about a repair shop
 /// Shows shop information, hours, contact details, services, and reviews
@@ -71,8 +74,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     _loadReviews();
     _loadReports();
 
-    // Listen for auth state changes
-    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    listenToStream(FirebaseAuth.instance.authStateChanges(), (User? user) {
       if (mounted) {
         setState(() {
           _isLoggedIn = user != null;
@@ -104,21 +106,29 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               .doc(widget.shopId)
               .get();
       if (!doc.exists) {
+        if (!mounted) return;
         setState(() {
-          _error = 'Shop not found';
-          _isLoadingShop = false;
-        });
-        return;
-      }
-      setState(() {
-        _shop = RepairShop.fromMap(doc.data()!..['id'] = doc.id);
+        _error = 'shop_not_found';
         _isLoadingShop = false;
       });
-    } catch (e) {
-      setState(() {
-        _error = 'Error loading shop';
-        _isLoadingShop = false;
-      });
+      return;
+    }
+    if (!mounted) return;
+    final shop = RepairShop.fromMap(doc.data()!..['id'] = doc.id);
+    AnalyticsService.safeLog(() => AnalyticsService().logViewShop(
+      shopId: widget.shopId,
+      shopName: shop.name,
+    ));
+    setState(() {
+      _shop = shop;
+      _isLoadingShop = false;
+    });
+  } catch (e) {
+    if (!mounted) return;
+    setState(() {
+      _error = 'error_loading_shop';
+      _isLoadingShop = false;
+    });
     }
   }
 
@@ -197,6 +207,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
       if (loginResult == true) {
         // User logged in successfully
+        if (!mounted) return;
         setState(() {
           _isLoggedIn = true;
           _isLoadingSavedState = true;
@@ -209,52 +220,64 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       }
     }
 
+    if (_isLoadingSavedState) return;
+
+    final wasSaved = _isSaved;
+
+    // Optimistic UI: update state and show feedback immediately
     setState(() {
+      _isSaved = !wasSaved;
       _isLoadingSavedState = true;
     });
 
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            wasSaved
+                ? 'removed_from_saved'
+                    .tr(context)
+                    .replaceAll('{shop_name}', _shop!.name)
+                : 'saved_to_locations'
+                    .tr(context)
+                    .replaceAll('{shop_name}', _shop!.name),
+          ),
+          backgroundColor: wasSaved ? Colors.red[400] : AppConstants.primaryColor,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+
+    // Perform Firestore write in background
     try {
-      bool success;
-      if (_isSaved) {
-        // Remove shop from saved locations
+      final bool success;
+      if (wasSaved) {
+        AnalyticsService.safeLog(() => AnalyticsService().logUnsaveShop(widget.shopId));
         success = await _savedShopService.removeShop(widget.shopId);
-        if (success && mounted) {
-          setState(() {
-            _isSaved = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'removed_from_saved'
-                    .tr(context)
-                    .replaceAll('{shop_name}', _shop!.name),
-              ),
-              backgroundColor: Colors.red[400],
-            ),
-          );
-        }
       } else {
-        // Add shop to saved locations
+        AnalyticsService.safeLog(() => AnalyticsService().logSaveShop(widget.shopId));
         success = await _savedShopService.saveShop(widget.shopId);
-        if (success && mounted) {
-          setState(() {
-            _isSaved = true;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'saved_to_locations'
-                    .tr(context)
-                    .replaceAll('{shop_name}', _shop!.name),
-              ),
-              backgroundColor: AppConstants.primaryColor,
-            ),
-          );
-        }
+      }
+
+      if (!success && mounted) {
+        // Revert on failure
+        setState(() {
+          _isSaved = wasSaved;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('failed_to_update_saved'.tr(context)),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         debugPrint('Error toggling saved shop: $e');
+        setState(() {
+          _isSaved = wasSaved;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('failed_to_update_saved'.tr(context)),
@@ -352,11 +375,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_error != null) {
-      return Scaffold(body: Center(child: Text(_error!)));
+      return Scaffold(body: Center(child: Text(_error!.tr(context))));
     }
     if (_shop == null) {
       return Scaffold(
-        body: Center(child: Text('Shop not found')), // fallback
+        body: Center(child: Text('shop_not_found'.tr(context))),
       );
     }
 
@@ -385,7 +408,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           automaticallyImplyLeading: false,
           pinned: false,
           floating: false,
-          expandedHeight: 200,
+          expandedHeight: 280,
           flexibleSpace: FlexibleSpaceBar(
             background: Stack(
               fit: StackFit.expand,
@@ -399,21 +422,37 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                       errorWidget: AssetHelpers.getShopPlaceholder(
                         _shop!.name,
                         containerWidth: MediaQuery.of(context).size.width,
-                        containerHeight: 200,
+                        containerHeight: 280,
                       ),
                     )
                     : AssetHelpers.getShopPlaceholder(
                       _shop!.name,
                       containerWidth: MediaQuery.of(context).size.width,
-                      containerHeight: 200,
+                      containerHeight: 280,
                     ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 120,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black54],
+                      ),
+                    ),
+                  ),
+                ),
                 Positioned(
                   top: 8,
                   left: 8,
                   child: CircleAvatar(
-                    backgroundColor: Colors.white.withOpacity(0.7),
+                    backgroundColor: Colors.white.withValues(alpha:0.7),
                     child: IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.black),
+                      tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ),
@@ -426,12 +465,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                       // Edit button - only show for admin users
                       if (_isAdmin)
                         CircleAvatar(
-                          backgroundColor: Colors.white.withOpacity(0.7),
+                          backgroundColor: Colors.white.withValues(alpha:0.7),
                           child: IconButton(
                             icon: const Icon(
                               Icons.edit_outlined,
                               color: AppConstants.primaryColor,
                             ),
+                            tooltip: 'edit'.tr(context),
                             onPressed: () {
                               Navigator.push(
                                 context,
@@ -449,12 +489,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                         alignment: Alignment.center,
                         children: [
                           CircleAvatar(
-                            backgroundColor: Colors.white.withOpacity(0.7),
+                            backgroundColor: Colors.white.withValues(alpha:0.7),
                             child: IconButton(
                               icon: const Icon(
                                 Icons.report_problem_outlined,
                                 color: Colors.red,
                               ),
+                              tooltip: 'report'.tr(context),
                               onPressed: _showReportDialog,
                             ),
                           ),
@@ -505,7 +546,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               children: [
                 _buildShopInfo(),
                 SizedBox(height: ResponsiveSize.getHeight(4)),
+                _buildServicesSection(),
+                SizedBox(height: ResponsiveSize.getHeight(6)),
                 _buildAddress(),
+                SizedBox(height: ResponsiveSize.getHeight(6)),
+                _buildDesktopMapLocation(),
                 SizedBox(height: ResponsiveSize.getHeight(6)),
                 _buildHours(),
                 SizedBox(height: ResponsiveSize.getHeight(6)),
@@ -516,8 +561,6 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 _buildPaymentMethodsSection(),
                 SizedBox(height: ResponsiveSize.getHeight(6)),
                 _buildFeaturesSection(),
-                SizedBox(height: ResponsiveSize.getHeight(6)),
-                _buildDesktopMapLocation(),
                 SizedBox(height: ResponsiveSize.getHeight(6)),
                 _buildReviews(),
                 SizedBox(
@@ -534,8 +577,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   Widget _buildDesktopLayout() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isLargeScreen = ResponsiveBreakpoints.isLargeDesktop(screenWidth);
-    final isMediumScreen =
-        screenWidth > 1000 && screenWidth <= ResponsiveBreakpoints.largeDesktop;
+    final isMediumScreen = ResponsiveBreakpoints.isDesktop(screenWidth);
 
     // Responsive sidebar width
     double sidebarWidth;
@@ -564,7 +606,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha:0.1),
                         blurRadius: 8,
                         offset: const Offset(2, 0),
                       ),
@@ -596,8 +638,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
   Widget _buildDesktopCompactHeader() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 1000;
-    final isVerySmall = screenWidth < 600;
+    final isSmallScreen = screenWidth < ResponsiveBreakpoints.desktop;
+    final isVerySmall = ResponsiveBreakpoints.isMobile(screenWidth);
 
     return Container(
       width: double.infinity,
@@ -609,7 +651,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha:0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -647,39 +689,75 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              // Action Buttons
-              // Log Repair Button
-              if (!isVerySmall)
+              // Action Buttons (only for logged-in users)
+              if (_isLoggedIn) ...[
+                // Log Repair Button
+                if (!isVerySmall)
+                  Container(
+                    margin: EdgeInsets.only(left: isSmallScreen ? 4 : 8),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LogRepairScreen(shop: _shop!),
+                          ),
+                        );
+                      },
+                      icon: Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: isSmallScreen ? 16 : 18,
+                      ),
+                      label: Text(
+                        'log_repair'.tr(context),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isSmallScreen ? 12 : 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[900],
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isSmallScreen ? 12 : 16,
+                          vertical: isSmallScreen ? 8 : 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                // Save Shop Button
                 Container(
                   margin: EdgeInsets.only(left: isSmallScreen ? 4 : 8),
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => LogRepairScreen(shop: _shop!),
-                        ),
-                      );
-                    },
+                    onPressed: _toggleSaved,
                     icon: Icon(
-                      Icons.add,
+                      _isSaved ? Icons.bookmark : Icons.bookmark_border,
                       color: Colors.white,
-                      size: isSmallScreen ? 16 : 18,
+                      size: isVerySmall ? 16 : (isSmallScreen ? 16 : 18),
                     ),
                     label: Text(
-                      'Log Repair',
+                      _isSaved ? 'saved'.tr(context) : 'save_shop'.tr(context),
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: isSmallScreen ? 12 : 14,
+                        fontSize: isVerySmall ? 12 : (isSmallScreen ? 12 : 14),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[900],
+                      backgroundColor:
+                          _isSaved
+                              ? Colors.orange[700]
+                              : AppConstants.primaryColor,
                       foregroundColor: Colors.white,
                       padding: EdgeInsets.symmetric(
-                        horizontal: isSmallScreen ? 12 : 16,
-                        vertical: isSmallScreen ? 8 : 10,
+                        horizontal: isVerySmall ? 10 : (isSmallScreen ? 12 : 16),
+                        vertical: isVerySmall ? 6 : (isSmallScreen ? 8 : 10),
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -688,41 +766,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                     ),
                   ),
                 ),
-              // Save Shop Button
-              Container(
-                margin: EdgeInsets.only(left: isSmallScreen ? 4 : 8),
-                child: ElevatedButton.icon(
-                  onPressed: _toggleSaved,
-                  icon: Icon(
-                    _isSaved ? Icons.bookmark : Icons.bookmark_border,
-                    color: Colors.white,
-                    size: isVerySmall ? 16 : (isSmallScreen ? 16 : 18),
-                  ),
-                  label: Text(
-                    _isSaved ? 'Saved' : 'Save Shop',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isVerySmall ? 12 : (isSmallScreen ? 12 : 14),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        _isSaved
-                            ? Colors.orange[700]
-                            : AppConstants.primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isVerySmall ? 10 : (isSmallScreen ? 12 : 16),
-                      vertical: isVerySmall ? 6 : (isSmallScreen ? 8 : 10),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
+              ],
               // Report Button
               if (!isVerySmall)
                 Container(
@@ -735,7 +779,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                       size: isSmallScreen ? 16 : 18,
                     ),
                     label: Text(
-                      'Report',
+                      'report'.tr(context),
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: isSmallScreen ? 12 : 14,
@@ -761,7 +805,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 Container(
                   margin: EdgeInsets.only(left: isSmallScreen ? 4 : 8),
                   decoration: BoxDecoration(
-                    color: AppConstants.primaryColor.withOpacity(0.1),
+                    color: AppConstants.primaryColor.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: IconButton(
@@ -817,7 +861,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '${_shop!.area} • ${_shop!.reviewCount} reviews',
+                    '${_shop!.area} • ${'n_reviews'.tr(context).replaceAll('{count}', '${_shop!.reviewCount}')}',
                     style: TextStyle(
                       color: Colors.grey.shade600,
                       fontSize: isSmallScreen ? 12 : 14,
@@ -835,7 +879,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
   Widget _buildDesktopSidebar() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 1000;
+    final isSmallScreen = screenWidth < ResponsiveBreakpoints.desktop;
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(isSmallScreen ? 16 : 24),
@@ -851,7 +895,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha:0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -881,7 +925,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           // Shop Description
           if (_shop!.description.isNotEmpty) ...[
             Text(
-              'About',
+              'about'.tr(context),
               style: GoogleFonts.montserrat(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -937,10 +981,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         Expanded(
           child: ElevatedButton.icon(
             onPressed: () {
-              // Call action
+              final phone = _shop?.phoneNumber;
+              if (phone != null && phone.isNotEmpty) {
+                _launchUrl('tel:$phone');
+              }
             },
             icon: const Icon(Icons.phone, size: 18),
-            label: const Text('Call'),
+            label: Text('phone_label'.tr(context)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppConstants.primaryColor,
               foregroundColor: Colors.white,
@@ -954,11 +1001,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         const SizedBox(width: 12),
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: () {
-              // Directions action
-            },
+            onPressed: _openDirections,
             icon: const Icon(Icons.directions, size: 18),
-            label: const Text('Directions'),
+            label: Text('directions'.tr(context)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppConstants.primaryColor,
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1021,6 +1066,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   }
 
   Widget _buildContactInfoCard() {
+    final phone = _shop!.phoneNumber;
+    final otherContacts = _shop!.otherContacts;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1032,7 +1079,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Contact',
+            'contact'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -1041,36 +1088,34 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           const SizedBox(height: 12),
           _buildContactRow(
             Icons.phone,
-            _shop!.phoneNumber != null && _shop!.phoneNumber!.isNotEmpty
-                ? _shop!.phoneNumber!
-                : 'No information',
+            phone != null && phone.isNotEmpty ? phone : 'no_information'.tr(context),
           ),
           _buildContactRow(
             Icons.facebook,
             _shop!.facebookPage?.isNotEmpty == true
-                ? 'Facebook Page'
-                : 'No information',
+                ? 'facebook_page'.tr(context)
+                : 'no_information'.tr(context),
           ),
           _buildContactRow(
             Icons.camera_alt,
             _shop!.instagramPage?.isNotEmpty == true
-                ? 'Instagram'
-                : 'No information',
+                ? 'instagram'.tr(context)
+                : 'no_information'.tr(context),
           ),
           if (_shop!.lineId?.isNotEmpty == true || _shop!.lineId == null)
             _buildContactRow(
               Icons.chat,
               _shop!.lineId?.isNotEmpty == true
-                  ? 'Line: ${_shop!.lineId}'
-                  : 'No information',
+                  ? '${'line_id_label'.tr(context)}: ${_shop!.lineId}'
+                  : 'no_information'.tr(context),
             ),
-          if (_shop!.otherContacts?.isNotEmpty == true ||
-              _shop!.otherContacts == null)
+          if (otherContacts != null && otherContacts.isNotEmpty ||
+              otherContacts == null)
             _buildContactRow(
               Icons.contact_phone,
-              _shop!.otherContacts?.isNotEmpty == true
-                  ? _shop!.otherContacts!
-                  : 'No information',
+              otherContacts != null && otherContacts.isNotEmpty
+                  ? otherContacts
+                  : 'no_information'.tr(context),
             ),
         ],
       ),
@@ -1102,7 +1147,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Hours',
+            'hours_label'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -1117,14 +1162,14 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   }
 
   Widget _buildAllDaysHours() {
-    const days = [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
+    final days = [
+      'day_monday'.tr(context),
+      'day_tuesday'.tr(context),
+      'day_wednesday'.tr(context),
+      'day_thursday'.tr(context),
+      'day_friday'.tr(context),
+      'day_saturday'.tr(context),
+      'day_sunday'.tr(context),
     ];
     const shortKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
     final today = DateTime.now().weekday;
@@ -1178,7 +1223,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Services',
+          'services'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -1191,24 +1236,42 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           runSpacing: 8,
           children:
               _shop!.categories.map((category) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppConstants.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppConstants.primaryColor.withOpacity(0.3),
+                return InkWell(
+                  onTap: () {
+                    Navigator.pop(context, {'filterCategory': category});
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
                     ),
-                  ),
-                  child: Text(
-                    category,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppConstants.primaryColor,
-                      fontWeight: FontWeight.w500,
+                    decoration: BoxDecoration(
+                      color: AppConstants.primaryColor.withValues(alpha:0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppConstants.primaryColor.withValues(alpha:0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'category_$category'.tr(context),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppConstants.primaryColor,
+                            fontWeight: FontWeight.w500,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 10,
+                          color: AppConstants.primaryColor.withValues(alpha:0.6),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -1223,7 +1286,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Photos',
+          'photos'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -1251,7 +1314,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'No information',
+                    'no_information'.tr(context),
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                   ),
                 ],
@@ -1301,7 +1364,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Payment Methods',
+          'payment_methods'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -1311,7 +1374,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         const SizedBox(height: 12),
         if (paymentMethods.isEmpty)
           Text(
-            'No information',
+            'no_information'.tr(context),
             style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
           )
         else
@@ -1351,7 +1414,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                         Icon(icon, size: 16, color: Colors.blue.shade700),
                         const SizedBox(width: 6),
                         Text(
-                          method,
+                          _localizePayment(method),
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.blue.shade700,
@@ -1375,7 +1438,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Features & Amenities',
+          'features_amenities'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -1385,13 +1448,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         const SizedBox(height: 12),
         if (features.isEmpty && amenities.isEmpty)
           Text(
-            'No information',
+            'no_information'.tr(context),
             style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
           )
         else ...[
           if (amenities.isNotEmpty) ...[
             Text(
-              'Amenities:',
+              'amenities_label'.tr(context),
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -1415,7 +1478,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                         border: Border.all(color: Colors.green.shade200),
                       ),
                       child: Text(
-                        amenity,
+                        _localizeAmenity(amenity),
                         style: TextStyle(
                           fontSize: 11,
                           color: Colors.green.shade700,
@@ -1429,7 +1492,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           ],
           if (features.isNotEmpty) ...[
             Text(
-              'Features:',
+              'features_label'.tr(context),
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -1450,7 +1513,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        entry.key,
+                        _localizeFeature(entry.key),
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey.shade700,
@@ -1474,7 +1537,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Business Information',
+          'business_information'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -1482,38 +1545,56 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           ),
         ),
         const SizedBox(height: 12),
-        _buildInfoItem('Price Range', _shop!.priceRange.toString()),
+        _buildInfoItem('price_range'.tr(context), _shop!.priceRange.toString()),
         _buildInfoItem(
-          'Duration',
+          'duration'.tr(context),
           _shop!.durationMinutes > 0
-              ? '${_shop!.durationMinutes} minutes'
-              : 'No information',
+              ? '${_shop!.durationMinutes} ${'minutes_label'.tr(context)}'
+              : 'no_information'.tr(context),
         ),
         _buildInfoItem(
-          'Try-on Area',
+          'try_on_area'.tr(context),
           _shop!.tryOnAreaAvailable == true
-              ? 'Available'
+              ? 'available'.tr(context)
               : (_shop!.tryOnAreaAvailable == false
-                  ? 'Not Available'
-                  : 'No information'),
+                  ? 'not_available'.tr(context)
+                  : 'no_information'.tr(context)),
         ),
         _buildInfoItem(
-          'Purchase Required',
+          'purchase_required'.tr(context),
           _shop!.requiresPurchase == true
-              ? 'Yes'
-              : (_shop!.requiresPurchase == false ? 'No' : 'No information'),
+              ? 'yes_label'.tr(context)
+              : (_shop!.requiresPurchase == false ? 'no_label'.tr(context) : 'no_information'.tr(context)),
         ),
-        _buildInfoItem('Irregular Hours', _shop!.irregularHours ? 'Yes' : 'No'),
+        _buildInfoItem('irregular_hours'.tr(context), _shop!.irregularHours ? 'yes_label'.tr(context) : 'no_label'.tr(context)),
         _buildInfoItem(
-          'Status',
-          _shop!.approved ? 'Approved' : 'Pending Approval',
+          'status_label'.tr(context),
+          _shop!.approved ? 'approved'.tr(context) : 'pending_approval'.tr(context),
         ),
-        if (_shop!.notesOrConditions?.isNotEmpty == true)
-          _buildInfoItem('Notes', _shop!.notesOrConditions!)
-        else
-          _buildInfoItem('Notes', 'No information'),
+        _buildInfoItem(
+          'notes'.tr(context),
+          _shop!.notesOrConditions ?? 'no_information'.tr(context),
+        ),
       ],
     );
+  }
+
+  String _localizePayment(String method) {
+    final key = 'payment_${method.toLowerCase()}';
+    final localized = key.tr(context);
+    return localized != key ? localized : method;
+  }
+
+  String _localizeFeature(String feature) {
+    final key = 'feature_${feature.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_').replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'_$'), '')}';
+    final localized = key.tr(context);
+    return localized != key ? localized : feature;
+  }
+
+  String _localizeAmenity(String amenity) {
+    final key = 'amenity_${amenity.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_').replaceAll(RegExp(r'_+'), '_').replaceAll(RegExp(r'_$'), '')}';
+    final localized = key.tr(context);
+    return localized != key ? localized : amenity;
   }
 
   Widget _buildInfoItem(String label, String value) {
@@ -1522,8 +1603,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
+          Expanded(
+            flex: 2,
             child: Text(
               '$label:',
               style: TextStyle(
@@ -1534,16 +1615,17 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
             ),
           ),
           Expanded(
+            flex: 3,
             child: Text(
               value,
               style: TextStyle(
                 fontSize: 13,
                 color:
-                    value == 'No information'
+                    value == 'no_information'.tr(context)
                         ? Colors.grey.shade500
                         : Colors.grey.shade800,
                 fontStyle:
-                    value == 'No information'
+                    value == 'no_information'.tr(context)
                         ? FontStyle.italic
                         : FontStyle.normal,
               ),
@@ -1556,7 +1638,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
   Widget _buildDesktopReviewsSection() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isSmallScreen = screenWidth < 1000;
+    final isSmallScreen = screenWidth < ResponsiveBreakpoints.desktop;
 
     return Container(
       padding: EdgeInsets.all(isSmallScreen ? 12 : 16),
@@ -1566,7 +1648,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           Row(
             children: [
               Text(
-                'Reviews & Ratings',
+                'reviews_ratings'.tr(context),
                 style: GoogleFonts.montserrat(
                   fontSize: isSmallScreen ? 16 : 18,
                   fontWeight: FontWeight.w600,
@@ -1574,15 +1656,16 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 ),
               ),
               const Spacer(),
-              ElevatedButton.icon(
-                onPressed: _showAddReviewDialog,
-                icon: Icon(
-                  Icons.edit,
-                  color: Colors.white,
-                  size: isSmallScreen ? 14 : 16,
-                ),
-                label: Text(
-                  'Write Review',
+              if (_isLoggedIn)
+                ElevatedButton.icon(
+                  onPressed: _showAddReviewDialog,
+                  icon: Icon(
+                    Icons.edit,
+                    color: Colors.white,
+                    size: isSmallScreen ? 14 : 16,
+                  ),
+                  label: Text(
+                    'write_review'.tr(context),
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: isSmallScreen ? 12 : 14,
@@ -1638,7 +1721,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${_shop!.reviewCount} reviews',
+                      'n_reviews'.tr(context).replaceAll('{count}', '${_shop!.reviewCount}'),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -1647,7 +1730,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Based on customer feedback',
+                      'based_on_feedback'.tr(context),
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -1666,7 +1749,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 children: [
                   if (_reviews.isNotEmpty) ...[
                     Text(
-                      'Recent Reviews:',
+                      'recent_reviews_label'.tr(context),
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -1693,7 +1776,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                                       ...List.generate(
                                         5,
                                         (i) => Icon(
-                                          Icons.star,
+                                          i < review.rating ? Icons.star : Icons.star_border,
                                           size: 14,
                                           color:
                                               i < review.rating
@@ -1728,7 +1811,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                       child: Padding(
                         padding: const EdgeInsets.all(20),
                         child: Text(
-                          'No reviews yet',
+                          'no_reviews_yet'.tr(context),
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 14,
@@ -1788,7 +1871,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
             ),
             const SizedBox(width: 8),
             Text(
-              '(${_shop!.reviewCount} reviews)',
+              '(${'n_reviews'.tr(context).replaceAll('{count}', '${_shop!.reviewCount}')})',
               style: TextStyle(color: Colors.grey[600]),
             ),
           ],
@@ -1821,16 +1904,17 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   }
 
   Widget _buildAddress() {
+    final landmark = _shop!.landmark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(Icons.location_on, color: Colors.brown),
+            Icon(Icons.location_on, color: AppConstants.primaryColor, size: 20),
             const SizedBox(width: 8),
             Text(
               'address_label'.tr(context),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleSmall,
             ),
           ],
         ),
@@ -1839,11 +1923,30 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: Colors.grey.shade50,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[200]!),
           ),
-          child: Text(_shop!.address, style: const TextStyle(fontSize: 16)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_shop!.address, style: const TextStyle(fontSize: 16)),
+              if (landmark != null && landmark.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.near_me, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${'landmark'.tr(context)}: $landmark',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
       ],
     );
@@ -1865,11 +1968,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       children: [
         Row(
           children: [
-            Icon(Icons.access_time, color: Colors.brown),
+            Icon(Icons.access_time, color: AppConstants.primaryColor, size: 20),
             const SizedBox(width: 8),
             Text(
               'hours_label'.tr(context),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleSmall,
             ),
           ],
         ),
@@ -1878,9 +1981,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: Colors.grey.shade50,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[200]!),
           ),
           child: Column(
             children: List.generate(days.length, (i) {
@@ -1932,36 +2034,40 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
   Widget _buildContactInfo() {
     final shop = _shop!;
+    final phone = shop.phoneNumber;
+    final facebookPage = shop.facebookPage;
+    final instagramPage = shop.instagramPage;
+    final otherContacts = shop.otherContacts;
     final List<InfoRow> info = [
-      if (shop.phoneNumber != null && shop.phoneNumber!.isNotEmpty)
+      if (phone != null && phone.isNotEmpty)
         InfoRow(
           icon: Icons.phone,
-          text: '${'phone_label'.tr(context)}: ${shop.phoneNumber!}',
-          onTap: () => _launchUrl('tel:${shop.phoneNumber}'),
+          text: '${'phone_label'.tr(context)}: $phone',
+          onTap: () => _launchUrl('tel:$phone'),
         ),
-      if (shop.facebookPage != null && shop.facebookPage!.isNotEmpty)
+      if (facebookPage != null && facebookPage.isNotEmpty)
         InfoRow(
           icon: Icons.facebook,
-          text: '${'facebook_label'.tr(context)}: Facebook Page',
-          onTap: () => _launchUrl(shop.facebookPage!),
+          text: '${'facebook_label'.tr(context)}: $facebookPage',
+          onTap: () => _launchUrl(facebookPage),
         ),
-      if (shop.instagramPage != null && shop.instagramPage!.isNotEmpty)
+      if (instagramPage != null && instagramPage.isNotEmpty)
         InfoRow(
           icon: Icons.camera_alt,
-          text: '${'instagram_label'.tr(context)}: Instagram',
-          onTap: () => _launchUrl(shop.instagramPage!),
+          text: '${'instagram_label'.tr(context)}: $instagramPage',
+          onTap: () => _launchUrl(instagramPage),
         ),
       if (shop.lineId != null && shop.lineId!.isNotEmpty)
         InfoRow(
           icon: Icons.chat,
-          text: '${'line_label'.tr(context)}: Line: ${shop.lineId}',
+          text: '${'line_id_label'.tr(context)}: ${shop.lineId}',
           onTap: () => _launchUrl('https://line.me/ti/p/${shop.lineId}'),
         ),
-      if (shop.otherContacts != null && shop.otherContacts!.isNotEmpty)
+      if (otherContacts != null && otherContacts.isNotEmpty)
         InfoRow(
           icon: Icons.contact_phone,
-          text: '${'other_contacts_label'.tr(context)}: ${shop.otherContacts!}',
-          onTap: () => _launchUrl('tel:${shop.otherContacts}'),
+          text: '${'other_contacts_label'.tr(context)}: $otherContacts',
+          onTap: () => _launchUrl('tel:$otherContacts'),
         ),
     ];
 
@@ -1974,20 +2080,19 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       children: [
         Row(
           children: [
-            Icon(Icons.contact_phone, color: Colors.brown),
+            Icon(Icons.contact_phone, color: AppConstants.primaryColor, size: 20),
             const SizedBox(width: 8),
             Text(
               'contact_label'.tr(context),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleSmall,
             ),
           ],
         ),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: Colors.grey.shade50,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[200]!),
           ),
           padding: const EdgeInsets.all(16),
           child: Column(children: info.map((item) => item).toList()),
@@ -1998,12 +2103,40 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
   Future<void> _launchUrl(String url) async {
     try {
-      if (await canLaunchUrl(Uri.parse(url))) {
-        await launchUrl(Uri.parse(url));
+      final uri = Uri.parse(url);
+      if (!['https', 'http', 'tel', 'mailto'].contains(uri.scheme)) {
+        appLog('Blocked URL launch: unsupported scheme ${uri.scheme}');
+        return;
+      }
+      if (kIsWeb && uri.scheme == 'tel') {
+        final number = uri.path;
+        await Clipboard.setData(ClipboardData(text: number));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$number copied'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
       }
     } catch (e) {
       appLog('Error launching URL: $e');
     }
+  }
+
+  Future<void> _openDirections() async {
+    if (_shop == null) return;
+    AnalyticsService.safeLog(() => AnalyticsService().logGetDirections(widget.shopId));
+    final lat = _shop!.latitude;
+    final lng = _shop!.longitude;
+    final name = Uri.encodeComponent(_shop!.name);
+    final url = 'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&destination_place_id=$name';
+    await _launchUrl(url);
   }
 
   Widget _buildReviews() {
@@ -2012,11 +2145,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       children: [
         Row(
           children: [
-            Icon(Icons.star, color: Colors.brown),
+            Icon(Icons.star, color: Colors.amber, size: 20),
             const SizedBox(width: 8),
             Text(
               'reviews_label'.tr(context),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleSmall,
             ),
           ],
         ),
@@ -2036,7 +2169,29 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         if (_reviews.length > 3)
           TextButton(
             onPressed: () {
-              // Show all reviews
+              // Show all reviews in a dialog
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('reviews_label'.tr(context)),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _reviews.length,
+                      itemBuilder: (context, index) {
+                        return _buildReviewItem(_reviews[index]);
+                      },
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text('cancel'.tr(context)),
+                    ),
+                  ],
+                ),
+              );
             },
             child: Text('show_all_reviews'.tr(context)),
           ),
@@ -2048,14 +2203,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: Colors.grey.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
       ),
       child: Center(
         child: Text(
           'no_reviews_yet'.tr(context),
-          style: TextStyle(color: Colors.grey[600]),
+          style: TextStyle(color: Colors.grey.shade500),
         ),
       ),
     );
@@ -2063,19 +2217,9 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
   Widget _buildReviewItem(Review review) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2083,52 +2227,55 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           Row(
             children: [
               CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.grey[300],
+                radius: 18,
+                backgroundColor: AppConstants.primaryColor.withValues(alpha: 0.15),
                 child: Text(
                   review.userName.isNotEmpty
                       ? review.userName[0].toUpperCase()
                       : 'U',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                  style: TextStyle(
+                    color: AppConstants.primaryColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      review.userName.isNotEmpty
-                          ? review.userName
-                          : 'Anonymous',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Text(
-                      _formatDate(review.createdAt),
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                    ),
-                  ],
+                child: Text(
+                  review.userName.isNotEmpty
+                      ? review.userName
+                      : 'anonymous'.tr(context),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
-              ),
-              Row(
-                children: List.generate(5, (i) {
-                  return Icon(
-                    Icons.star,
-                    size: 16,
-                    color: i < review.rating ? Colors.amber : Colors.grey[300],
-                  );
-                }),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(review.comment, style: const TextStyle(fontSize: 14)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              ...List.generate(5, (i) {
+                return Icon(
+                  i < review.rating ? Icons.star_rounded : Icons.star_border_rounded,
+                  size: 16,
+                  color: i < review.rating ? Colors.amber : Colors.grey.shade300,
+                );
+              }),
+              const SizedBox(width: 8),
+              Text(
+                _formatDate(review.createdAt),
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            review.comment,
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade800, height: 1.4),
+          ),
           if (review.replies.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
@@ -2166,7 +2313,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                                   Text(
                                     reply.userName.isNotEmpty
                                         ? reply.userName
-                                        : 'Anonymous',
+                                        : 'anonymous'.tr(context),
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 12,
@@ -2204,35 +2351,52 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
     final rating = await showDialog<int>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('add_review'.tr(context)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('select_rating'.tr(context)),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (i) {
-                    return IconButton(
-                      icon: Icon(
-                        Icons.star,
-                        color: i < 3 ? Colors.amber : Colors.grey[300],
-                      ),
-                      onPressed: () => Navigator.pop(context, i + 1),
-                    );
-                  }),
+      builder: (dialogContext) {
+        int selectedRating = 0;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('add_review'.tr(context)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('select_rating'.tr(context)),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (i) {
+                      return IconButton(
+                        icon: Icon(
+                          i < selectedRating ? Icons.star : Icons.star_border,
+                          color: i < selectedRating ? Colors.amber : Colors.grey[400],
+                          size: 36,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            selectedRating = i + 1;
+                          });
+                        },
+                      );
+                    }),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('cancel'.tr(context)),
+                ),
+                TextButton(
+                  onPressed: selectedRating > 0
+                      ? () => Navigator.pop(context, selectedRating)
+                      : null,
+                  child: Text('submit'.tr(context)),
                 ),
               ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('cancel'.tr(context)),
-              ),
-            ],
-          ),
+            );
+          },
+        );
+      },
     );
 
     if (rating == null) return;
@@ -2266,22 +2430,28 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
     comment = result;
 
-    if (comment == null || comment!.isEmpty) return;
+    if (comment?.isEmpty ?? true) return;
 
     try {
-      final user = FirebaseAuth.instance.currentUser!;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
       final review = Review(
         id: '',
         shopId: widget.shopId,
         userId: user.uid,
-        userName: user.displayName ?? 'Anonymous',
+        userName: user.displayName ?? 'anonymous'.tr(context),
         rating: rating.toDouble(),
-        comment: comment!,
+        comment: comment ?? '',
         createdAt: DateTime.now(),
         replies: [],
       );
 
       await _reviewService.addReview(review);
+      AnalyticsService.safeLog(() => AnalyticsService().logWriteReview(
+        shopId: widget.shopId,
+        rating: rating.toDouble(),
+      ));
+      if (!mounted) return;
       _loadReviews();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -2290,6 +2460,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('error_adding_review'.tr(context)),
@@ -2345,96 +2516,79 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     final difference = now.difference(date);
 
     if (difference.inDays == 0) {
-      return 'Today';
+      return 'today_label'.tr(context);
     } else if (difference.inDays == 1) {
-      return 'Yesterday';
+      return 'yesterday_label'.tr(context);
     } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
+      return 'time_days_ago'.tr(context).replaceAll('{count}', '${difference.inDays}');
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
   }
 
   Widget _buildBottomBar() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _toggleSaved,
-              icon: Icon(
-                _isSaved ? Icons.bookmark : Icons.bookmark_border,
-                color: Colors.white,
-              ),
-              label: Text(
-                _isSaved ? 'saved'.tr(context) : 'save_shop'.tr(context),
-                style: const TextStyle(color: Colors.white),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    _isSaved ? Colors.orange : AppConstants.primaryColor,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => LogRepairScreen(shop: _shop!),
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _openDirections,
+                icon: const Icon(Icons.directions, color: Colors.white, size: 20),
+                label: Text(
+                  'directions'.tr(context),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                   ),
-                );
-              },
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: Text(
-                'log_repair'.tr(context),
-                style: const TextStyle(color: Colors.white),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey[900],
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppConstants.primaryColor,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _showReportDialog,
-              icon: const Icon(Icons.flag, color: Colors.white),
-              label: Text(
-                'report'.tr(context),
-                style: const TextStyle(color: Colors.white),
+            const SizedBox(width: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red[600],
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+              child: IconButton(
+                onPressed: _toggleSaved,
+                icon: Icon(
+                  _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                  color: _isSaved ? Colors.orange : Colors.grey.shade700,
+                  size: 22,
                 ),
+                tooltip: _isSaved ? 'saved'.tr(context) : 'save_shop'.tr(context),
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: IconButton(
+                onPressed: _showReportDialog,
+                icon: Icon(Icons.flag_outlined, color: Colors.grey.shade700, size: 22),
+                tooltip: 'report'.tr(context),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

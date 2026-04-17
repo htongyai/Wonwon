@@ -1,14 +1,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/services/advanced_search_service.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
+import 'package:wonwonw2/services/analytics_service.dart';
 
 class AdvancedSearchBar extends StatefulWidget {
   final Function(String) onSearch;
   final Function(String) onSuggestionSelected;
   final AdvancedSearchService searchService;
   final List<RepairShop> shops;
-  final String hintText;
+  final String? hintText;
   final bool showSearchHistory;
 
   const AdvancedSearchBar({
@@ -17,7 +20,7 @@ class AdvancedSearchBar extends StatefulWidget {
     required this.onSuggestionSelected,
     required this.searchService,
     required this.shops,
-    this.hintText = 'Search shops, services, locations...',
+    this.hintText,
     this.showSearchHistory = true,
   }) : super(key: key);
 
@@ -60,6 +63,8 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _focusNode.removeListener(_onFocusChanged);
+    _controller.removeListener(_onTextChanged);
     _removeOverlay();
     _controller.dispose();
     _focusNode.dispose();
@@ -74,7 +79,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
     } else {
       // Delay hiding to allow for suggestion selection
       Future.delayed(const Duration(milliseconds: 150), () {
-        if (!_focusNode.hasFocus) {
+        if (mounted && !_focusNode.hasFocus) {
           _hideSuggestionsOverlay();
         }
       });
@@ -84,6 +89,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
   void _onTextChanged() {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
       _updateSuggestions();
       if (_focusNode.hasFocus) {
         _showSuggestionsOverlay();
@@ -121,6 +127,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
     if (_overlayEntry == null) return;
 
     _animationController.reverse().then((_) {
+      if (!mounted) return;
       _removeOverlay();
     });
   }
@@ -132,7 +139,19 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
 
   Widget _buildSuggestionsOverlay() {
     final screenSize = MediaQuery.of(context).size;
-    final isMobile = screenSize.width < 600;
+    final viewInsets = MediaQuery.of(context).viewInsets;
+    final keyboardHeight = viewInsets.bottom;
+    final keyboardOpen = keyboardHeight > 0;
+    final isMobile = ResponsiveBreakpoints.isMobile(screenSize.width);
+
+    // When keyboard is open on mobile, position overlay above the search bar
+    final maxHeight = isMobile
+        ? (screenSize.height - keyboardHeight - 120)
+            .clamp(100.0, screenSize.height * 0.4)
+            .toDouble()
+        : 300.0;
+    final positionAbove = isMobile && keyboardOpen;
+    final verticalOffset = positionAbove ? -maxHeight : 60.0;
 
     return Stack(
       children: [
@@ -150,7 +169,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
           child: CompositedTransformFollower(
             link: _layerLink,
             showWhenUnlinked: false,
-            offset: Offset(isMobile ? -8 : 0, 60), // Adjust for mobile
+            offset: Offset(isMobile ? -8 : 0, verticalOffset),
             child: Material(
               elevation: isMobile ? 4 : 8,
               borderRadius: BorderRadius.circular(isMobile ? 8 : 12),
@@ -165,7 +184,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
                     ),
                   );
                 },
-                child: _buildSuggestionsList(),
+                child: _buildSuggestionsList(maxHeight: maxHeight),
               ),
             ),
           ),
@@ -174,20 +193,20 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
     );
   }
 
-  Widget _buildSuggestionsList() {
+  Widget _buildSuggestionsList({double? maxHeight}) {
     final screenSize = MediaQuery.of(context).size;
-    final isMobile = screenSize.width < 600;
-    final maxHeight =
-        isMobile ? screenSize.height * 0.4 : 300.0; // Limit height on mobile
+    final isMobile = ResponsiveBreakpoints.isMobile(screenSize.width);
+    final effectiveMaxHeight = maxHeight ??
+        (isMobile ? screenSize.height * 0.4 : 300.0);
 
     return Container(
-      constraints: BoxConstraints(maxHeight: maxHeight),
+      constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(isMobile ? 8 : 12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isMobile ? 0.05 : 0.1),
+            color: Colors.black.withValues(alpha: isMobile ? 0.05 : 0.1),
             blurRadius: isMobile ? 4 : 8,
             offset: Offset(0, isMobile ? 2 : 4),
           ),
@@ -198,9 +217,9 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
         children: [
           // Header
           if (_controller.text.isEmpty && widget.showSearchHistory)
-            _buildSectionHeader('Recent Searches', Icons.history),
+            _buildSectionHeader('recent_searches'.tr(context), Icons.history),
           if (_controller.text.isNotEmpty)
-            _buildSectionHeader('Suggestions', Icons.search),
+            _buildSectionHeader('suggestions'.tr(context), Icons.search),
 
           // Suggestions list
           Flexible(
@@ -262,7 +281,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
 
   Widget _buildSuggestionItem(String suggestion, bool isHistory, bool isLast) {
     final screenSize = MediaQuery.of(context).size;
-    final isMobile = screenSize.width < 600;
+    final isMobile = ResponsiveBreakpoints.isMobile(screenSize.width);
 
     return InkWell(
       onTap: () => _selectSuggestion(suggestion),
@@ -330,7 +349,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
             Icon(Icons.clear_all, size: 16, color: Colors.grey.shade500),
             const SizedBox(width: 8),
             Text(
-              'Clear Search History',
+              'clear_search_history'.tr(context),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -367,6 +386,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
   void _performSearch() {
     final query = _controller.text.trim();
     if (query.isNotEmpty) {
+      AnalyticsService.safeLog(() => AnalyticsService().logSearch(query));
       widget.searchService.addToHistory(query);
       widget.onSearch(query);
     }
@@ -379,17 +399,10 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
     return CompositedTransformTarget(
       link: _layerLink,
       child: Container(
-        height: 56,
+        height: 52,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(26),
         ),
         child: Row(
           children: [
@@ -401,7 +414,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
                 controller: _controller,
                 focusNode: _focusNode,
                 decoration: InputDecoration(
-                  hintText: widget.hintText,
+                  hintText: widget.hintText ?? 'search_shops_services'.tr(context),
                   hintStyle: TextStyle(
                     color: Colors.grey.shade500,
                     fontSize: 16,
@@ -418,17 +431,20 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
               ),
             ),
             if (_controller.text.isNotEmpty)
-              InkWell(
-                onTap: () {
-                  _controller.clear();
-                  widget.onSearch('');
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Icon(
-                    Icons.clear,
-                    color: Colors.grey.shade500,
-                    size: 20,
+              SizedBox(
+                width: 44,
+                height: 44,
+                child: InkWell(
+                  onTap: () {
+                    _controller.clear();
+                    widget.onSearch('');
+                  },
+                  child: Center(
+                    child: Icon(
+                      Icons.clear,
+                      color: Colors.grey.shade500,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),

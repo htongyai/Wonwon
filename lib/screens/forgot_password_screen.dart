@@ -1,4 +1,8 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
 import 'package:wonwonw2/services/auth_service.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/utils/responsive_size.dart';
@@ -17,11 +21,31 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   bool _isLoading = false;
   bool _emailSent = false;
+  int _cooldownSeconds = 0;
+  Timer? _cooldownTimer;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _cooldownTimer?.cancel();
     super.dispose();
+  }
+
+  void _startCooldown() {
+    _cooldownSeconds = 60;
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _cooldownSeconds--;
+        if (_cooldownSeconds <= 0) {
+          timer.cancel();
+        }
+      });
+    });
   }
 
   Future<void> _handleResetPassword() async {
@@ -31,18 +55,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       });
 
       try {
-        // Call password reset method from AuthService
-        final success = await _authService.resetPassword(
+        final result = await _authService.resetPassword(
           _emailController.text.trim(),
         );
 
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _emailSent = success;
+            _emailSent = result.success;
           });
 
-          if (success) {
+          if (result.success) {
+            _startCooldown();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('reset_email_sent'.tr(context)),
@@ -52,13 +76,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('reset_failed'.tr(context)),
+                content: Text(
+                  (result.errorKey ?? 'reset_failed').tr(context),
+                ),
                 backgroundColor: Colors.red,
               ),
             );
           }
         }
       } catch (e) {
+        debugPrint('Password reset error: $e');
         if (mounted) {
           setState(() {
             _isLoading = false;
@@ -66,7 +93,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error: ${e.toString()}'),
+              content: Text('unexpected_error'.tr(context)),
               backgroundColor: Colors.red,
             ),
           );
@@ -78,8 +105,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 768;
-    final isMobile = screenWidth < 600;
+    final isDesktop = screenWidth >= ResponsiveBreakpoints.tablet;
+    final isMobile = ResponsiveBreakpoints.isMobile(screenWidth);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -91,6 +118,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               maxWidth: isDesktop ? 400 : screenWidth * 0.9,
             ),
             child: SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
               child: Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: isMobile ? 16.0 : 24.0,
@@ -108,8 +136,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             IconButton(
                               icon: const Icon(
                                 Icons.arrow_back,
-                                color: Colors.brown,
+                                color: AppConstants.primaryColor,
                               ),
+                              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                               onPressed: () => Navigator.pop(context),
                             ),
                             const Spacer(),
@@ -142,7 +171,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         style: TextStyle(
                           fontSize: isMobile ? 24 : 28,
                           fontWeight: FontWeight.bold,
-                          color: Colors.brown,
+                          color: AppConstants.primaryColor,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -166,7 +195,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           labelText: 'email'.tr(context),
                           prefixIcon: const Icon(
                             Icons.email_outlined,
-                            color: Colors.brown,
+                            color: AppConstants.primaryColor,
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -179,7 +208,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: const BorderSide(
-                              color: Colors.brown,
+                              color: AppConstants.primaryColor,
                               width: 2,
                             ),
                           ),
@@ -266,38 +295,47 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                       SizedBox(
                                         width: double.infinity,
                                         child: TextButton(
-                                          onPressed: () {
-                                            setState(() {
-                                              _emailSent = false;
-                                            });
-                                          },
+                                          onPressed: _cooldownSeconds > 0
+                                              ? null
+                                              : () {
+                                                  setState(() {
+                                                    _emailSent = false;
+                                                  });
+                                                },
                                           style: TextButton.styleFrom(
                                             foregroundColor:
                                                 Colors.green.shade700,
                                           ),
                                           child: Text(
-                                            'send_another_email'.tr(context),
+                                            _cooldownSeconds > 0
+                                                ? '${_cooldownSeconds}s'
+                                                : 'send_another_email'.tr(context),
                                           ),
                                         ),
                                       ),
                                     ],
                                   )
-                                  : Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceEvenly,
+                                  : Wrap(
+                                    alignment: WrapAlignment.spaceEvenly,
+                                    spacing: 8,
+                                    runSpacing: 8,
                                     children: [
                                       TextButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            _emailSent = false;
-                                          });
-                                        },
+                                        onPressed: _cooldownSeconds > 0
+                                            ? null
+                                            : () {
+                                                setState(() {
+                                                  _emailSent = false;
+                                                });
+                                              },
                                         style: TextButton.styleFrom(
                                           foregroundColor:
                                               Colors.green.shade700,
                                         ),
                                         child: Text(
-                                          'send_another_email'.tr(context),
+                                          _cooldownSeconds > 0
+                                              ? '${_cooldownSeconds}s'
+                                              : 'send_another_email'.tr(context),
                                         ),
                                       ),
                                       ElevatedButton(
@@ -330,7 +368,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ElevatedButton(
                           onPressed: _isLoading ? null : _handleResetPassword,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.brown,
+                            backgroundColor: AppConstants.primaryColor,
                             minimumSize: Size(
                               double.infinity,
                               isMobile ? 45 : ResponsiveSize.getHeight(12),
@@ -367,7 +405,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             Navigator.pop(context);
                           },
                           style: TextButton.styleFrom(
-                            foregroundColor: Colors.brown,
+                            foregroundColor: AppConstants.primaryColor,
                           ),
                           child: Text(
                             'back_to_login'.tr(context),

@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/utils/app_logger.dart';
-import 'package:wonwonw2/constants/api_constants.dart';
 
-/// Centralized error handling utilities
 class ErrorHandler {
-  /// Handle and display errors with user-friendly messages
   static void handleError(
     BuildContext context,
     dynamic error, {
@@ -12,9 +10,9 @@ class ErrorHandler {
     VoidCallback? onRetry,
   }) {
     appLog('Error occurred: $error');
-    
-    String message = customMessage ?? _getErrorMessage(error);
-    
+
+    String message = customMessage ?? _getLocalizedErrorMessage(context, error);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -28,14 +26,15 @@ class ErrorHandler {
                   ScaffoldMessenger.of(context).hideCurrentSnackBar();
                   onRetry();
                 },
-                child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                child: Text('retry'.tr(context),
+                    style: const TextStyle(color: Colors.white)),
               ),
           ],
         ),
         backgroundColor: Colors.red,
         duration: const Duration(seconds: 5),
         action: SnackBarAction(
-          label: 'Dismiss',
+          label: 'cancel'.tr(context),
           textColor: Colors.white,
           onPressed: () {
             ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -45,24 +44,49 @@ class ErrorHandler {
     );
   }
 
-  /// Get user-friendly error message
-  static String _getErrorMessage(dynamic error) {
-    if (error.toString().contains('network')) {
-      return ApiConstants.networkErrorMessage;
-    } else if (error.toString().contains('permission')) {
-      return 'Permission denied. Please check your app permissions.';
-    } else if (error.toString().contains('timeout')) {
-      return ApiConstants.timeoutErrorMessage;
-    } else if (error.toString().contains('not found')) {
-      return ApiConstants.notFoundErrorMessage;
-    } else if (error.toString().contains('unauthorized')) {
-      return ApiConstants.unauthorizedErrorMessage;
+  static void showError(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  static String _getLocalizedErrorMessage(
+      BuildContext context, dynamic error) {
+    final errorStr = error.toString().toLowerCase();
+
+    if (errorStr.contains('network') || errorStr.contains('socket') ||
+        errorStr.contains('connection')) {
+      return 'network_error'.tr(context);
+    } else if (errorStr.contains('permission') || errorStr.contains('denied')) {
+      return 'permission_error'.tr(context);
+    } else if (errorStr.contains('timeout') || errorStr.contains('timed out')) {
+      return 'timeout_error'.tr(context);
+    } else if (errorStr.contains('not found') || errorStr.contains('404')) {
+      return 'not_found_error'.tr(context);
+    } else if (errorStr.contains('unauthorized') || errorStr.contains('401') ||
+        errorStr.contains('unauthenticated')) {
+      return 'unauthorized_error'.tr(context);
+    } else if (errorStr.contains('server') || errorStr.contains('500') ||
+        errorStr.contains('503')) {
+      return 'server_error'.tr(context);
+    } else if (errorStr.contains('validation') ||
+        errorStr.contains('invalid input')) {
+      return 'validation_error'.tr(context);
     } else {
-      return ApiConstants.unknownErrorMessage;
+      return 'unexpected_error'.tr(context);
     }
   }
 
-  /// Show loading dialog
   static void showLoadingDialog(BuildContext context, {String? message}) {
     showDialog(
       context: context,
@@ -72,19 +96,17 @@ class ErrorHandler {
           children: [
             const CircularProgressIndicator(),
             const SizedBox(width: 16),
-            Text(message ?? 'Loading...'),
+            Text(message ?? 'loading'.tr(context)),
           ],
         ),
       ),
     );
   }
 
-  /// Hide loading dialog
   static void hideLoadingDialog(BuildContext context) {
     Navigator.of(context).pop();
   }
 
-  /// Show success message
   static void showSuccess(
     BuildContext context,
     String message, {
@@ -105,7 +127,6 @@ class ErrorHandler {
     );
   }
 
-  /// Show warning message
   static void showWarning(
     BuildContext context,
     String message, {
@@ -126,13 +147,12 @@ class ErrorHandler {
     );
   }
 
-  /// Show confirmation dialog
   static Future<bool?> showConfirmationDialog(
     BuildContext context, {
     required String title,
     required String message,
-    String confirmText = 'Confirm',
-    String cancelText = 'Cancel',
+    String? confirmText,
+    String? cancelText,
   }) {
     return showDialog<bool>(
       context: context,
@@ -142,11 +162,11 @@ class ErrorHandler {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(cancelText),
+            child: Text(cancelText ?? 'cancel'.tr(context)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text(confirmText),
+            child: Text(confirmText ?? 'confirm_button'.tr(context)),
           ),
         ],
       ),

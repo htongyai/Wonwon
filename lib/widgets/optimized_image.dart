@@ -158,21 +158,29 @@ class _OptimizedImageState extends State<OptimizedImage>
         },
         errorWidget: (context, url, error) {
           appLog('OptimizedImage: Network image error: $error');
-          setState(() {
-            _hasError = true;
-            _isLoading = false;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _hasError = true;
+                _isLoading = false;
+              });
+            }
           });
           return widget.errorWidget ?? _defaultErrorWidget;
         },
         imageBuilder: (context, imageProvider) {
-          setState(() {
-            _isLoading = false;
-            _hasError = false;
-          });
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _hasError = false;
+              });
 
-          if (widget.fadeInAnimation && _animationController != null) {
-            _animationController!.forward();
-          }
+              if (widget.fadeInAnimation && _animationController != null) {
+                _animationController!.forward();
+              }
+            }
+          });
 
           return Image(
             image: imageProvider,
@@ -181,8 +189,6 @@ class _OptimizedImageState extends State<OptimizedImage>
             fit: widget.fit,
           );
         },
-        cacheManager:
-            widget.enableDiskCache ? null : null, // Use default cache manager
       );
     } else {
       imageWidget = widget.errorWidget ?? _defaultErrorWidget;

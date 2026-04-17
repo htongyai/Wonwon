@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:wonwonw2/services/auth_service.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 
 /// Centralized authentication manager that provides consistent auth state
 /// across the entire application
@@ -59,16 +60,6 @@ class AuthManager {
     }
   }
 
-  /// Check if user is logged in (synchronous)
-  bool getIsLoggedIn() {
-    return _isLoggedIn;
-  }
-
-  /// Check if user is logged in (asynchronous - for compatibility)
-  Future<bool> isLoggedInAsync() async {
-    return _isLoggedIn;
-  }
-
   /// Get current user ID
   String? getCurrentUserId() {
     return _currentUser?.uid;
@@ -84,33 +75,11 @@ class AuthManager {
     return await _authService.getUserName();
   }
 
-  /// Login user with retry mechanism
+  /// Login user. Returns true on success, rethrows on failure so the
+  /// caller can show an appropriate error message.
   Future<bool> login(String email, String password) async {
-    int retryCount = 0;
-    const maxRetries = 3;
-
-    while (retryCount < maxRetries) {
-      try {
-        final result = await _authService.login(email, password);
-        if (result.success) {
-          return true;
-        }
-
-        // If login failed, wait before retrying
-        if (retryCount < maxRetries - 1) {
-          await Future.delayed(Duration(seconds: (retryCount + 1) * 2));
-        }
-      } catch (e) {
-        print('AuthManager: Login attempt ${retryCount + 1} failed: $e');
-        if (retryCount < maxRetries - 1) {
-          await Future.delayed(Duration(seconds: (retryCount + 1) * 2));
-        }
-      }
-
-      retryCount++;
-    }
-
-    return false;
+    final result = await _authService.login(email, password);
+    return result.success;
   }
 
   /// Logout user
@@ -119,16 +88,24 @@ class AuthManager {
   }
 
   /// Register user
-  Future<bool> register(
+  Future<RegistrationResult> register(
     String name,
     String email,
     String password,
-    String accountType,
-  ) async {
+    String accountType, {
+    bool acceptedTerms = false,
+  }) async {
     try {
-      return await _authService.register(name, email, password, accountType);
+      return await _authService.register(
+        name, email, password, accountType,
+        acceptedTerms: acceptedTerms,
+      );
     } catch (e) {
-      return false;
+      return RegistrationResult(
+        success: false,
+        errorType: RegistrationErrorType.unknown,
+        errorKey: 'unexpected_error',
+      );
     }
   }
 
@@ -157,11 +134,10 @@ class AuthManager {
   Future<void> _refreshTokenIfNeeded() async {
     if (_currentUser != null) {
       try {
-        // Force refresh the token
         await _currentUser!.getIdToken(true);
-        print('AuthManager: Token refreshed successfully');
+        appLog('AuthManager: Token refreshed');
       } catch (e) {
-        print('AuthManager: Token refresh failed: $e');
+        appLog('AuthManager: Token refresh failed: $e');
         // If token refresh fails, the user needs to re-login
         await _handleTokenRefreshFailure(e);
       }
@@ -170,15 +146,12 @@ class AuthManager {
 
   /// Handle token refresh failure
   Future<void> _handleTokenRefreshFailure(dynamic error) async {
-    print('AuthManager: Handling token refresh failure: $error');
+    appLog('AuthManager: Handling token refresh failure: $error');
 
-    // Try to logout gracefully
     try {
       await logout();
     } catch (logoutError) {
-      print(
-        'AuthManager: Error during logout after token failure: $logoutError',
-      );
+      appLog('AuthManager: Error during logout after token failure: $logoutError');
     }
 
     // Notify listeners that auth state has changed
@@ -194,7 +167,7 @@ class AuthManager {
       await _currentUser!.getIdToken(true);
       return true;
     } catch (e) {
-      print('AuthManager: Token validation failed: $e');
+      appLog('AuthManager: Token validation failed: $e');
       return false;
     }
   }

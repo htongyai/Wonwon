@@ -31,95 +31,42 @@ class ServiceManager {
   OptimizedImageCacheManager? _imageCacheManager;
   AdvancedSearchService? _advancedSearchService;
 
-  // Service initialization status
   bool _isInitialized = false;
-  final Set<String> _initializedServices = {};
 
-  /// Initialize all services
+  /// Initialize all services. Safe to call multiple times.
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     appLog('ServiceManager: Initializing services...');
 
     try {
-      // Initialize core services first
-      await _initializeCoreServices();
+      // Core infrastructure
+      _performanceMonitor = PerformanceMonitor()..startFrameMonitoring();
+      _memoryManager = UnifiedMemoryManager();
+      _imageCacheManager = OptimizedImageCacheManager();
+      _advancedSearchService = AdvancedSearchService();
+      _authService = AuthService();
 
-      // Initialize feature services
-      await _initializeFeatureServices();
+      await Future.wait([
+        _memoryManager!.initialize(),
+        _imageCacheManager!.initialize(),
+        _advancedSearchService!.initialize(),
+      ]);
 
-      // Start monitoring services
-      await _startMonitoringServices();
+      // Feature services (no async init needed)
+      _userService = UserService();
+      _shopService = ShopService();
+      _forumService = ForumService();
+      _reviewService = ReviewService();
+      _reportService = ReportService();
+      _savedShopService = SavedShopService();
 
       _isInitialized = true;
-      appLog('ServiceManager: All services initialized successfully');
+      appLog('ServiceManager: All services initialized');
     } catch (e) {
       appLog('ServiceManager: Failed to initialize services: $e');
       rethrow;
     }
-  }
-
-  Future<void> _initializeCoreServices() async {
-    // Performance Monitor (highest priority)
-    _performanceMonitor = PerformanceMonitor();
-    _performanceMonitor!.startFrameMonitoring();
-    _initializedServices.add('PerformanceMonitor');
-
-    // Unified Memory Manager
-    _memoryManager = UnifiedMemoryManager();
-    await _memoryManager!.initialize();
-    _initializedServices.add('UnifiedMemoryManager');
-
-    // Optimized Image Cache Manager
-    _imageCacheManager = OptimizedImageCacheManager();
-    await _imageCacheManager!.initialize();
-    _initializedServices.add('OptimizedImageCacheManager');
-
-    // Advanced Search Service
-    _advancedSearchService = AdvancedSearchService();
-    await _advancedSearchService!.initialize();
-    _initializedServices.add('AdvancedSearchService');
-
-    // Auth Service (required by most other services)
-    _authService = AuthService();
-    _initializedServices.add('AuthService');
-
-    appLog('ServiceManager: Core services initialized');
-  }
-
-  Future<void> _initializeFeatureServices() async {
-    // User Service
-    _userService = UserService();
-    _initializedServices.add('UserService');
-
-    // Shop Service
-    _shopService = ShopService();
-    _initializedServices.add('ShopService');
-
-    // Forum Service
-    _forumService = ForumService();
-    _initializedServices.add('ForumService');
-
-    // Review Service
-    _reviewService = ReviewService();
-    _initializedServices.add('ReviewService');
-
-    // Report Service
-    _reportService = ReportService();
-    _initializedServices.add('ReportService');
-
-    // Saved Shop Service
-    _savedShopService = SavedShopService();
-    _initializedServices.add('SavedShopService');
-
-    appLog('ServiceManager: Feature services initialized');
-  }
-
-  Future<void> _startMonitoringServices() async {
-    // Start performance monitoring for all services
-    _performanceMonitor?.startOperation('service_manager_lifecycle');
-
-    appLog('ServiceManager: Monitoring services started');
   }
 
   /// Get service instances with lazy initialization
@@ -178,27 +125,16 @@ class ServiceManager {
     return _advancedSearchService!;
   }
 
-  /// Check if a specific service is initialized
-  bool isServiceInitialized(String serviceName) {
-    return _initializedServices.contains(serviceName);
-  }
-
-  /// Get initialization status
   bool get isInitialized => _isInitialized;
 
-  /// Get list of initialized services
-  List<String> get initializedServices => _initializedServices.toList();
-
-  /// Dispose all services and clean up resources
+  /// Dispose all services and clean up resources.
   Future<void> dispose() async {
     appLog('ServiceManager: Disposing services...');
 
     try {
-      // Stop monitoring services
       _performanceMonitor?.stopFrameMonitoring();
       _memoryManager?.dispose();
 
-      // Dispose services in reverse order of initialization
       _savedShopService = null;
       _reportService = null;
       _reviewService = null;
@@ -210,28 +146,18 @@ class ServiceManager {
       _advancedSearchService = null;
       _memoryManager = null;
       _performanceMonitor = null;
-
-      _initializedServices.clear();
       _isInitialized = false;
 
-      appLog('ServiceManager: All services disposed successfully');
+      appLog('ServiceManager: All services disposed');
     } catch (e) {
       appLog('ServiceManager: Error disposing services: $e');
     }
   }
 
-  /// Reset service manager (useful for testing)
-  Future<void> reset() async {
-    await dispose();
-    await initialize();
-  }
-
-  /// Get service health status
+  /// Get service health status.
   Map<String, dynamic> getHealthStatus() {
     return {
       'isInitialized': _isInitialized,
-      'initializedServices': _initializedServices.toList(),
-      'serviceCount': _initializedServices.length,
       'memoryUsage': _memoryManager?.getObject('memory_usage'),
       'performanceMetrics': _performanceMonitor?.getPerformanceMetrics(),
     };

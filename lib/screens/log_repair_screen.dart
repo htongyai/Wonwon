@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:wonwonw2/models/repair_shop.dart';
 import 'package:wonwonw2/models/repair_record.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/models/repair_sub_service.dart';
 import 'package:wonwonw2/mixins/auth_state_mixin.dart';
+import 'package:wonwonw2/services/analytics_service.dart';
 
 class LogRepairScreen extends StatefulWidget {
   final RepairShop shop;
@@ -22,10 +25,21 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
   final _durationController = TextEditingController();
   final _notesController = TextEditingController();
   bool _isSubmitting = false;
+  bool _submittedSuccessfully = false;
   int? _satisfactionRating;
   String? _selectedCategory;
   String? _selectedSubService;
   Map<String, List<RepairSubService>> _subServices = {};
+
+  List<String> get _availableCategories {
+    final shopCats = widget.shop.categories;
+    final allCats = _subServices.keys.toList();
+    if (shopCats.isNotEmpty) {
+      final matched = shopCats.where((c) => allCats.contains(c)).toList();
+      if (matched.isNotEmpty) return matched;
+    }
+    return allCats;
+  }
 
   @override
   void initState() {
@@ -43,7 +57,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate() ||
+    if (!(_formKey.currentState?.validate() ?? false) ||
         _selectedDate == null ||
         _selectedCategory == null ||
         _selectedSubService == null)
@@ -53,6 +67,8 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
       _isSubmitting = true;
     });
     if (!isLoggedIn || currentUser == null) return;
+    final currentUserUid = currentUser?.uid;
+    if (currentUserUid == null) return;
     final record = RepairRecord(
       id: FirebaseFirestore.instance.collection('tmp').doc().id,
       shopId: widget.shop.id,
@@ -72,27 +88,118 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
       category: _selectedCategory!,
       subService: _selectedSubService!,
     );
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(currentUser!.uid)
-        .collection('repairRecords')
-        .doc(record.id)
-        .set(record.toMap());
-    if (mounted) {
-      Navigator.pop(context, true);
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUserUid)
+          .collection('repairRecords')
+          .doc(record.id)
+          .set(record.toMap());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('repair_logged'.tr(context)),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _submittedSuccessfully = true;
+        AnalyticsService.safeLog(() => AnalyticsService().logLogRepair(widget.shop.id));
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('error_generic'.tr(context).replaceAll('{error}', e.toString())),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  bool get _hasUnsavedChanges {
+    if (_submittedSuccessfully) return false;
+    return _itemController.text.isNotEmpty ||
+        _priceController.text.isNotEmpty ||
+        _durationController.text.isNotEmpty ||
+        _notesController.text.isNotEmpty ||
+        _selectedDate != null ||
+        _selectedCategory != null ||
+        _selectedSubService != null ||
+        _satisfactionRating != null;
+  }
+
+  Future<bool> _showDiscardDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'discard_changes'.tr(context),
+          style: GoogleFonts.montserrat(
+            fontWeight: FontWeight.bold,
+            color: Colors.brown,
+          ),
+        ),
+        content: Text(
+          'discard_changes_message'.tr(context),
+          style: GoogleFonts.montserrat(),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'keep_editing'.tr(context),
+              style: const TextStyle(color: Colors.brown),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              'discard'.tr(context),
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('log_repair'.tr(context))),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldDiscard = await _showDiscardDialog();
+        if (shouldDiscard && mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+      appBar: AppBar(
+        title: Text('log_repair'.tr(context)),
+        backgroundColor: Colors.brown,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: ResponsiveBreakpoints.mobile),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: ListView(
+                padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+                children: [
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -138,11 +245,14 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
                         children: [
                           Icon(Icons.place, size: 16, color: Colors.grey[600]),
                           const SizedBox(width: 4),
-                          Text(
-                            widget.shop.area,
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
+                          Expanded(
+                            child: Text(
+                              widget.shop.area,
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -155,11 +265,14 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
                         children: [
                           Icon(Icons.phone, size: 16, color: Colors.grey[600]),
                           const SizedBox(width: 4),
-                          Text(
-                            widget.shop.phoneNumber!,
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
+                          Expanded(
+                            child: Text(
+                              widget.shop.phoneNumber ?? '',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -170,16 +283,16 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
               ),
               const SizedBox(height: 24),
               DropdownButtonFormField<String>(
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: 'category_form_label'.tr(context),
+                  border: const OutlineInputBorder(),
                 ),
                 value: _selectedCategory,
                 items:
-                    widget.shop.categories.map((category) {
+                    _availableCategories.map((category) {
                       return DropdownMenuItem(
                         value: category,
-                        child: Text(category),
+                        child: Text('category_$category'.tr(context)),
                       );
                     }).toList(),
                 onChanged: (value) {
@@ -190,21 +303,22 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
                 },
                 validator:
                     (value) =>
-                        value == null ? 'Please select a category' : null,
+                        value == null ? 'please_select_category'.tr(context) : null,
               ),
               const SizedBox(height: 16),
               if (_selectedCategory != null)
                 DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(
-                    labelText: 'Service',
-                    border: OutlineInputBorder(),
+                  key: ValueKey(_selectedCategory),
+                  decoration: InputDecoration(
+                    labelText: 'service_form_label'.tr(context),
+                    border: const OutlineInputBorder(),
                   ),
                   value: _selectedSubService,
                   items:
                       (_subServices[_selectedCategory] ?? []).map((subService) {
                         return DropdownMenuItem(
                           value: subService.id,
-                          child: Text(subService.name),
+                          child: Text(subService.getLocalizedName(context)),
                         );
                       }).toList(),
                   onChanged: (value) {
@@ -214,23 +328,23 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
                   },
                   validator:
                       (value) =>
-                          value == null ? 'Please select a service' : null,
+                          value == null ? 'please_select_service'.tr(context) : null,
                 ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _itemController,
-                decoration: const InputDecoration(
-                  labelText: 'Item Fixed',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: 'item_fixed'.tr(context),
+                  border: const OutlineInputBorder(),
                 ),
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                validator: (v) => v == null || v.isEmpty ? 'field_required'.tr(context) : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _priceController,
-                decoration: const InputDecoration(
-                  labelText: 'Price (THB)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: 'price_thb'.tr(context),
+                  border: const OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
               ),
@@ -247,11 +361,15 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      _selectedDate == null
-                          ? 'Repair Date'
-                          : 'Repair Date: ${_selectedDate!.toLocal().toString().split(' ')[0]}',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    Expanded(
+                      child: Text(
+                        _selectedDate == null
+                            ? 'repair_date'.tr(context)
+                            : '${'repair_date'.tr(context)}: ${_selectedDate!.toLocal().toString().split(' ')[0]}',
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
                     ),
                     TextButton.icon(
                       onPressed: () async {
@@ -261,14 +379,14 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
                           firstDate: DateTime(2000),
                           lastDate: DateTime.now(),
                         );
-                        if (picked != null) {
+                        if (picked != null && mounted) {
                           setState(() {
                             _selectedDate = picked;
                           });
                         }
                       },
                       icon: const Icon(Icons.calendar_today, size: 20),
-                      label: const Text('Select Date'),
+                      label: Text('select_date'.tr(context)),
                       style: TextButton.styleFrom(foregroundColor: Colors.blue),
                     ),
                   ],
@@ -277,27 +395,27 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _durationController,
-                decoration: const InputDecoration(
-                  labelText: 'Duration (days)',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: 'duration_days'.tr(context),
+                  border: const OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: 'notes'.tr(context),
+                  border: const OutlineInputBorder(),
                   alignLabelWithHint: true,
                 ),
                 maxLines: 4,
                 textAlignVertical: TextAlignVertical.top,
               ),
               const SizedBox(height: 16),
-              const Text(
-                'How satisfied were you with the repair?',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Text(
+                'satisfaction_question'.tr(context),
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Row(
@@ -324,15 +442,39 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isSubmitting ? null : _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.brown,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 child:
                     _isSubmitting
-                        ? const CircularProgressIndicator()
-                        : const Text('Save'),
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text(
+                            'submit_repair'.tr(context),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
               ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
+    ),
+    ),
     );
   }
 }

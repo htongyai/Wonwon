@@ -1,26 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:shared/constants/responsive_breakpoints.dart';
 import 'package:wonwonw2/screens/home_screen.dart';
 import 'package:wonwonw2/screens/map_screen.dart';
 import 'package:wonwonw2/screens/saved_locations_screen.dart';
 import 'package:wonwonw2/screens/profile_screen.dart';
-import 'package:wonwonw2/screens/desktop_home_screen.dart';
-import 'package:wonwonw2/screens/desktop_map_screen.dart';
-import 'package:wonwonw2/screens/desktop_saved_locations_screen.dart';
-import 'package:wonwonw2/screens/desktop_profile_screen.dart';
-import 'package:wonwonw2/screens/tablet_home_screen.dart';
-import 'package:wonwonw2/screens/tablet_map_screen.dart';
-import 'package:wonwonw2/screens/tablet_saved_locations_screen.dart';
-import 'package:wonwonw2/screens/tablet_profile_screen.dart';
-import 'package:wonwonw2/screens/admin_dashboard_main_screen.dart';
 import 'package:wonwonw2/screens/forum_screen.dart';
-import 'package:wonwonw2/utils/responsive_size.dart';
-import 'package:wonwonw2/widgets/custom_navigation_bar.dart';
-import 'package:wonwonw2/widgets/tablet_navigation_bar.dart';
-import 'package:wonwonw2/widgets/desktop_navigation.dart';
-import 'package:wonwonw2/services/auth_manager.dart';
-import 'package:wonwonw2/mixins/auth_state_mixin.dart';
-import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:shared/mixins/auth_state_mixin.dart';
 import 'package:wonwonw2/widgets/notification_overlay.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
+import 'package:wonwonw2/localization/app_localizations.dart';
+import 'package:shared/constants/app_constants.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:shared/utils/app_reload.dart';
 
 class MainNavigation extends StatefulWidget {
   final int initialIndex;
@@ -35,204 +27,254 @@ class MainNavigation extends StatefulWidget {
 
 class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
   late int _currentIndex;
-  bool _isAdmin = false;
-  bool _isLoading = true;
-  final _authManager = AuthManager();
+  final _pageStorageBucket = PageStorageBucket();
 
   @override
   void initState() {
     super.initState();
-    print('=== MAIN NAVIGATION INIT ===');
-    print(
-      'MainNavigation: initState called with initialIndex: ${widget.initialIndex}',
-    );
     _currentIndex = widget.initialIndex;
-    _checkAdminStatus();
-  }
-
-  Future<void> _checkAdminStatus() async {
-    try {
-      final isAdmin = await _authManager.isAdmin();
-      if (mounted) {
-        setState(() {
-          _isAdmin = isAdmin;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('Error checking admin status: $e');
-      if (mounted) {
-        setState(() {
-          _isAdmin = false;
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
-  void onAuthStateChanged(bool isLoggedIn) {
-    if (!isLoggedIn) {
-      // User logged out, reset admin status
-      if (mounted) {
-        setState(() {
-          _isAdmin = false;
-          _isLoading = false;
-        });
-      }
-    } else {
-      // User logged in, check admin status
-      _checkAdminStatus();
-    }
-  }
-
-  @override
-  void onUserChanged(user) {
-    if (user != null) {
-      _checkAdminStatus();
-    }
   }
 
   void onTap(int index) {
-    // Check if user is trying to access admin routes
-    if (index >= 5 && !_isAdmin) {
-      // Show error message for non-admin users trying to access admin routes
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'access_denied'.tr(context) +
-                '. ' +
-                'admin_privileges_required'.tr(context),
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    // Handle admin dashboard separately (opens as new screen)
-    if (index == 5 && _isAdmin) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => const AdminDashboardMainScreen(),
-        ),
-      );
-      return;
-    }
-
-    // For regular tabs, just update the current index
     setState(() {
       _currentIndex = index;
     });
   }
 
-  // Static method to find the MainNavigationState
   static MainNavigationState? of(BuildContext context) {
     return context.findAncestorStateOfType<MainNavigationState>();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Initialize ResponsiveSize if needed
-    if (ResponsiveSize.screenWidth == 0) {
-      ResponsiveSize.init(context);
-    }
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = ResponsiveBreakpoints.shouldShowDesktopLayout(width);
 
-    // Use desktop navigation for desktop screens
-    if (ResponsiveSize.shouldShowDesktopLayout(context)) {
-      return NotificationOverlay(
-        child: DesktopNavigation(
-          currentIndex: _currentIndex,
-          onTap: onTap,
-          onSidebarCollapsed: (collapsed) {
-            // Sidebar collapse state handled by DesktopNavigation
-          },
-          child: _buildCurrentScreen(),
+    return NotificationOverlay(
+      child: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
+    );
+  }
+
+  Widget _buildDesktopLayout() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Row(
+        children: [
+          _buildDesktopSidebar(),
+          Expanded(
+            child: PageStorage(
+              bucket: _pageStorageBucket,
+              child: _buildCurrentScreen(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopSidebar() {
+    return Container(
+      width: 240,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          right: BorderSide(color: Colors.grey.shade200),
         ),
-      );
-    }
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Image.asset('assets/images/wwg.png', height: 36),
+                const SizedBox(width: 10),
+                const Text(
+                  'WonWon',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF443616),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          ..._buildNavItems(),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLangButton('EN', const Locale('en')),
+                const SizedBox(width: 8),
+                _buildLangButton('TH', const Locale('th')),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
 
-    // Use tablet navigation for tablet screens
-    if (ResponsiveSize.shouldShowTabletLayout(context)) {
-      return NotificationOverlay(
-        child: Scaffold(
-          backgroundColor: const Color(0xFFF8FAFC),
-          body: _buildCurrentScreen(),
-          bottomNavigationBar: TabletNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: onTap,
+  List<Widget> _buildNavItems() {
+    final items = [
+      _NavItem(icon: FontAwesomeIcons.house, label: 'home'.tr(context), index: 0),
+      _NavItem(icon: FontAwesomeIcons.map, label: 'search'.tr(context), index: 1),
+      _NavItem(icon: FontAwesomeIcons.bookmark, label: 'saved'.tr(context), index: 2),
+      _NavItem(icon: FontAwesomeIcons.comments, label: 'forum'.tr(context), index: 4),
+      _NavItem(icon: FontAwesomeIcons.user, label: 'profile'.tr(context), index: 3),
+    ];
+
+    return items.map((item) {
+      final isSelected = _currentIndex == item.index;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => onTap(item.index),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isSelected ? AppConstants.primaryColor.withValues(alpha: 0.1) : null,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  FaIcon(
+                    item.icon,
+                    size: 18,
+                    color: isSelected ? AppConstants.primaryColor : const Color(0xFF757575),
+                  ),
+                  const SizedBox(width: 14),
+                  Text(
+                    item.label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected ? AppConstants.primaryColor : const Color(0xFF424242),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       );
-    }
+    }).toList();
+  }
 
-    // Use mobile navigation for mobile screens
-    return NotificationOverlay(
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
-        body: _buildCurrentScreen(),
-        bottomNavigationBar: CustomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: onTap,
+  Widget _buildLangButton(String label, Locale locale) {
+    return FutureBuilder<Locale>(
+      future: AppLocalizationsService.getLocale(),
+      builder: (context, snapshot) {
+        final currentLocale = snapshot.data ?? const Locale('th');
+        final isSelected = currentLocale.languageCode == locale.languageCode;
+
+        return TextButton(
+          onPressed: () async {
+            await AppLocalizationsService.setLocale(locale.languageCode);
+            if (kIsWeb) {
+              reload();
+            }
+            if (mounted) setState(() {});
+          },
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            backgroundColor: isSelected
+                ? AppConstants.primaryColor.withValues(alpha: 0.1)
+                : null,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+              color: isSelected ? AppConstants.primaryColor : Colors.grey[600],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: PageStorage(
+        bucket: _pageStorageBucket,
+        child: _buildCurrentScreen(),
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(child: _buildNavBarItem(FontAwesomeIcons.house, 'home'.tr(context), 0)),
+              Expanded(child: _buildNavBarItem(FontAwesomeIcons.magnifyingGlass, 'search'.tr(context), 1)),
+              Expanded(child: _buildNavBarItem(FontAwesomeIcons.bookmark, 'saved'.tr(context), 2)),
+              Expanded(child: _buildNavBarItem(FontAwesomeIcons.comments, 'forum'.tr(context), 4)),
+              Expanded(child: _buildNavBarItem(FontAwesomeIcons.user, 'profile'.tr(context), 3)),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildCurrentScreen() {
-    // Show loading screen while checking admin status
-    if (_isLoading) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Loading...'),
-            ],
+  Widget _buildNavBarItem(IconData icon, String label, int index) {
+    final isSelected = _currentIndex == index;
+    return GestureDetector(
+      onTap: () => onTap(index),
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FaIcon(
+            icon,
+            size: 20,
+            color: isSelected ? AppConstants.primaryColor : const Color(0xFFBDBDBD),
           ),
-        ),
-      );
-    }
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected ? AppConstants.primaryColor : const Color(0xFFBDBDBD),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
 
-    // For desktop, use desktop-specific screens when available
-    if (ResponsiveSize.shouldShowDesktopLayout(context)) {
-      switch (_currentIndex) {
-        case 0:
-          return const DesktopHomeScreen();
-        case 1:
-          return const DesktopMapScreen();
-        case 2:
-          return const DesktopSavedLocationsScreen();
-        case 3:
-          return const DesktopProfileScreen();
-        case 4:
-          return const ForumScreen();
-        default:
-          return const HomeScreen();
-      }
-    }
-
-    // For tablet, use tablet-specific screens when available
-    if (ResponsiveSize.shouldShowTabletLayout(context)) {
-      switch (_currentIndex) {
-        case 0:
-          return const TabletHomeScreen();
-        case 1:
-          return const TabletMapScreen();
-        case 2:
-          return const TabletSavedLocationsScreen();
-        case 3:
-          return const TabletProfileScreen();
-        case 4:
-          return const ForumScreen();
-        default:
-          return const TabletHomeScreen();
-      }
-    }
-
-    // For mobile, use mobile-specific screens
+  Widget _buildCurrentScreen() {
     switch (_currentIndex) {
       case 0:
         return const HomeScreen();
@@ -248,4 +290,11 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
         return const HomeScreen();
     }
   }
+}
+
+class _NavItem {
+  final IconData icon;
+  final String label;
+  final int index;
+  _NavItem({required this.icon, required this.label, required this.index});
 }

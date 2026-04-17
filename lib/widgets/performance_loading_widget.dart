@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wonwonw2/constants/app_constants.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class PerformanceLoadingWidget extends StatefulWidget {
   final String? message;
@@ -92,7 +93,7 @@ class _PerformanceLoadingWidgetState extends State<PerformanceLoadingWidget>
                         boxShadow: [
                           BoxShadow(
                             color: (widget.color ?? AppConstants.primaryColor)
-                                .withOpacity(0.3),
+                                .withValues(alpha: 0.3),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -257,6 +258,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
           setState(() {
             _currentStep = i;
           });
+          _stepController.reset();
           _stepController.forward();
         }
         await Future.delayed(widget.stepDelay);
@@ -289,7 +291,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
             Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
             const SizedBox(height: 16),
             Text(
-              'Error loading content',
+              'error_loading_content'.tr(context),
               style: GoogleFonts.montserrat(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -298,7 +300,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
             ),
             const SizedBox(height: 8),
             Text(
-              _errorMessage ?? 'Unknown error occurred',
+              _errorMessage ?? 'unknown_error'.tr(context),
               style: GoogleFonts.montserrat(
                 fontSize: 14,
                 color: Colors.grey[500],
@@ -315,7 +317,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
                 });
                 _startLoading();
               },
-              child: const Text('Retry'),
+              child: Text('retry'.tr(context)),
             ),
           ],
         ),
@@ -341,7 +343,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: AppConstants.primaryColor.withOpacity(0.3),
+                    color: AppConstants.primaryColor.withValues(alpha: 0.3),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -354,7 +356,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
 
             // Loading text
             Text(
-              'Loading...',
+              'loading_text'.tr(context),
               style: GoogleFonts.montserrat(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -480,6 +482,7 @@ class OptimizedLoadingList extends StatefulWidget {
 class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
   List<dynamic> _items = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
   bool _hasError = false;
   String? _errorMessage;
   bool _hasMoreData = true;
@@ -498,7 +501,10 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
       });
     }
 
-    if (!_hasMoreData && !refresh) return;
+    if (!_hasMoreData && !refresh) {
+      _isLoadingMore = false;
+      return;
+    }
 
     try {
       setState(() {
@@ -516,6 +522,7 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
             _items.addAll(newItems);
           }
           _isLoading = false;
+          _isLoadingMore = false;
           _hasMoreData = newItems.length >= widget.pageSize;
         });
       }
@@ -525,6 +532,7 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
           _hasError = true;
           _errorMessage = e.toString();
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     }
@@ -541,7 +549,7 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
                 Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
                 const SizedBox(height: 16),
                 Text(
-                  'Error loading data',
+                  'error_loading_data'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -550,7 +558,7 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _errorMessage ?? 'Unknown error occurred',
+                  _errorMessage ?? 'unknown_error'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 14,
                     color: Colors.grey[500],
@@ -560,7 +568,7 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () => _loadData(refresh: true),
-                  child: const Text('Retry'),
+                  child: Text('retry'.tr(context)),
                 ),
               ],
             ),
@@ -568,8 +576,8 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
     }
 
     if (_isLoading && _items.isEmpty) {
-      return const PerformanceLoadingWidget(
-        message: 'Loading content...',
+      return PerformanceLoadingWidget(
+        message: 'loading'.tr(context),
         size: 50,
       );
     }
@@ -583,7 +591,7 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
                 Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
                 const SizedBox(height: 16),
                 Text(
-                  'No items found',
+                  'no_items_found'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -601,8 +609,14 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
         itemCount: _items.length + (_hasMoreData ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == _items.length) {
+            if (_hasMoreData && !_isLoadingMore) {
+              _isLoadingMore = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                _loadData();
+              });
+            }
             if (_hasMoreData) {
-              _loadData();
               return const Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Center(child: CircularProgressIndicator()),

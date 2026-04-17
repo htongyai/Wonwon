@@ -278,6 +278,7 @@ class LazyWidget extends StatefulWidget {
 class _LazyWidgetState extends State<LazyWidget> {
   Widget? _child;
   bool _isLoading = true;
+  Timer? _timer;
 
   @override
   void initState() {
@@ -286,7 +287,8 @@ class _LazyWidgetState extends State<LazyWidget> {
   }
 
   void _loadWidget() {
-    Timer(widget.delay, () {
+    _timer?.cancel();
+    _timer = Timer(widget.delay, () {
       if (mounted) {
         setState(() {
           _child = widget.builder();
@@ -294,6 +296,12 @@ class _LazyWidgetState extends State<LazyWidget> {
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -388,7 +396,7 @@ class _PerformanceMonitorWidgetState extends State<PerformanceMonitorWidget> {
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.7),
+              color: Colors.black.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(

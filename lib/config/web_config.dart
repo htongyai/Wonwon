@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
 
 /// Web-specific configuration and utilities
 class WebConfig {
@@ -23,15 +25,16 @@ class WebConfig {
   // Check if running on web
   static bool get isWeb => kIsWeb;
 
-  // Check if running on mobile web
-  static bool get isMobileWeb {
+  // Check if running on mobile web (uses window width as a heuristic)
+  static bool isMobileWebCheck(BuildContext context) {
     if (!kIsWeb) return false;
-    // This is a simplified check - in a real app you'd use a proper user agent parser
-    return false; // For now, assume desktop web
+    final width = MediaQuery.of(context).size.width;
+    return width < ResponsiveBreakpoints.mobile;
   }
 
   // Deployment mode getters
-  static bool get isAdminOnlyDeployment => forceAdminMode || deploymentMode == 'admin';
+  // Admin deployment disabled — admin will be a separate app
+  static bool get isAdminOnlyDeployment => false;
   static bool get isUserOnlyDeployment => forceUserMode || deploymentMode == 'user';
   static bool get isAutoModeDeployment => !forceAdminMode && !forceUserMode && deploymentMode == 'auto';
 
@@ -55,8 +58,8 @@ class WebConfig {
   // Web-specific error handling
   static void handleWebError(dynamic error, StackTrace stackTrace) {
     if (kDebugMode) {
-      print('Web Error: $error');
-      print('Stack Trace: $stackTrace');
+      debugPrint('Web Error: $error');
+      debugPrint('Stack Trace: $stackTrace');
     }
 
     // In production, you might want to send this to a logging service
@@ -141,9 +144,9 @@ class WebUtils {
 /// Web-specific constants
 class WebConstants {
   // Breakpoints for responsive design
-  static const double mobileBreakpoint = 768;
-  static const double tabletBreakpoint = 1024;
-  static const double desktopBreakpoint = 1200;
+  static const double mobileBreakpoint = ResponsiveBreakpoints.mobile;
+  static const double tabletBreakpoint = ResponsiveBreakpoints.tablet;
+  static const double desktopBreakpoint = ResponsiveBreakpoints.desktop;
 
   // Web-specific colors (might differ from mobile)
   static const int primaryColorWeb = 0xFF8B4513; // Brown

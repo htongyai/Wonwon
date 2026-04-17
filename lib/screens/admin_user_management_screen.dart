@@ -7,7 +7,9 @@ import 'package:wonwonw2/widgets/optimized_screen.dart';
 import 'package:wonwonw2/models/user.dart';
 import 'package:wonwonw2/services/user_service.dart';
 import 'package:wonwonw2/services/version_service.dart';
+import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:intl/intl.dart';
+import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 
 class AdminUserManagementScreen extends OptimizedScreen {
   const AdminUserManagementScreen({Key? key}) : super(key: key);
@@ -47,7 +49,7 @@ class _AdminUserManagementScreenState
           child: Row(
             children: [
               Text(
-                'User Management',
+                'user_management_label'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
@@ -60,7 +62,7 @@ class _AdminUserManagementScreenState
                   ElevatedButton.icon(
                     onPressed: _showBulkActionsDialog,
                     icon: const FaIcon(FontAwesomeIcons.tasks, size: 16),
-                    label: const Text('Bulk Actions'),
+                    label: Text('bulk_actions'.tr(context)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.grey[600],
                       foregroundColor: Colors.white,
@@ -85,11 +87,11 @@ class _AdminUserManagementScreenState
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: AppConstants.primaryColor.withOpacity(0.1),
+                          color: AppConstants.primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          '$count Total Users',
+                          'total_users_count'.tr(context).replaceAll('{count}', count.toString()),
                           style: GoogleFonts.inter(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -126,7 +128,7 @@ class _AdminUserManagementScreenState
                     });
                   },
                   decoration: InputDecoration(
-                    hintText: 'Search users by name or email...',
+                    hintText: 'search_users_hint'.tr(context),
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -152,24 +154,24 @@ class _AdminUserManagementScreenState
                 child: DropdownButtonFormField<String>(
                   value: _roleFilter,
                   decoration: InputDecoration(
-                    labelText: 'Role',
+                    labelText: 'role_label'.tr(context),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     filled: true,
                     fillColor: Colors.white,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Roles')),
-                    DropdownMenuItem(value: 'user', child: Text('User')),
+                  items: [
+                    DropdownMenuItem(value: 'all', child: Text('all_roles'.tr(context))),
+                    DropdownMenuItem(value: 'user', child: Text('user_role'.tr(context))),
                     DropdownMenuItem(
                       value: 'shop_owner',
-                      child: Text('Shop Owner'),
+                      child: Text('shop_owner_role'.tr(context)),
                     ),
-                    DropdownMenuItem(value: 'admin', child: Text('Admin')),
+                    DropdownMenuItem(value: 'admin', child: Text('admin_role_label'.tr(context))),
                     DropdownMenuItem(
                       value: 'moderator',
-                      child: Text('Moderator'),
+                      child: Text('moderator_role'.tr(context)),
                     ),
                   ],
                   onChanged: (value) {
@@ -186,21 +188,21 @@ class _AdminUserManagementScreenState
                 child: DropdownButtonFormField<String>(
                   value: _statusFilter,
                   decoration: InputDecoration(
-                    labelText: 'Status',
+                    labelText: 'admin_status'.tr(context),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     filled: true,
                     fillColor: Colors.white,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Status')),
-                    DropdownMenuItem(value: 'active', child: Text('Active')),
+                  items: [
+                    DropdownMenuItem(value: 'all', child: Text('all_status'.tr(context))),
+                    DropdownMenuItem(value: 'active', child: Text('active_status'.tr(context))),
                     DropdownMenuItem(
                       value: 'suspended',
-                      child: Text('Suspended'),
+                      child: Text('suspended_status'.tr(context)),
                     ),
-                    DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                    DropdownMenuItem(value: 'pending', child: Text('pending_status_label'.tr(context))),
                   ],
                   onChanged: (value) {
                     safeSetState(() {
@@ -216,24 +218,24 @@ class _AdminUserManagementScreenState
                 child: DropdownButtonFormField<String>(
                   value: _sortBy,
                   decoration: InputDecoration(
-                    labelText: 'Sort By',
+                    labelText: 'sort_by_label'.tr(context),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                     filled: true,
                     fillColor: Colors.white,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'name', child: Text('Name')),
-                    DropdownMenuItem(value: 'email', child: Text('Email')),
-                    DropdownMenuItem(value: 'role', child: Text('Role')),
+                  items: [
+                    DropdownMenuItem(value: 'name', child: Text('name_sort'.tr(context))),
+                    DropdownMenuItem(value: 'email', child: Text('email_sort'.tr(context))),
+                    DropdownMenuItem(value: 'role', child: Text('role_sort'.tr(context))),
                     DropdownMenuItem(
                       value: 'createdAt',
-                      child: Text('Join Date'),
+                      child: Text('join_date_sort'.tr(context)),
                     ),
                     DropdownMenuItem(
                       value: 'lastActive',
-                      child: Text('Last Active'),
+                      child: Text('last_active_sort'.tr(context)),
                     ),
                   ],
                   onChanged: (value) {
@@ -256,7 +258,7 @@ class _AdminUserManagementScreenState
                   _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
                   color: const Color(0xFF64748B),
                 ),
-                tooltip: _sortAscending ? 'Sort Ascending' : 'Sort Descending',
+                tooltip: _sortAscending ? 'sort_ascending_label'.tr(context) : 'sort_descending_label'.tr(context),
                 style: IconButton.styleFrom(
                   backgroundColor: Colors.white,
                   side: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -276,7 +278,7 @@ class _AdminUserManagementScreenState
               }
 
               if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
+                return Center(child: Text('error_prefix'.tr(context).replaceAll('{error}', snapshot.error.toString())));
               }
 
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -424,7 +426,7 @@ class _AdminUserManagementScreenState
           FaIcon(FontAwesomeIcons.users, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            'No users found',
+            'no_users_found_title'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -433,7 +435,7 @@ class _AdminUserManagementScreenState
           ),
           const SizedBox(height: 8),
           Text(
-            'No users match your current filters',
+            'no_users_match_filters_msg'.tr(context),
             style: GoogleFonts.inter(
               fontSize: 14,
               color: const Color(0xFF64748B),
@@ -461,7 +463,7 @@ class _AdminUserManagementScreenState
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -489,7 +491,7 @@ class _AdminUserManagementScreenState
             // Avatar
             CircleAvatar(
               radius: 24,
-              backgroundColor: _getRoleColor(user.accountType).withOpacity(0.1),
+              backgroundColor: _getRoleColor(user.accountType).withValues(alpha: 0.1),
               child: Text(
                 user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
                 style: GoogleFonts.inter(
@@ -525,7 +527,7 @@ class _AdminUserManagementScreenState
                         decoration: BoxDecoration(
                           color: _getRoleColor(
                             user.accountType,
-                          ).withOpacity(0.1),
+                          ).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -544,7 +546,7 @@ class _AdminUserManagementScreenState
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(user.status).withOpacity(0.1),
+                          color: _getStatusColor(user.status).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -579,7 +581,7 @@ class _AdminUserManagementScreenState
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Last active ${_formatLastActiveTime(_userLastActiveMap[user.id]!)}',
+                          'last_active_prefix'.tr(context).replaceAll('{time}', _formatLastActiveTime(_userLastActiveMap[user.id]!)),
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -604,7 +606,7 @@ class _AdminUserManagementScreenState
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'App v${_userAppVersionMap[user.id]!}',
+                          'app_version_prefix'.tr(context).replaceAll('{version}', _userAppVersionMap[user.id]!),
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
@@ -645,7 +647,7 @@ class _AdminUserManagementScreenState
                   Row(
                     children: [
                       Text(
-                        'Joined ${DateFormat('MMM dd, yyyy').format(user.createdAt)}',
+                        'joined_date_prefix'.tr(context).replaceAll('{date}', DateFormat('MMM dd, yyyy').format(user.createdAt)),
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: const Color(0xFF64748B),
@@ -661,7 +663,7 @@ class _AdminUserManagementScreenState
                           decoration: BoxDecoration(
                             color: _getActiveStatusColor(
                               _userLastActiveMap[user.id]!,
-                            ).withOpacity(0.1),
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
@@ -676,7 +678,7 @@ class _AdminUserManagementScreenState
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Last active ${_formatLastActiveTime(_userLastActiveMap[user.id]!)}',
+                                'last_active_prefix'.tr(context).replaceAll('{time}', _formatLastActiveTime(_userLastActiveMap[user.id]!)),
                                 style: GoogleFonts.inter(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w500,
@@ -702,9 +704,9 @@ class _AdminUserManagementScreenState
                 IconButton(
                   onPressed: () => _viewUserDetails(user),
                   icon: const FaIcon(FontAwesomeIcons.eye, size: 16),
-                  tooltip: 'View Details',
+                  tooltip: 'view_details_tooltip'.tr(context),
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFF3B82F6).withOpacity(0.1),
+                    backgroundColor: const Color(0xFF3B82F6).withValues(alpha: 0.1),
                     foregroundColor: const Color(0xFF3B82F6),
                   ),
                 ),
@@ -712,9 +714,9 @@ class _AdminUserManagementScreenState
                 IconButton(
                   onPressed: () => _editUser(user),
                   icon: const FaIcon(FontAwesomeIcons.userEdit, size: 16),
-                  tooltip: 'Edit User',
+                  tooltip: 'edit_user_action'.tr(context),
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFF59E0B).withOpacity(0.1),
+                    backgroundColor: const Color(0xFFF59E0B).withValues(alpha: 0.1),
                     foregroundColor: const Color(0xFFF59E0B),
                   ),
                 ),
@@ -723,9 +725,9 @@ class _AdminUserManagementScreenState
                   IconButton(
                     onPressed: () => _suspendUser(user),
                     icon: const FaIcon(FontAwesomeIcons.userSlash, size: 16),
-                    tooltip: 'Suspend User',
+                    tooltip: 'suspend_user_action'.tr(context),
                     style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFFEF4444).withOpacity(0.1),
+                      backgroundColor: const Color(0xFFEF4444).withValues(alpha: 0.1),
                       foregroundColor: const Color(0xFFEF4444),
                     ),
                   )
@@ -733,9 +735,9 @@ class _AdminUserManagementScreenState
                   IconButton(
                     onPressed: () => _activateUser(user),
                     icon: const FaIcon(FontAwesomeIcons.userCheck, size: 16),
-                    tooltip: 'Activate User',
+                    tooltip: 'activate_user_action'.tr(context),
                     style: IconButton.styleFrom(
-                      backgroundColor: AppConstants.primaryColor.withOpacity(
+                      backgroundColor: AppConstants.primaryColor.withValues(alpha: 
                         0.1,
                       ),
                       foregroundColor: AppConstants.primaryColor,
@@ -745,9 +747,9 @@ class _AdminUserManagementScreenState
                 IconButton(
                   onPressed: () => _deleteUser(user),
                   icon: const FaIcon(FontAwesomeIcons.trash, size: 16),
-                  tooltip: 'Delete User',
+                  tooltip: 'delete_user_action'.tr(context),
                   style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFEF4444).withOpacity(0.1),
+                    backgroundColor: const Color(0xFFEF4444).withValues(alpha: 0.1),
                     foregroundColor: const Color(0xFFEF4444),
                   ),
                 ),
@@ -793,7 +795,7 @@ class _AdminUserManagementScreenState
       builder:
           (context) => Dialog(
             child: Container(
-              width: 500,
+              width: MediaQuery.of(context).size.width > 540 ? 500 : MediaQuery.of(context).size.width * 0.92,
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -802,7 +804,7 @@ class _AdminUserManagementScreenState
                   Row(
                     children: [
                       Text(
-                        'User Details',
+                        'user_details_title'.tr(context),
                         style: GoogleFonts.inter(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
@@ -816,25 +818,25 @@ class _AdminUserManagementScreenState
                     ],
                   ),
                   const SizedBox(height: 20),
-                  _buildDetailRow('Name', user.name),
-                  _buildDetailRow('Email', user.email),
-                  _buildDetailRow('Role', user.accountType.toUpperCase()),
-                  _buildDetailRow('Status', user.status.toUpperCase()),
+                  _buildDetailRow('admin_label_name'.tr(context), user.name),
+                  _buildDetailRow('email'.tr(context), user.email),
+                  _buildDetailRow('role_label'.tr(context), user.accountType.toUpperCase()),
+                  _buildDetailRow('admin_status'.tr(context), user.status.toUpperCase()),
                   _buildDetailRow(
-                    'Joined',
+                    'joined_detail'.tr(context),
                     DateFormat('MMM dd, yyyy HH:mm').format(user.createdAt),
                   ),
                   _buildDetailRow(
-                    'Terms Accepted',
-                    user.acceptedTerms ? 'Yes' : 'No',
+                    'terms_accepted_detail'.tr(context),
+                    user.acceptedTerms ? 'yes'.tr(context) : 'no'.tr(context),
                   ),
                   _buildDetailRow(
-                    'Privacy Accepted',
-                    user.acceptedPrivacy ? 'Yes' : 'No',
+                    'privacy_accepted_detail'.tr(context),
+                    user.acceptedPrivacy ? 'yes'.tr(context) : 'no'.tr(context),
                   ),
                   if (user.lastLoginAt != null)
                     _buildDetailRow(
-                      'Last Login',
+                      'last_login_detail'.tr(context),
                       DateFormat(
                         'MMM dd, yyyy HH:mm',
                       ).format(user.lastLoginAt!),
@@ -845,7 +847,7 @@ class _AdminUserManagementScreenState
                     children: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Close'),
+                        child: Text('close_button'.tr(context)),
                       ),
                     ],
                   ),
@@ -897,26 +899,26 @@ class _AdminUserManagementScreenState
           (context) => StatefulBuilder(
             builder:
                 (context, setState) => AlertDialog(
-                  title: Text('Edit User: ${user.name}'),
+                  title: Text('edit_user_dialog'.tr(context).replaceAll('{name}', user.name)),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       DropdownButtonFormField<String>(
                         value: selectedRole,
-                        decoration: const InputDecoration(labelText: 'Role'),
-                        items: const [
-                          DropdownMenuItem(value: 'user', child: Text('User')),
+                        decoration: InputDecoration(labelText: 'role_label'.tr(context)),
+                        items: [
+                          DropdownMenuItem(value: 'user', child: Text('user_role'.tr(context))),
                           DropdownMenuItem(
                             value: 'shop_owner',
-                            child: Text('Shop Owner'),
+                            child: Text('shop_owner_role'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'moderator',
-                            child: Text('Moderator'),
+                            child: Text('moderator_role'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'admin',
-                            child: Text('Admin'),
+                            child: Text('admin_role_label'.tr(context)),
                           ),
                         ],
                         onChanged: (value) {
@@ -928,19 +930,19 @@ class _AdminUserManagementScreenState
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         value: selectedStatus,
-                        decoration: const InputDecoration(labelText: 'Status'),
-                        items: const [
+                        decoration: InputDecoration(labelText: 'admin_status'.tr(context)),
+                        items: [
                           DropdownMenuItem(
                             value: 'active',
-                            child: Text('Active'),
+                            child: Text('active_status'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'suspended',
-                            child: Text('Suspended'),
+                            child: Text('suspended_status'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'pending',
-                            child: Text('Pending'),
+                            child: Text('pending_status_label'.tr(context)),
                           ),
                         ],
                         onChanged: (value) {
@@ -954,14 +956,14 @@ class _AdminUserManagementScreenState
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                      child: Text('cancel'.tr(context)),
                     ),
                     ElevatedButton(
                       onPressed: () async {
                         Navigator.of(context).pop();
                         await _updateUser(user, selectedRole, selectedStatus);
                       },
-                      child: const Text('Save'),
+                      child: Text('save_button'.tr(context)),
                     ),
                   ],
                 ),
@@ -970,29 +972,30 @@ class _AdminUserManagementScreenState
   }
 
   Future<void> _updateUser(User user, String role, String status) async {
-    setLoading(true, message: 'Updating user...');
+    final messenger = ScaffoldMessenger.of(context);
+    setLoading(true, message: 'updating_user'.tr(context));
 
     try {
-      // Update role if changed
       if (role != user.accountType) {
         await UserService.updateUserAccountType(user.id, role);
       }
 
-      // Update status if changed
       if (status != user.status) {
         await UserService.updateUserStatus(user.id, status);
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      messenger.showSnackBar(
         SnackBar(
-          content: Text('${user.name} has been updated'),
+          content: Text('user_updated_msg'.tr(context).replaceAll('{name}', user.name)),
           backgroundColor: const Color(0xFF10B981),
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return;
+      messenger.showSnackBar(
         SnackBar(
-          content: Text('Error updating user: $e'),
+          content: Text('error_updating_user'.tr(context).replaceAll('{error}', e.toString())),
           backgroundColor: Colors.red,
         ),
       );
@@ -1006,17 +1009,17 @@ class _AdminUserManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Suspend User'),
-            content: Text('Are you sure you want to suspend "${user.name}"?'),
+            title: Text('suspend_user_dialog'.tr(context)),
+            content: Text('confirm_suspend_user'.tr(context).replaceAll('{name}', user.name)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Suspend'),
+                child: Text('suspend_button'.tr(context)),
               ),
             ],
           ),
@@ -1036,34 +1039,36 @@ class _AdminUserManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Delete User'),
+            title: Text('delete_user_dialog'.tr(context)),
             content: Text(
-              'Are you sure you want to delete "${user.name}"? This action cannot be undone.',
+              'confirm_delete_user_action'.tr(context).replaceAll('{name}', user.name),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Delete'),
+                child: Text('delete'.tr(context)),
               ),
             ],
           ),
     );
 
-    if (confirmed == true) {
-      setLoading(true, message: 'Deleting user...');
+    if (confirmed == true && mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      setLoading(true, message: 'deleting_user'.tr(context));
 
       try {
         final success = await UserService.deleteUser(user.id);
 
+        if (!mounted) return;
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             SnackBar(
-              content: Text('${user.name} has been deleted'),
+              content: Text('error_deleting_user_snack'.tr(context).replaceAll('{name}', user.name)),
               backgroundColor: Colors.red,
             ),
           );
@@ -1071,9 +1076,10 @@ class _AdminUserManagementScreenState
           throw Exception('Failed to delete user');
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('Error deleting user: $e'),
+            content: Text('error_deleting_user'.tr(context).replaceAll('{error}', e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -1086,8 +1092,8 @@ class _AdminUserManagementScreenState
   void _showBulkActionsDialog() {
     if (_selectedUserIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select users to perform bulk actions'),
+        SnackBar(
+          content: Text('select_users_for_bulk'.tr(context)),
           backgroundColor: Colors.orange,
         ),
       );
@@ -1099,14 +1105,14 @@ class _AdminUserManagementScreenState
       builder:
           (context) => AlertDialog(
             title: Text(
-              'Bulk Actions (${_selectedUserIds.length} users selected)',
+              'bulk_actions_selected'.tr(context).replaceAll('{count}', _selectedUserIds.length.toString()),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
                   leading: const Icon(Icons.check_circle, color: Colors.green),
-                  title: const Text('Activate All Selected'),
+                  title: Text('activate_all_selected'.tr(context)),
                   onTap: () {
                     Navigator.of(context).pop();
                     _bulkActivateUsers();
@@ -1114,7 +1120,7 @@ class _AdminUserManagementScreenState
                 ),
                 ListTile(
                   leading: const Icon(Icons.block, color: Colors.orange),
-                  title: const Text('Suspend All Selected'),
+                  title: Text('suspend_all_selected'.tr(context)),
                   onTap: () {
                     Navigator.of(context).pop();
                     _bulkSuspendUsers();
@@ -1125,7 +1131,7 @@ class _AdminUserManagementScreenState
                     Icons.admin_panel_settings,
                     color: Colors.blue,
                   ),
-                  title: const Text('Change Role'),
+                  title: Text('change_role'.tr(context)),
                   onTap: () {
                     Navigator.of(context).pop();
                     _showBulkRoleChangeDialog();
@@ -1133,7 +1139,7 @@ class _AdminUserManagementScreenState
                 ),
                 ListTile(
                   leading: const Icon(Icons.delete, color: Colors.red),
-                  title: const Text('Delete All Selected'),
+                  title: Text('delete_all_selected'.tr(context)),
                   onTap: () {
                     Navigator.of(context).pop();
                     _bulkDeleteUsers();
@@ -1144,7 +1150,7 @@ class _AdminUserManagementScreenState
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
             ],
           ),
@@ -1161,31 +1167,31 @@ class _AdminUserManagementScreenState
             builder:
                 (context, setState) => AlertDialog(
                   title: Text(
-                    'Change Role for ${_selectedUserIds.length} users',
+                    'change_role_for'.tr(context).replaceAll('{count}', _selectedUserIds.length.toString()),
                   ),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Select new role:'),
+                      Text('select_new_role'.tr(context)),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
                         value: selectedRole,
-                        decoration: const InputDecoration(
-                          labelText: 'New Role',
+                        decoration: InputDecoration(
+                          labelText: 'new_role'.tr(context),
                         ),
-                        items: const [
-                          DropdownMenuItem(value: 'user', child: Text('User')),
+                        items: [
+                          DropdownMenuItem(value: 'user', child: Text('user_role'.tr(context))),
                           DropdownMenuItem(
                             value: 'shop_owner',
-                            child: Text('Shop Owner'),
+                            child: Text('shop_owner_role'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'moderator',
-                            child: Text('Moderator'),
+                            child: Text('moderator_role'.tr(context)),
                           ),
                           DropdownMenuItem(
                             value: 'admin',
-                            child: Text('Admin'),
+                            child: Text('admin_role_label'.tr(context)),
                           ),
                         ],
                         onChanged: (value) {
@@ -1199,14 +1205,14 @@ class _AdminUserManagementScreenState
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                      child: Text('cancel'.tr(context)),
                     ),
                     ElevatedButton(
                       onPressed: () {
                         Navigator.of(context).pop();
                         _bulkChangeRole(selectedRole);
                       },
-                      child: const Text('Change Role'),
+                      child: Text('change_role_button'.tr(context)),
                     ),
                   ],
                 ),
@@ -1219,26 +1225,27 @@ class _AdminUserManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Bulk Activate Users'),
+            title: Text('bulk_activate_users'.tr(context)),
             content: Text(
-              'Are you sure you want to activate ${_selectedUserIds.length} users?',
+              'confirm_bulk_activate'.tr(context).replaceAll('{count}', _selectedUserIds.length.toString()),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text('Activate All'),
+                child: Text('activate_all'.tr(context)),
               ),
             ],
           ),
     );
 
-    if (confirmed == true) {
-      setLoading(true, message: 'Activating users...');
+    if (confirmed == true && mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      setLoading(true, message: 'activating_users'.tr(context));
       try {
         int successCount = 0;
         for (final userId in _selectedUserIds) {
@@ -1246,7 +1253,7 @@ class _AdminUserManagementScreenState
             await UserService.updateUserStatus(userId, 'active');
             successCount++;
           } catch (e) {
-            // Continue with other users if one fails
+            appLog('Error activating user $userId: $e');
           }
         }
 
@@ -1254,16 +1261,18 @@ class _AdminUserManagementScreenState
           _selectedUserIds.clear();
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('$successCount users activated successfully'),
+            content: Text('users_activated_success'.tr(context).replaceAll('{count}', successCount.toString())),
             backgroundColor: Colors.green,
           ),
         );
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('Error during bulk activation: $e'),
+            content: Text('error_bulk_activation'.tr(context).replaceAll('{error}', e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -1278,26 +1287,27 @@ class _AdminUserManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Bulk Suspend Users'),
+            title: Text('bulk_suspend_users'.tr(context)),
             content: Text(
-              'Are you sure you want to suspend ${_selectedUserIds.length} users?',
+              'confirm_bulk_suspend'.tr(context).replaceAll('{count}', _selectedUserIds.length.toString()),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                child: const Text('Suspend All'),
+                child: Text('suspend_all'.tr(context)),
               ),
             ],
           ),
     );
 
-    if (confirmed == true) {
-      setLoading(true, message: 'Suspending users...');
+    if (confirmed == true && mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      setLoading(true, message: 'suspending_users'.tr(context));
       try {
         int successCount = 0;
         for (final userId in _selectedUserIds) {
@@ -1305,7 +1315,7 @@ class _AdminUserManagementScreenState
             await UserService.updateUserStatus(userId, 'suspended');
             successCount++;
           } catch (e) {
-            // Continue with other users if one fails
+            appLog('Error suspending user $userId: $e');
           }
         }
 
@@ -1313,16 +1323,18 @@ class _AdminUserManagementScreenState
           _selectedUserIds.clear();
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('$successCount users suspended successfully'),
+            content: Text('users_suspended_success'.tr(context).replaceAll('{count}', successCount.toString())),
             backgroundColor: Colors.orange,
           ),
         );
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('Error during bulk suspension: $e'),
+            content: Text('error_bulk_suspension'.tr(context).replaceAll('{error}', e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -1337,25 +1349,26 @@ class _AdminUserManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Bulk Change Role'),
+            title: Text('bulk_change_role'.tr(context)),
             content: Text(
-              'Are you sure you want to change ${_selectedUserIds.length} users to $newRole role?',
+              'confirm_bulk_role_change'.tr(context).replaceAll('{count}', _selectedUserIds.length.toString()).replaceAll('{role}', newRole),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Change Role'),
+                child: Text('change_role_button'.tr(context)),
               ),
             ],
           ),
     );
 
-    if (confirmed == true) {
-      setLoading(true, message: 'Changing user roles...');
+    if (confirmed == true && mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      setLoading(true, message: 'changing_roles'.tr(context));
       try {
         int successCount = 0;
         for (final userId in _selectedUserIds) {
@@ -1363,7 +1376,7 @@ class _AdminUserManagementScreenState
             await UserService.updateUserAccountType(userId, newRole);
             successCount++;
           } catch (e) {
-            // Continue with other users if one fails
+            appLog('Error changing role for user $userId: $e');
           }
         }
 
@@ -1371,16 +1384,18 @@ class _AdminUserManagementScreenState
           _selectedUserIds.clear();
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('$successCount users updated to $newRole role'),
+            content: Text('users_role_changed'.tr(context).replaceAll('{count}', successCount.toString()).replaceAll('{role}', newRole)),
             backgroundColor: Colors.blue,
           ),
         );
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('Error during bulk role change: $e'),
+            content: Text('error_bulk_role_change'.tr(context).replaceAll('{error}', e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -1395,26 +1410,27 @@ class _AdminUserManagementScreenState
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Bulk Delete Users'),
+            title: Text('bulk_delete_users'.tr(context)),
             content: Text(
-              'Are you sure you want to delete ${_selectedUserIds.length} users? This action cannot be undone.',
+              'confirm_bulk_delete_users'.tr(context).replaceAll('{count}', _selectedUserIds.length.toString()),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
+                child: Text('cancel'.tr(context)),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Delete All'),
+                child: Text('delete_all'.tr(context)),
               ),
             ],
           ),
     );
 
-    if (confirmed == true) {
-      setLoading(true, message: 'Deleting users...');
+    if (confirmed == true && mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      setLoading(true, message: 'deleting_users'.tr(context));
       try {
         int successCount = 0;
         for (final userId in _selectedUserIds) {
@@ -1422,7 +1438,7 @@ class _AdminUserManagementScreenState
             final success = await UserService.deleteUser(userId);
             if (success) successCount++;
           } catch (e) {
-            // Continue with other users if one fails
+            appLog('Error deleting user $userId: $e');
           }
         }
 
@@ -1430,16 +1446,18 @@ class _AdminUserManagementScreenState
           _selectedUserIds.clear();
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('$successCount users deleted successfully'),
+            content: Text('users_deleted_success'.tr(context).replaceAll('{count}', successCount.toString())),
             backgroundColor: Colors.red,
           ),
         );
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        if (!mounted) return;
+        messenger.showSnackBar(
           SnackBar(
-            content: Text('Error during bulk deletion: $e'),
+            content: Text('error_bulk_deletion'.tr(context).replaceAll('{error}', e.toString())),
             backgroundColor: Colors.red,
           ),
         );
@@ -1454,16 +1472,16 @@ class _AdminUserManagementScreenState
     final difference = now.difference(lastActive);
 
     if (difference.inMinutes < 1) {
-      return 'just now';
+      return 'just_now'.tr(context);
     } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
+      return 'admin_minutes_ago'.tr(context).replaceAll('{m}', difference.inMinutes.toString());
     } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
+      return 'admin_hours_ago'.tr(context).replaceAll('{h}', difference.inHours.toString());
     } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
+      return 'admin_days_ago'.tr(context).replaceAll('{d}', difference.inDays.toString());
     } else if (difference.inDays < 30) {
       final weeks = (difference.inDays / 7).floor();
-      return '${weeks}w ago';
+      return 'admin_weeks_ago'.tr(context).replaceAll('{w}', weeks.toString());
     } else {
       return DateFormat('MMM dd').format(lastActive);
     }

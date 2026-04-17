@@ -22,6 +22,7 @@ class _NotificationOverlayState extends State<NotificationOverlay> {
     _sidebarSubscription = NotificationController().sidebarStream.listen((
       isOpen,
     ) {
+      if (!mounted) return;
       setState(() {
         _isNotificationSidebarOpen = isOpen;
       });

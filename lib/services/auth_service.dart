@@ -5,6 +5,7 @@ import 'package:wonwonw2/utils/app_logger.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:async';
 import 'package:wonwonw2/services/activity_service.dart';
+import 'package:wonwonw2/services/analytics_service.dart';
 
 // Password strength enum
 enum PasswordStrength { none, weak, fair, good, strong }
@@ -30,6 +31,7 @@ enum LoginErrorType {
   userDisabled,
   tooManyRequests,
   accountLocked,
+  networkError,
   unknown,
 }
 
@@ -40,6 +42,34 @@ class LoginResult {
   final String message;
 
   LoginResult({required this.success, this.errorType, required this.message});
+}
+
+// Registration error types
+enum RegistrationErrorType {
+  emptyName,
+  invalidEmail,
+  weakPassword,
+  emailAlreadyInUse,
+  operationNotAllowed,
+  networkError,
+  unknown,
+}
+
+// Registration result
+class RegistrationResult {
+  final bool success;
+  final RegistrationErrorType? errorType;
+  final String? errorKey;
+
+  RegistrationResult({required this.success, this.errorType, this.errorKey});
+}
+
+// Reset password result
+class ResetPasswordResult {
+  final bool success;
+  final String? errorKey;
+
+  ResetPasswordResult({required this.success, this.errorKey});
 }
 
 class AuthService {
@@ -68,10 +98,10 @@ class AuthService {
   }
 
   // Initialize Firebase Auth with proper persistence
-  void _initializeAuth() {
+  Future<void> _initializeAuth() async {
     // Set persistence for web
     if (kIsWeb) {
-      _auth.setPersistence(Persistence.LOCAL);
+      await _auth.setPersistence(Persistence.LOCAL);
     }
   }
 
@@ -118,12 +148,12 @@ class AuthService {
     return prefs.getString(_userNameKey);
   }
 
-  // Enhanced password validation
+  // Enhanced password validation - returns localization keys as messages
   static PasswordValidationResult validatePassword(String password) {
     if (password.isEmpty) {
       return PasswordValidationResult(
         isValid: false,
-        message: 'Password cannot be empty',
+        message: 'password_empty',
         strength: PasswordStrength.none,
       );
     }
@@ -131,12 +161,11 @@ class AuthService {
     if (password.length < 8) {
       return PasswordValidationResult(
         isValid: false,
-        message: 'Password must be at least 8 characters long',
+        message: 'password_min_length',
         strength: PasswordStrength.weak,
       );
     }
 
-    // Check for different character types
     bool hasUppercase = password.contains(RegExp(r'[A-Z]'));
     bool hasLowercase = password.contains(RegExp(r'[a-z]'));
     bool hasDigits = password.contains(RegExp(r'[0-9]'));
@@ -150,26 +179,25 @@ class AuthService {
     if (password.length >= 12) strength++;
 
     PasswordStrength passwordStrength;
-    String message;
+    String messageKey;
 
     if (strength < 3) {
       passwordStrength = PasswordStrength.weak;
-      message =
-          'Password is too weak. Include uppercase, lowercase, numbers, and special characters.';
+      messageKey = 'password_too_weak';
     } else if (strength < 4) {
       passwordStrength = PasswordStrength.fair;
-      message = 'Password strength is fair. Consider adding more complexity.';
+      messageKey = 'password_fair';
     } else if (strength < 5) {
       passwordStrength = PasswordStrength.good;
-      message = 'Password strength is good.';
+      messageKey = 'password_good';
     } else {
       passwordStrength = PasswordStrength.strong;
-      message = 'Password strength is strong.';
+      messageKey = 'password_strong';
     }
 
     return PasswordValidationResult(
       isValid: strength >= 3,
-      message: message,
+      message: messageKey,
       strength: passwordStrength,
     );
   }
@@ -216,29 +244,28 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
 
-    // Get current attempts
     final attempts = prefs.getInt('${_loginAttemptsKey}_$email') ?? 0;
     final lastAttempt = prefs.getString('${_lastLoginAttemptKey}_$email');
 
-    // Reset attempts if outside the window
+    int newAttemptCount;
     if (lastAttempt != null) {
       final lastAttemptTime = DateTime.parse(lastAttempt);
       if (now.difference(lastAttemptTime) > _attemptWindow) {
-        await prefs.setInt('${_loginAttemptsKey}_$email', 1);
+        newAttemptCount = 1;
       } else {
-        await prefs.setInt('${_loginAttemptsKey}_$email', attempts + 1);
+        newAttemptCount = attempts + 1;
       }
     } else {
-      await prefs.setInt('${_loginAttemptsKey}_$email', 1);
+      newAttemptCount = 1;
     }
 
+    await prefs.setInt('${_loginAttemptsKey}_$email', newAttemptCount);
     await prefs.setString(
       '${_lastLoginAttemptKey}_$email',
       now.toIso8601String(),
     );
 
-    // Lock account if max attempts reached
-    if (attempts + 1 >= _maxLoginAttempts) {
+    if (newAttemptCount >= _maxLoginAttempts) {
       final lockoutUntil = now.add(_lockoutDuration);
       await prefs.setString(
         '${_lockoutUntilKey}_$email',
@@ -261,22 +288,19 @@ class AuthService {
     final sanitizedEmail = sanitizeInput(email);
     final sanitizedPassword = password; // Don't sanitize password
 
-    // Validate email
     if (!isValidEmail(sanitizedEmail)) {
       return LoginResult(
         success: false,
         errorType: LoginErrorType.invalidEmail,
-        message: 'Invalid email format',
+        message: 'valid_email_required',
       );
     }
 
-    // Check if account is locked
     if (await isAccountLocked(sanitizedEmail)) {
       return LoginResult(
         success: false,
         errorType: LoginErrorType.accountLocked,
-        message:
-            'Account is temporarily locked due to too many failed attempts. Please try again later.',
+        message: 'account_locked_message',
       );
     }
 
@@ -317,94 +341,115 @@ class AuthService {
           appLog('Error logging login activity: $e');
         }
 
+        AnalyticsService.safeLog(() async {
+          final analytics = AnalyticsService();
+          await analytics.setUserId(userCredential.user!.uid);
+        });
+
         return LoginResult(success: true, message: 'Login successful');
       }
 
       return LoginResult(
         success: false,
         errorType: LoginErrorType.unknown,
-        message: 'Login failed',
+        message: 'login_failed',
       );
     } on FirebaseAuthException catch (e) {
-      // Record failed attempt
       await _recordFailedAttempt(sanitizedEmail);
-
       appLog('Login error (Firebase Auth): ${e.code} - ${e.message}');
 
       LoginErrorType errorType;
-      String message;
+      String messageKey;
 
       switch (e.code) {
         case 'user-not-found':
-          errorType = LoginErrorType.userNotFound;
-          message = 'No account found with this email address';
-          break;
         case 'wrong-password':
+        case 'invalid-credential':
           errorType = LoginErrorType.wrongPassword;
-          message = 'Incorrect password';
+          messageKey = 'invalid_credentials';
           break;
         case 'user-disabled':
           errorType = LoginErrorType.userDisabled;
-          message = 'This account has been disabled';
+          messageKey = 'account_disabled';
           break;
         case 'too-many-requests':
           errorType = LoginErrorType.tooManyRequests;
-          message = 'Too many requests. Please try again later';
+          messageKey = 'too_many_requests';
           break;
         case 'invalid-email':
           errorType = LoginErrorType.invalidEmail;
-          message = 'Invalid email format';
+          messageKey = 'valid_email_required';
+          break;
+        case 'network-request-failed':
+          errorType = LoginErrorType.networkError;
+          messageKey = 'network_error';
           break;
         default:
           errorType = LoginErrorType.unknown;
-          message = 'Login failed. Please try again';
+          messageKey = 'login_failed';
       }
 
       return LoginResult(
         success: false,
         errorType: errorType,
-        message: message,
+        message: messageKey,
       );
     } catch (e) {
       appLog('Login error (General): $e');
+      final errorStr = e.toString().toLowerCase();
+      if (errorStr.contains('network') || errorStr.contains('socket') ||
+          errorStr.contains('connection')) {
+        return LoginResult(
+          success: false,
+          errorType: LoginErrorType.networkError,
+          message: 'network_error',
+        );
+      }
       return LoginResult(
         success: false,
         errorType: LoginErrorType.unknown,
-        message: 'An unexpected error occurred',
+        message: 'unexpected_error',
       );
     }
   }
 
   // Register user with enhanced validation
-  Future<bool> register(
+  Future<RegistrationResult> register(
     String name,
     String email,
     String password,
-    String accountType,
-  ) async {
+    String accountType, {
+    bool acceptedTerms = false,
+  }) async {
     try {
-      // Validate inputs
       final sanitizedName = sanitizeInput(name);
       final sanitizedEmail = sanitizeInput(email);
 
-      if (sanitizedName.isEmpty) {
-        appLog('Registration error: Name is empty');
-        return false;
+      if (sanitizedName.isEmpty || sanitizedName.length > 100) {
+        return RegistrationResult(
+          success: false,
+          errorType: RegistrationErrorType.emptyName,
+          errorKey: 'full_name_required',
+        );
       }
 
       if (!isValidEmail(sanitizedEmail)) {
-        appLog('Registration error: Invalid email format');
-        return false;
+        return RegistrationResult(
+          success: false,
+          errorType: RegistrationErrorType.invalidEmail,
+          errorKey: 'valid_email_required',
+        );
       }
 
       final passwordValidation = validatePassword(password);
       if (!passwordValidation.isValid) {
-        appLog('Registration error: ${passwordValidation.message}');
-        return false;
+        return RegistrationResult(
+          success: false,
+          errorType: RegistrationErrorType.weakPassword,
+          errorKey: 'password_too_weak',
+        );
       }
 
-      // Create user with email and password using Firebase Auth
-      // This automatically logs the user in
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: sanitizedEmail,
         password: password,
@@ -412,13 +457,9 @@ class AuthService {
 
       final user = userCredential.user;
       if (user != null) {
-        // Update user profile with display name
-        await user.updateDisplayName(name);
-
-        // Reload user to ensure the display name is available
+        await user.updateDisplayName(sanitizedName);
         await user.reload();
 
-        // Create user document in Firestore
         await _firestore.collection('users').doc(user.uid).set({
           'userId': user.uid,
           'name': sanitizedName,
@@ -426,19 +467,17 @@ class AuthService {
           'accountType': accountType,
           'status': 'active',
           'createdAt': FieldValue.serverTimestamp(),
-          'acceptedTerms': true,
-          'acceptedPrivacy': true,
+          'acceptedTerms': acceptedTerms,
+          'acceptedPrivacy': acceptedTerms,
           'admin': false,
         });
 
-        // Store user info in SharedPreferences (as a backup)
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool(_isLoggedInKey, true);
         await prefs.setString(_userIdKey, user.uid);
         await prefs.setString(_userEmailKey, sanitizedEmail);
         await prefs.setString(_userNameKey, sanitizedName);
 
-        // Log user registration activity
         try {
           await ActivityService().logUserRegistration(
             sanitizedName,
@@ -448,76 +487,128 @@ class AuthService {
           appLog('Error logging user registration activity: $e');
         }
 
-        return true;
+        AnalyticsService.safeLog(() async {
+          final analytics = AnalyticsService();
+          await analytics.setUserId(user.uid);
+          await analytics.setUserRole(accountType);
+        });
+
+        return RegistrationResult(success: true);
       }
-      return false;
+      return RegistrationResult(
+        success: false,
+        errorType: RegistrationErrorType.unknown,
+        errorKey: 'registration_error_occurred',
+      );
     } on FirebaseAuthException catch (e) {
       appLog('Registration error (Firebase Auth): ${e.code} - ${e.message}');
 
-      // Handle specific Firebase Auth errors
+      RegistrationErrorType errorType;
+      String errorKey;
+
       switch (e.code) {
         case 'email-already-in-use':
-          appLog('Registration error: Email already exists');
+          errorType = RegistrationErrorType.emailAlreadyInUse;
+          errorKey = 'email_already_in_use';
           break;
         case 'invalid-email':
-          appLog('Registration error: Invalid email format');
+          errorType = RegistrationErrorType.invalidEmail;
+          errorKey = 'valid_email_required';
           break;
         case 'weak-password':
-          appLog('Registration error: Password is too weak');
+          errorType = RegistrationErrorType.weakPassword;
+          errorKey = 'password_too_weak';
           break;
         case 'operation-not-allowed':
-          appLog('Registration error: Email/password accounts not enabled');
+          errorType = RegistrationErrorType.operationNotAllowed;
+          errorKey = 'registration_not_allowed';
+          break;
+        case 'network-request-failed':
+          errorType = RegistrationErrorType.networkError;
+          errorKey = 'network_error';
           break;
         default:
-          appLog('Registration error: ${e.message}');
+          errorType = RegistrationErrorType.unknown;
+          errorKey = 'registration_error_occurred';
       }
 
-      return false;
+      return RegistrationResult(
+        success: false,
+        errorType: errorType,
+        errorKey: errorKey,
+      );
     } on FirebaseException catch (e) {
       appLog('Registration error (Firestore): ${e.code} - ${e.message}');
-      return false;
+      return RegistrationResult(
+        success: false,
+        errorType: RegistrationErrorType.unknown,
+        errorKey: 'registration_error_occurred',
+      );
     } catch (e) {
       appLog('Registration error (General): $e');
-      return false;
+      final errorStr = e.toString().toLowerCase();
+      if (errorStr.contains('network') || errorStr.contains('socket') ||
+          errorStr.contains('connection')) {
+        return RegistrationResult(
+          success: false,
+          errorType: RegistrationErrorType.networkError,
+          errorKey: 'network_error',
+        );
+      }
+      return RegistrationResult(
+        success: false,
+        errorType: RegistrationErrorType.unknown,
+        errorKey: 'unexpected_error',
+      );
     }
   }
 
-  // Reset password
-  Future<bool> resetPassword(String email) async {
+  // Reset password - returns a result with success status and error key
+  Future<ResetPasswordResult> resetPassword(String email) async {
     try {
-      // Validate email format first
       if (!isValidEmail(email)) {
-        appLog('Password reset error: Invalid email format');
-        return false;
+        return ResetPasswordResult(
+          success: false,
+          errorKey: 'valid_email_required',
+        );
       }
 
-      // Send password reset email using Firebase Auth
       await _auth.sendPasswordResetEmail(email: email);
-      appLog('Password reset email sent successfully to: $email');
-      return true;
+      return ResetPasswordResult(success: true);
     } on FirebaseAuthException catch (e) {
       appLog('Password reset error (Firebase Auth): ${e.code} - ${e.message}');
 
-      // Handle specific Firebase Auth errors for better user experience
       switch (e.code) {
         case 'user-not-found':
-          appLog('Password reset error: No user found with this email');
-          break;
+          // Return success to prevent user enumeration
+          return ResetPasswordResult(success: true);
         case 'invalid-email':
-          appLog('Password reset error: Invalid email format');
-          break;
-        case 'too-many-requests':
-          appLog(
-            'Password reset error: Too many requests, please try again later',
+          return ResetPasswordResult(
+            success: false,
+            errorKey: 'valid_email_required',
           );
-          break;
+        case 'too-many-requests':
+          return ResetPasswordResult(
+            success: false,
+            errorKey: 'too_many_requests',
+          );
+        case 'network-request-failed':
+          return ResetPasswordResult(
+            success: false,
+            errorKey: 'network_error',
+          );
         default:
-          appLog('Password reset error: ${e.message}');
+          return ResetPasswordResult(
+            success: false,
+            errorKey: 'reset_failed',
+          );
       }
-      return false;
     } catch (e) {
       appLog('Password reset error (General): $e');
-      return false;
+      return ResetPasswordResult(
+        success: false,
+        errorKey: 'unexpected_error',
+      );
     }
   }
 

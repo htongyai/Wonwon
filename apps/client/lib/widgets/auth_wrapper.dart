@@ -1,0 +1,150 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:wonwon_client/screens/login_screen.dart';
+import 'package:wonwon_client/screens/main_navigation.dart';
+import 'package:wonwon_client/screens/home_screen.dart';
+import 'package:shared/services/auth_state_service.dart';
+import 'package:shared/services/service_providers.dart';
+import 'package:wonwon_client/localization/app_localizations_wrapper.dart';
+
+/// A wrapper widget that handles authentication state and determines which screen to show
+class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({Key? key}) : super(key: key);
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  late AuthStateService _authStateService;
+  AuthState? _currentState;
+  StreamSubscription<AuthState>? _subscription;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _authStateService = ServiceProvider.authStateOf(context);
+
+    _subscription?.cancel();
+    _subscription = _authStateService.authStateStream.listen((state) {
+      if (mounted) {
+        setState(() {
+          _currentState = state;
+        });
+      }
+    });
+
+    setState(() {
+      _currentState = AuthState(
+        isLoggedIn: _authStateService.isLoggedIn,
+        isGuestMode: _authStateService.isGuestMode,
+        hasSeenIntro: _authStateService.hasSeenIntro,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // If the auth state hasn't been determined yet, show a loading indicator
+    if (_currentState == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // Always show the main app first regardless of login status
+    // Users can access login-required features later if needed
+    return const MainNavigation(child: HomeScreen());
+  }
+}
+
+/// A widget that checks if a feature requires authentication and shows appropriate UI
+class FeatureAuthGate extends StatelessWidget {
+  final FeatureAccess featureAccess;
+  final Widget child;
+  final Widget? unauthorizedWidget;
+
+  const FeatureAuthGate({
+    Key? key,
+    required this.featureAccess,
+    required this.child,
+    this.unauthorizedWidget,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser != null) {
+            return child;
+          }
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final isLoggedIn = snapshot.hasData && snapshot.data != null;
+
+        // Check if user can access the feature
+        bool canAccess = false;
+        switch (featureAccess) {
+          case FeatureAccess.public:
+            canAccess = true;
+            break;
+          case FeatureAccess.preferLoggedIn:
+            canAccess = true; // Allow guest access for preferLoggedIn features
+            break;
+          case FeatureAccess.requiresLogin:
+            canAccess = isLoggedIn;
+            break;
+        }
+
+        if (canAccess) {
+          return child;
+        }
+
+        // If user cannot access the feature, show the unauthorized widget or a default one
+        return unauthorizedWidget ??
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lock_outline, size: 64, color: Colors.grey),
+                  const SizedBox(height: 16),
+                  Text(
+                    'login_required'.tr(context),
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'please_login_to_access'.tr(context),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final result = await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
+                      );
+                      if (result == true) {
+                        // No need to manually rebuild, StreamBuilder will handle it
+                      }
+                    },
+                    child: Text('login_button'.tr(context)),
+                  ),
+                ],
+              ),
+            );
+      },
+    );
+  }
+}

@@ -49,6 +49,20 @@
 	<string>This app needs access to location when open to show nearby repair shops.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>This app needs access to location when in the background to show nearby repair shops.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library to upload shop photos and profile pictures.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs access to the camera to take photos of repair shops.</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+		<string>https</string>
+		<string>http</string>
+		<string>fb</string>
+		<string>instagram</string>
+		<string>line</string>
+		<string>comgooglemaps</string>
+	</array>
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
 	<key>GMSAPIKey</key>
