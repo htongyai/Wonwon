@@ -40,9 +40,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final isWide = screenWidth >= ResponsiveBreakpoints.mobile;
     final formWidth = screenWidth >= ResponsiveBreakpoints.desktop ? 440.0 : 400.0;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -98,6 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildLoginForm() {
+    final theme = Theme.of(context);
     return Form(
       key: _formKey,
       child: Column(
@@ -137,7 +139,8 @@ class _LoginScreenState extends State<LoginScreen> {
           // Subtitle
           Text(
             'login_description'.tr(context),
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            style: TextStyle(
+                fontSize: 16, color: theme.colorScheme.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
 
@@ -159,7 +162,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     labelText: 'email'.tr(context),
                     prefixIcon: const Icon(Icons.email_outlined),
                     filled: true,
-                    fillColor: Colors.grey.shade50,
+                    fillColor: theme.colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -206,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                     ),
                     filled: true,
-                    fillColor: Colors.grey.shade50,
+                    fillColor: theme.colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -287,7 +290,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Flexible(
                 child: Text(
                   'dont_have_account'.tr(context),
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

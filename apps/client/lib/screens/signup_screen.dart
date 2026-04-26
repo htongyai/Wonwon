@@ -120,7 +120,7 @@ class _SignupScreenState extends State<SignupScreen> {
         }
       },
       child: Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -175,6 +175,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Widget _buildSignupForm() {
+    final theme = Theme.of(context);
     return Form(
       key: _formKey,
       child: Column(
@@ -214,7 +215,7 @@ class _SignupScreenState extends State<SignupScreen> {
           // Subtitle
           Text(
             'sign_up_description'.tr(context),
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+            style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
 
@@ -237,7 +238,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     prefixIcon: const Icon(Icons.person_outline),
                     counterText: '',
                     filled: true,
-                    fillColor: Colors.grey.shade50,
+                    fillColor: theme.colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -271,7 +272,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     labelText: 'email'.tr(context),
                     prefixIcon: const Icon(Icons.email_outlined),
                     filled: true,
-                    fillColor: Colors.grey.shade50,
+                    fillColor: theme.colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -316,7 +317,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       },
                     ),
                     filled: true,
-                    fillColor: Colors.grey.shade50,
+                    fillColor: theme.colorScheme.surfaceContainerHighest,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -342,33 +343,46 @@ class _SignupScreenState extends State<SignupScreen> {
 
           const SizedBox(height: 8),
 
-          // Password requirements helper text
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'password_requirements_title'.tr(context),
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade800,
-                    fontSize: 12,
+          // Password requirements helper text. Light blue palette
+          // is hard-coded so it doesn't follow the dark theme — wrap
+          // in a Builder so the colors flip with brightness.
+          Builder(builder: (context) {
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final bg =
+                isDark ? const Color(0xFF1E2A38) : Colors.blue.shade50;
+            final border =
+                isDark ? const Color(0xFF334D6E) : Colors.blue.shade200;
+            final titleColor =
+                isDark ? const Color(0xFFBFD7FF) : Colors.blue.shade800;
+            final bodyColor =
+                isDark ? const Color(0xFF9FBCE0) : Colors.blue.shade700;
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'password_requirements_title'.tr(context),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: titleColor,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'password_requirements_text'.tr(context),
-                  style: TextStyle(color: Colors.blue.shade700, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'password_requirements_text'.tr(context),
+                    style: TextStyle(color: bodyColor, fontSize: 11),
+                  ),
+                ],
+              ),
+            );
+          }),
 
           const SizedBox(height: 20),
 
@@ -398,7 +412,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 },
               ),
               filled: true,
-              fillColor: Colors.grey.shade50,
+              fillColor: theme.colorScheme.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -429,7 +443,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Colors.grey[700],
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 12),
@@ -447,12 +461,12 @@ class _SignupScreenState extends State<SignupScreen> {
                         decoration: BoxDecoration(
                           color: _selectedAccountType == 'user'
                               ? AppConstants.primaryColor.withValues(alpha: 0.1)
-                              : Colors.grey.shade50,
+                              : theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: _selectedAccountType == 'user'
                                 ? AppConstants.primaryColor
-                                : Colors.grey.shade300,
+                                : theme.dividerColor,
                             width: _selectedAccountType == 'user' ? 2 : 1,
                           ),
                         ),
@@ -463,7 +477,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               size: 32,
                               color: _selectedAccountType == 'user'
                                   ? AppConstants.primaryColor
-                                  : Colors.grey.shade500,
+                                  : theme.colorScheme.onSurfaceVariant,
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -474,8 +488,8 @@ class _SignupScreenState extends State<SignupScreen> {
                                     ? FontWeight.w600
                                     : FontWeight.w400,
                                 color: _selectedAccountType == 'user'
-                                    ? AppConstants.darkColor
-                                    : Colors.grey.shade600,
+                                    ? theme.colorScheme.onSurface
+                                    : theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -497,12 +511,12 @@ class _SignupScreenState extends State<SignupScreen> {
                         decoration: BoxDecoration(
                           color: _selectedAccountType == 'shop_owner'
                               ? AppConstants.primaryColor.withValues(alpha: 0.1)
-                              : Colors.grey.shade50,
+                              : theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: _selectedAccountType == 'shop_owner'
                                 ? AppConstants.primaryColor
-                                : Colors.grey.shade300,
+                                : theme.dividerColor,
                             width: _selectedAccountType == 'shop_owner' ? 2 : 1,
                           ),
                         ),
@@ -513,7 +527,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               size: 32,
                               color: _selectedAccountType == 'shop_owner'
                                   ? AppConstants.primaryColor
-                                  : Colors.grey.shade500,
+                                  : theme.colorScheme.onSurfaceVariant,
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -524,8 +538,8 @@ class _SignupScreenState extends State<SignupScreen> {
                                     ? FontWeight.w600
                                     : FontWeight.w400,
                                 color: _selectedAccountType == 'shop_owner'
-                                    ? AppConstants.darkColor
-                                    : Colors.grey.shade600,
+                                    ? theme.colorScheme.onSurface
+                                    : theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -591,7 +605,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               'signup_agreement_text'.tr(context),
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.grey[600],
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
@@ -648,7 +662,7 @@ class _SignupScreenState extends State<SignupScreen> {
               Flexible(
                 child: Text(
                   'already_have_account'.tr(context),
-                  style: TextStyle(color: Colors.grey[600]),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

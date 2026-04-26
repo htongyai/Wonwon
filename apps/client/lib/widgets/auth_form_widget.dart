@@ -167,6 +167,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
 
   Widget get _header {
     final isSignup = widget.type == AuthFormType.signup;
+    final theme = Theme.of(context);
 
     return Column(
       children: [
@@ -202,7 +203,10 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
           isSignup
               ? 'sign_up_description'.tr(context)
               : 'login_description'.tr(context),
-          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+          style: TextStyle(
+            fontSize: 16,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
           textAlign: TextAlign.center,
         ),
       ],
@@ -211,6 +215,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
 
   Widget get _footer {
     final isSignup = widget.type == AuthFormType.signup;
+    final theme = Theme.of(context);
 
     return Column(
       children: [
@@ -218,7 +223,10 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
           // Agreement text
           Text(
             'signup_agreement_text'.tr(context),
-            style: const TextStyle(fontSize: 13, color: Colors.grey),
+            style: TextStyle(
+              fontSize: 13,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
@@ -285,7 +293,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
               isSignup
                   ? 'already_have_account'.tr(context)
                   : 'dont_have_account'.tr(context),
-              style: TextStyle(color: Colors.grey[600]),
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
             ),
             TextButton(
               onPressed: () {

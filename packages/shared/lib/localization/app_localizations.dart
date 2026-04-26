@@ -104,7 +104,12 @@ class _AppLocalizationsDelegate
   }
 
   @override
-  bool shouldReload(_AppLocalizationsDelegate old) => false;
+  // When the delegate is rebuilt we reload translations. Returning `false`
+  // here was a common source of "language toggle does nothing" bugs —
+  // Flutter would reuse the cached AppLocalizations instance (with the old
+  // JSON still in memory) even when the locale had changed. Loading is
+  // cheap (rootBundle caches the JSON string), so reloading is safe.
+  bool shouldReload(_AppLocalizationsDelegate old) => true;
 }
 
 /// Service to manage locale changes throughout the app

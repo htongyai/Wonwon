@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared/models/repair_shop.dart';
 import 'package:shared/constants/app_constants.dart';
+import 'package:shared/constants/eco_palette.dart';
+import 'package:shared/utils/repair_impact.dart';
 import '../localization/app_localizations_wrapper.dart';
 
 /// Modern shop card inspired by travel/location card designs.
@@ -42,18 +44,20 @@ class ShopCard extends StatelessWidget {
   // Image with gradient overlay, rating badge, category chips on image.
 
   Widget _buildGridCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.02),
             blurRadius: 6,
             offset: const Offset(0, 1),
           ),
@@ -193,10 +197,10 @@ class ShopCard extends StatelessWidget {
                   children: [
                     Text(
                       shop.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1A1A),
+                        color: theme.colorScheme.onSurface,
                         letterSpacing: -0.3,
                       ),
                       maxLines: 1,
@@ -205,15 +209,16 @@ class ShopCard extends StatelessWidget {
                     const SizedBox(height: 5),
                     Row(
                       children: [
-                        const Icon(Icons.location_on_outlined,
-                            size: 13, color: Color(0xFF9E9E9E)),
+                        Icon(Icons.location_on_outlined,
+                            size: 13,
+                            color: theme.colorScheme.onSurfaceVariant),
                         const SizedBox(width: 2),
                         Expanded(
                           child: Text(
                             _locationText,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF757575),
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -221,7 +226,7 @@ class ShopCard extends StatelessWidget {
                         ),
                         if (distanceKm != null) ...[
                           const SizedBox(width: 6),
-                          _buildDistanceBadge(),
+                          _buildDistanceBadge(context),
                         ],
                       ],
                     ),
@@ -239,19 +244,21 @@ class ShopCard extends StatelessWidget {
   // Horizontal list card with thumbnail, info, category chips, distance.
 
   Widget _buildCompactCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
             blurRadius: 14,
             offset: const Offset(0, 2),
           ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.02),
             blurRadius: 4,
             offset: const Offset(0, 1),
           ),
@@ -330,10 +337,10 @@ class ShopCard extends StatelessWidget {
                       // Shop name
                       Text(
                         shop.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1A1A),
+                          color: theme.colorScheme.onSurface,
                           letterSpacing: -0.3,
                         ),
                         maxLines: 1,
@@ -344,15 +351,16 @@ class ShopCard extends StatelessWidget {
                       // Location
                       Row(
                         children: [
-                          const Icon(Icons.location_on_outlined,
-                              size: 13, color: Color(0xFF9E9E9E)),
+                          Icon(Icons.location_on_outlined,
+                              size: 13,
+                              color: theme.colorScheme.onSurfaceVariant),
                           const SizedBox(width: 2),
                           Expanded(
                             child: Text(
                               _locationText,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF757575),
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -362,38 +370,41 @@ class ShopCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
 
-                      // Category chips + distance
+                      // Category chip + savings + distance
                       Row(
                         children: [
-                          // Category chips
-                          ...shop.categories
-                              .take(2)
-                              .map((String cat) => Padding(
-                                    padding: const EdgeInsets.only(right: 4),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF5F5F5),
-                                        borderRadius:
-                                            BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        'category_$cat'.tr(context),
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xFF616161),
-                                          letterSpacing: 0.1,
-                                        ),
-                                      ),
-                                    ),
-                                  )),
+                          // Single category chip (most representative)
+                          if (shop.categories.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: theme
+                                      .colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'category_${shop.categories.first}'.tr(context),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        theme.colorScheme.onSurfaceVariant,
+                                    letterSpacing: 0.1,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          const SizedBox(width: 2),
+                          // Savings chip (sustainability cue)
+                          _buildSavingsChip(),
 
                           const Spacer(),
 
                           // Distance badge
-                          if (distanceKm != null) _buildDistanceBadge(),
+                          if (distanceKm != null) _buildDistanceBadge(context),
                         ],
                       ),
                     ],
@@ -432,18 +443,28 @@ class ShopCard extends StatelessWidget {
   }
 
   Widget _buildPlaceholder() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFFF0F0F0),
-      ),
-      child: const Center(
-        child: Icon(Icons.store_rounded, color: Color(0xFFBDBDBD), size: 30),
-      ),
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+          ),
+          child: Center(
+            child: Icon(
+              Icons.store_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 30,
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildDistanceBadge() {
+  Widget _buildDistanceBadge(BuildContext context) {
     if (distanceKm == null) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final String distanceText;
     if (distanceKm! < 1) {
@@ -454,24 +475,72 @@ class ShopCard extends StatelessWidget {
       distanceText = '${distanceKm!.round()} km';
     }
 
+    // Indigo accent — keep the brand-y blue but shift bg intensity so it
+    // reads correctly on both light cards (pastel wash) and dark cards
+    // (deeper translucent wash rather than a near-white chip).
+    const indigo = Color(0xFF6366F1);
+    const indigoDeep = Color(0xFF4F46E5);
+    final bg = isDark
+        ? indigo.withValues(alpha: 0.22)
+        : const Color(0xFFEEF2FF);
+    final fg = isDark ? const Color(0xFFC7D2FE) : indigoDeep;
+    final iconColor = isDark ? const Color(0xFFA5B4FC) : indigo;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: const Color(0xFFEEF2FF),
+        color: bg,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.near_me_rounded,
-              size: 10, color: Color(0xFF6366F1)),
+          Icon(Icons.near_me_rounded, size: 10, color: iconColor),
           const SizedBox(width: 3),
           Text(
             distanceText,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF4F46E5),
+              color: fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Small leaf-tinted chip showing rough money saved vs. buying new.
+  /// Helps communicate the sustainability story at a glance.
+  Widget _buildSavingsChip() {
+    final baht = RepairImpact.avgSavedBahtForCategories(shop.categories);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: EcoPalette.leafWash.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: EcoPalette.leaf.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Tiny leaf dot
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              color: EcoPalette.leaf,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '~฿$baht',
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: EcoPalette.leaf,
+              letterSpacing: 0.1,
             ),
           ),
         ],

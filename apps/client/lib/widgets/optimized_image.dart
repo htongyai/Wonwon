@@ -81,30 +81,47 @@ class _OptimizedImageState extends State<OptimizedImage>
   }
 
   Widget get _defaultPlaceholder {
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      color: widget.backgroundColor ?? Colors.grey[200],
-      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          color: widget.backgroundColor ?? theme.colorScheme.surfaceContainerHighest,
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        );
+      },
     );
   }
 
   Widget get _defaultErrorWidget {
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      color: widget.backgroundColor ?? Colors.grey[100],
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.broken_image_outlined, size: 48, color: Colors.grey[400]),
-          const SizedBox(height: 8),
-          Text(
-            'Failed to load image',
-            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          color: widget.backgroundColor ?? theme.colorScheme.surfaceContainerHighest,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.broken_image_outlined,
+                size: 48,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Failed to load image',
+                style: TextStyle(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -254,6 +271,7 @@ class OptimizedCircularImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: radius * 2,
       height: radius * 2,
@@ -276,21 +294,21 @@ class OptimizedCircularImage extends StatelessWidget {
           placeholder:
               placeholder ??
               Container(
-                color: Colors.grey[200],
+                color: theme.colorScheme.surfaceContainerHighest,
                 child: Icon(
                   Icons.person,
                   size: radius,
-                  color: Colors.grey[400],
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
           errorWidget:
               errorWidget ??
               Container(
-                color: Colors.grey[100],
+                color: theme.colorScheme.surfaceContainerHighest,
                 child: Icon(
                   Icons.person,
                   size: radius,
-                  color: Colors.grey[400],
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
         ),
@@ -341,11 +359,12 @@ class _OptimizedImageGalleryState extends State<OptimizedImageGallery> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     if (widget.imageUrls.isEmpty) {
       return AspectRatio(
         aspectRatio: widget.aspectRatio,
         child: Container(
-          color: Colors.grey[200],
+          color: theme.colorScheme.surfaceContainerHighest,
           child: const Center(child: Icon(Icons.image_not_supported, size: 48)),
         ),
       );
@@ -388,8 +407,8 @@ class _OptimizedImageGalleryState extends State<OptimizedImageGallery> {
                   shape: BoxShape.circle,
                   color:
                       index == _currentIndex
-                          ? Theme.of(context).primaryColor
-                          : Colors.grey[300],
+                          ? theme.primaryColor
+                          : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                 ),
               ),
             ),

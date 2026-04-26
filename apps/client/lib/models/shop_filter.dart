@@ -136,6 +136,13 @@ class ShopFilterEngine {
             final db = distanceKm(b) ?? double.infinity;
             return da.compareTo(db);
           });
+        } else {
+          // No location available — falling back to rating sort gives
+          // the user a meaningful order ("best shops first") instead of
+          // leaving the list in arbitrary Firestore-fetch order. The
+          // alternative (no sort) feels broken when a user picks
+          // "Distance" and gets a random-looking list.
+          list.sort((a, b) => b.rating.compareTo(a.rating));
         }
         break;
       case ShopSortMode.rating:

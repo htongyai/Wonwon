@@ -1,6 +1,11 @@
 import 'dart:math' show min;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+// `firebase_auth` exports a `User` class that collides with our app's
+// `shared/models/user.dart` `User`. We only need FirebaseAuth.instance
+// for the current-uid lookup, so prefix the import to keep the
+// app's `User` symbol unambiguous everywhere else in this file.
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared/constants/app_constants.dart';
@@ -904,6 +909,31 @@ class _AdminUserManagementScreenState
 
   Future<void> _updateUser(User user, String role, String status) async {
     final messenger = ScaffoldMessenger.of(context);
+
+    // Self-action guard: an admin must not be able to (a) demote
+    // themselves out of admin or (b) suspend their own account from
+    // this screen. Both would lock them out of the dashboard mid-edit
+    // (the auth gate would kick them on the next route change) AND
+    // could leave the system without any admins if they're the last
+    // one. The right path for stepping down is for another admin to
+    // perform the change.
+    final currentUid = fb_auth.FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid != null && currentUid == user.id) {
+      final demotingSelf =
+          user.accountType == 'admin' && role != 'admin';
+      final suspendingSelf =
+          user.status == 'active' && status != 'active';
+      if (demotingSelf || suspendingSelf) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('admin_self_action_blocked'.tr(context)),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
     setLoading(true, message: 'updating_user'.tr(context));
 
     try {
@@ -966,6 +996,21 @@ class _AdminUserManagementScreenState
   }
 
   void _deleteUser(User user) async {
+    // Self-delete guard — same rationale as the demote/suspend check in
+    // _updateUser. An admin must not be able to delete their own
+    // account from inside the dashboard; that would orphan their
+    // session and could remove the last admin from the system.
+    final currentUid = fb_auth.FirebaseAuth.instance.currentUser?.uid;
+    if (currentUid != null && currentUid == user.id) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('admin_self_action_blocked'.tr(context)),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder:

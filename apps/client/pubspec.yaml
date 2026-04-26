@@ -1,7 +1,7 @@
 name: wonwon_client
 description: "WonWon Repair Finder - Client App"
 publish_to: 'none'
-version: 2.2.3
+version: 2.2.4
 
 environment:
   sdk: ^3.7.2

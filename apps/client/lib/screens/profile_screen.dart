@@ -9,6 +9,7 @@ import 'package:shared/models/user.dart' as app_user;
 import 'package:shared/services/user_service.dart';
 import 'package:wonwon_client/screens/login_screen.dart';
 import 'package:wonwon_client/screens/settings_screen.dart';
+import 'package:wonwon_client/widgets/sustainability/impact_card.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared/constants/app_constants.dart';
 import 'package:shared/mixins/widget_disposal_mixin.dart';
@@ -64,13 +65,24 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _setupUserDataListener(String uid) {
+    // Primary listener on the user doc — picks up profile field changes
+    // AND the denormalized `reviewCount` that ReviewService now
+    // maintains (so the profile stat updates the moment a review is
+    // written or deleted, without requiring a page refresh).
     listenToStream(
       FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
       (snapshot) {
         if (snapshot.exists && mounted) {
+          final data = snapshot.data() ?? {};
           setState(() {
-            _userData = app_user.User.fromMap(snapshot.data() ?? {}, snapshot.id);
+            _userData = app_user.User.fromMap(data, snapshot.id);
             _loading = false;
+            final denormalized = (data['reviewCount'] as num?)?.toInt();
+            // Only trust the denormalized counter if it's present —
+            // otherwise the one-shot _fetchCounts seed still wins.
+            if (denormalized != null) {
+              _reviewCount = denormalized;
+            }
           });
         }
       },
@@ -82,6 +94,38 @@ class _ProfileScreenState extends State<ProfileScreen>
           });
         }
       },
+    );
+
+    // Real-time saved-shop count via the user's savedShops subcollection.
+    // Cheap to listen on (scoped to the signed-in user's own data).
+    listenToStream(
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('savedShops')
+          .snapshots(),
+      (snapshot) {
+        if (mounted) {
+          setState(() => _savedCount = snapshot.docs.length);
+        }
+      },
+      onError: (e) => appLog('savedShops stream error: $e'),
+    );
+
+    // Real-time repair-record count via the user's repairRecords
+    // subcollection — same reactivity as saved shops.
+    listenToStream(
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('repairRecords')
+          .snapshots(),
+      (snapshot) {
+        if (mounted) {
+          setState(() => _repairCount = snapshot.docs.length);
+        }
+      },
+      onError: (e) => appLog('repairRecords stream error: $e'),
     );
   }
 
@@ -185,9 +229,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           .get();
 
       final records = snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return RepairRecord.fromMap(data);
+        return RepairRecord.fromMap({...doc.data(), 'id': doc.id});
       }).toList();
       if (mounted) {
         setState(() => _repairCount = records.length);
@@ -214,8 +256,27 @@ class _ProfileScreenState extends State<ProfileScreen>
         _savedCount = savedSnapshot.docs.length;
       });
 
-      // Fetch review count by querying all shops' review subcollections
-      // where the review was written by this user
+      // Short-circuit the expensive shop-by-shop review scan if the
+      // user doc already has a denormalized reviewCount — that field
+      // is the source of truth going forward, maintained atomically by
+      // ReviewService. The stream listener on the user doc already
+      // wires it into `_reviewCount`, so we don't need to recompute.
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final existingCounter =
+          (userDoc.data()?['reviewCount'] as num?)?.toInt();
+      if (existingCounter != null) {
+        if (mounted) {
+          setState(() => _reviewCount = existingCounter);
+        }
+        return;
+      }
+
+      // Legacy path: user doc hasn't been seeded yet. Count reviews
+      // across shops once, then persist the value so future reads are
+      // cheap and realtime.
       int reviewCount = 0;
       final shopsSnapshot = await FirebaseFirestore.instance
           .collection('shops')
@@ -240,6 +301,17 @@ class _ProfileScreenState extends State<ProfileScreen>
       setState(() {
         _reviewCount = reviewCount;
       });
+
+      // Seed the user doc so subsequent loads skip the scan and the
+      // stream listener picks up atomic increments.
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .set({'reviewCount': reviewCount}, SetOptions(merge: true));
+      } catch (e) {
+        appLog('Failed to seed user reviewCount: $e');
+      }
     } catch (e) {
       appLog('Error fetching counts: $e');
     }
@@ -261,7 +333,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: Theme.of(context).dividerColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -374,17 +446,21 @@ class _ProfileScreenState extends State<ProfileScreen>
               const SizedBox(height: 28),
               Text(
                 'login_to_view_profile'.tr(context),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.3,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 'please_login_to_view_profile'.tr(context),
-                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
@@ -428,15 +504,22 @@ class _ProfileScreenState extends State<ProfileScreen>
   // Authenticated
   // ---------------------------------------------------------------------------
   Widget _buildAuthenticatedView() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final scaffoldBg = isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8F9FA);
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         title: Text(
           'profile'.tr(context),
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 20),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            color: theme.colorScheme.onSurface,
+          ),
         ),
         centerTitle: false,
-        backgroundColor: Colors.white,
+        backgroundColor: theme.cardColor,
         elevation: 0,
         scrolledUnderElevation: .5,
         actions: [
@@ -468,7 +551,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               // ---- Profile header card ----
               Container(
                 width: double.infinity,
-                color: Colors.white,
+                color: theme.cardColor,
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
                 child: Column(
                   children: [
@@ -502,7 +585,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       width: 96,
                                       height: 96,
                                       placeholder: Container(
-                                        color: Colors.grey[100],
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest,
                                         child: const Center(
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
@@ -524,7 +609,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 color: AppConstants.primaryColor,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: Colors.white,
+                                  color: theme.cardColor,
                                   width: 2.5,
                                 ),
                               ),
@@ -557,10 +642,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                       _userData?.name.isNotEmpty == true
                           ? _userData!.name
                           : _user!.email ?? 'user_fallback'.tr(context),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -0.3,
+                        color: theme.colorScheme.onSurface,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -571,7 +657,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       _user!.email ?? '',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[500],
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -612,11 +698,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.cardColor,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
+                      color: isDark
+                          ? Colors.black.withValues(alpha: 0.2)
+                          : Colors.black.withValues(alpha: 0.04),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -634,7 +722,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     Container(
                       width: 1,
                       height: 40,
-                      color: Colors.grey[200],
+                      color: theme.dividerColor,
                     ),
                     Expanded(
                       child: _buildStatItem(
@@ -646,7 +734,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     Container(
                       width: 1,
                       height: 40,
-                      color: Colors.grey[200],
+                      color: theme.dividerColor,
                     ),
                     Expanded(
                       child: _buildStatItem(
@@ -660,6 +748,17 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
 
               const SizedBox(height: 24),
+
+              // ---- Sustainability impact card ----
+              FutureBuilder<List<RepairRecord>>(
+                future: _repairRecordsFuture,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return ImpactCard(records: snapshot.data!);
+                },
+              ),
 
               // ---- Repair summary analytics card ----
               FutureBuilder<List<RepairRecord>>(
@@ -679,10 +778,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'repair_history'.tr(context),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                       letterSpacing: -0.3,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                 ),
@@ -761,12 +861,13 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
     }
 
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: AppConstants.primaryColor.withValues(alpha: 0.15),
@@ -789,10 +890,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                 const SizedBox(width: 8),
                 Text(
                   'repair_summary_title'.tr(context),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A1A),
+                    color: theme.colorScheme.onSurface,
                     letterSpacing: 0.2,
                   ),
                 ),
@@ -810,7 +911,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Container(
                     width: 1,
                     height: 40,
-                    color: Colors.grey.shade200),
+                    color: theme.dividerColor),
                 Expanded(
                   child: _summaryStat(
                     value:
@@ -821,7 +922,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 Container(
                     width: 1,
                     height: 40,
-                    color: Colors.grey.shade200),
+                    color: theme.dividerColor),
                 Expanded(
                   child: _summaryStat(
                     value: satisfactionCount == 0
@@ -869,14 +970,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _summaryStat({required String value, required String label}) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF1A1A1A),
+            color: theme.colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 2),
@@ -886,7 +988,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w500,
-            color: Colors.grey[600],
+            color: theme.colorScheme.onSurfaceVariant,
             letterSpacing: 0.2,
           ),
         ),
@@ -910,6 +1012,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     required String label,
     required IconData icon,
   }) {
+    final theme = Theme.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -919,10 +1022,11 @@ class _ProfileScreenState extends State<ProfileScreen>
           curve: Curves.easeOutCubic,
           builder: (context, value, child) => Text(
             '$value',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
+              color: theme.colorScheme.onSurface,
             ),
           ),
         ),
@@ -931,7 +1035,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           label,
           style: TextStyle(
             fontSize: 13,
-            color: Colors.grey[500],
+            color: theme.colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -940,6 +1044,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildEmptyHistory() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 32),
       child: Column(
@@ -947,13 +1052,13 @@ class _ProfileScreenState extends State<ProfileScreen>
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: theme.colorScheme.surfaceContainerHighest,
               shape: BoxShape.circle,
             ),
             child: Icon(
               FontAwesomeIcons.screwdriverWrench,
               size: 32,
-              color: Colors.grey[400],
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 16),
@@ -961,7 +1066,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             'no_repair_records'.tr(context),
             style: TextStyle(
               fontSize: 15,
-              color: Colors.grey[500],
+              color: theme.colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
@@ -972,13 +1077,17 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildRepairRecordCard(RepairRecord record) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.2)
+                : Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1021,9 +1130,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                   children: [
                     Text(
                       record.shopName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
+                        color: theme.colorScheme.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1033,7 +1143,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       record.itemFixed,
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey[500],
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1058,7 +1168,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     DateFormat('yyyy-MM-dd').format(record.date.toLocal()),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[400],
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   if (record.satisfactionRating != null) ...[
@@ -1086,17 +1196,18 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildTag(String text) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         text,
         style: TextStyle(
           fontSize: 11,
-          color: Colors.grey[600],
+          color: theme.colorScheme.onSurfaceVariant,
           fontWeight: FontWeight.w500,
         ),
         maxLines: 1,
@@ -1173,10 +1284,12 @@ class RepairRecordDetailScreen extends StatelessWidget {
                           children: [
                             Text(
                               record.shopName,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w700,
                                 letterSpacing: -0.3,
+                                color:
+                                    Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -1184,7 +1297,9 @@ class RepairRecordDetailScreen extends StatelessWidget {
                               record.itemFixed,
                               style: TextStyle(
                                 fontSize: 15,
-                                color: Colors.grey[600],
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -1270,45 +1385,59 @@ class RepairRecordDetailScreen extends StatelessWidget {
   }
 
   Widget _buildChip(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-      ),
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            text,
+            style: TextStyle(
+                fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildDetailRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppConstants.primaryColor, size: 22),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 18),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: AppConstants.primaryColor, size: 22),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      value,
+                      style: TextStyle(
+                          fontSize: 15, color: theme.colorScheme.onSurface),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  value,
-                  style: const TextStyle(fontSize: 15),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

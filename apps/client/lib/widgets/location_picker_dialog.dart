@@ -182,8 +182,9 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
@@ -192,7 +193,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
         height: min(700, MediaQuery.of(context).size.height - 64),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -213,18 +214,18 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                   style: GoogleFonts.inter(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1E293B),
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 const Spacer(),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Color(0xFF64748B)),
+                    icon: Icon(Icons.close, color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ),
               ],
@@ -232,32 +233,47 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
             const SizedBox(height: 16),
 
             // Instructions
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0F9FF),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFBAE6FD)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.info_outline,
-                    color: Color(0xFF0284C7),
-                    size: 20,
+            Builder(
+              builder: (context) {
+                final isDark =
+                    Theme.of(context).brightness == Brightness.dark;
+                final bgColor = isDark
+                    ? const Color(0xFF0C2D44)
+                    : const Color(0xFFF0F9FF);
+                final borderColor = isDark
+                    ? const Color(0xFF1E5A80)
+                    : const Color(0xFFBAE6FD);
+                final fgColor = isDark
+                    ? const Color(0xFF7DD3FC)
+                    : const Color(0xFF0284C7);
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: borderColor),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Tap on the map or drag the marker to select a location',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: const Color(0xFF0284C7),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: fgColor,
+                        size: 20,
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Tap on the map or drag the marker to select a location',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: fgColor,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
             const SizedBox(height: 16),
 
@@ -295,7 +311,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: theme.dividerColor),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
@@ -324,9 +340,9 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: theme.dividerColor),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -336,7 +352,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1E293B),
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -347,14 +363,14 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                       Text(
                         '${_selectedLocation.latitude.toStringAsFixed(6)}, ${_selectedLocation.longitude.toStringAsFixed(6)}',
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: const Color(0xFF1E293B),
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -368,24 +384,24 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: const Color(0xFF64748B),
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                       Expanded(
                         child: _isLoadingAddress
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 12,
                                 width: 12,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 1,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF64748B)),
+                                  valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.onSurfaceVariant),
                                 ),
                               )
                             : Text(
                                 _selectedAddress.isNotEmpty ? _selectedAddress : 'Loading address...',
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
-                                  color: const Color(0xFF1E293B),
+                                  color: theme.colorScheme.onSurface,
                                 ),
                               ),
                       ),
@@ -407,7 +423,7 @@ class _LocationPickerDialogState extends State<LocationPickerDialog> {
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: const Color(0xFF64748B),
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared/constants/app_constants.dart';
-import 'package:shared/constants/app_colors.dart';
 import 'package:shared/constants/app_text_styles.dart';
 import 'package:shared/models/repair_shop.dart';
 import 'package:shared/services/shop_service.dart';
@@ -387,14 +386,16 @@ class _EditShopScreenState extends State<EditShopScreen> {
         }
       },
       child: Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           'edit_shop'.tr(context),
-          style: AppTextStyles.heading.copyWith(color: AppColors.text),
+          style: AppTextStyles.heading.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 20),
@@ -777,19 +778,33 @@ class _EditShopScreenState extends State<EditShopScreen> {
                           height: 80,
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: CachedNetworkImage(
-                              imageUrl: photo,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                              memCacheWidth: 200,
-                              memCacheHeight: 200,
-                              placeholder: (_, __) => const ColoredBox(color: Color(0xFFF0F0F0)),
-                              errorWidget: (_, __, ___) => const ColoredBox(
-                                color: Color(0xFFF0F0F0),
-                                child: Center(child: Icon(Icons.broken_image, color: Colors.grey)),
-                              ),
-                            ),
+                            child: Builder(builder: (context) {
+                              final isDark = Theme.of(context).brightness ==
+                                  Brightness.dark;
+                              final placeholderColor = isDark
+                                  ? const Color(0xFF2A2A2A)
+                                  : const Color(0xFFF0F0F0);
+                              final iconColor = Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant;
+                              return CachedNetworkImage(
+                                imageUrl: photo,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                memCacheWidth: 200,
+                                memCacheHeight: 200,
+                                placeholder: (_, __) =>
+                                    ColoredBox(color: placeholderColor),
+                                errorWidget: (_, __, ___) => ColoredBox(
+                                  color: placeholderColor,
+                                  child: Center(
+                                    child: Icon(Icons.broken_image,
+                                        color: iconColor),
+                                  ),
+                                ),
+                              );
+                            }),
                           ),
                         ),
                         Positioned(
@@ -911,7 +926,7 @@ class _EditShopScreenState extends State<EditShopScreen> {
       width: double.infinity,
       padding: ResponsiveSize.getScaledPadding(const EdgeInsets.all(16)),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -966,12 +981,9 @@ class _EditShopScreenState extends State<EditShopScreen> {
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (!mounted) return;
 
       if (image != null) {
-        setState(() {
-          // Processing image
-        });
-
         Uint8List? compressedImage;
         if (kIsWeb) {
           compressedImage = await image.readAsBytes();

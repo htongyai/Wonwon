@@ -27,6 +27,11 @@ class _AdminReportsManagementScreenState
   String _sortBy = 'createdAt';
   bool _sortAscending = false;
 
+  final Map<String, String> _shopNameCache = {};
+  final Map<String, String> _userNameCache = {};
+  final Set<String> _pendingShopFetches = {};
+  final Set<String> _pendingUserFetches = {};
+
   final List<String> _reportTypes = [
     'Inappropriate Content',
     'Spam',
@@ -35,6 +40,71 @@ class _AdminReportsManagementScreenState
     'Copyright Violation',
     'Other',
   ];
+
+  void _prefetchNames(List<Map<String, dynamic>> reports) {
+    final shopIds = <String>{};
+    final userIds = <String>{};
+    for (final report in reports) {
+      final shopId = (report['shopId'] ?? '').toString();
+      final userId = (report['userId'] ?? '').toString();
+      if (shopId.isNotEmpty &&
+          !_shopNameCache.containsKey(shopId) &&
+          !_pendingShopFetches.contains(shopId)) {
+        shopIds.add(shopId);
+      }
+      if (userId.isNotEmpty &&
+          !_userNameCache.containsKey(userId) &&
+          !_pendingUserFetches.contains(userId)) {
+        userIds.add(userId);
+      }
+    }
+    if (shopIds.isEmpty && userIds.isEmpty) return;
+    _pendingShopFetches.addAll(shopIds);
+    _pendingUserFetches.addAll(userIds);
+    for (final id in shopIds) {
+      _firestore.collection('shops').doc(id).get().then((doc) {
+        if (!mounted) return;
+        final name = (doc.data()?['name'] ?? '').toString();
+        safeSetState(() {
+          _shopNameCache[id] = name.isNotEmpty ? name : id;
+          _pendingShopFetches.remove(id);
+        });
+      }).catchError((_) {
+        if (!mounted) return;
+        safeSetState(() {
+          _shopNameCache[id] = id;
+          _pendingShopFetches.remove(id);
+        });
+      });
+    }
+    for (final id in userIds) {
+      _firestore.collection('users').doc(id).get().then((doc) {
+        if (!mounted) return;
+        final data = doc.data();
+        final name = (data?['name'] ?? data?['displayName'] ?? data?['email'] ?? '').toString();
+        safeSetState(() {
+          _userNameCache[id] = name.isNotEmpty ? name : id;
+          _pendingUserFetches.remove(id);
+        });
+      }).catchError((_) {
+        if (!mounted) return;
+        safeSetState(() {
+          _userNameCache[id] = id;
+          _pendingUserFetches.remove(id);
+        });
+      });
+    }
+  }
+
+  String _shopLabelFor(String id) {
+    if (id.isEmpty) return '';
+    return _shopNameCache[id] ?? (id.length > 10 ? '${id.substring(0, 6)}…' : id);
+  }
+
+  String _userLabelFor(String id) {
+    if (id.isEmpty) return '';
+    return _userNameCache[id] ?? (id.length > 10 ? '${id.substring(0, 6)}…' : id);
+  }
 
   @override
   Widget buildContent(BuildContext context) {
@@ -157,6 +227,10 @@ class _AdminReportsManagementScreenState
                     data['docId'] = doc.id;
                     return data;
                   }).toList();
+
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _prefetchNames(reports);
+              });
 
               final filteredReports = _filterReports(reports);
               _sortReports(filteredReports);
@@ -373,38 +447,52 @@ class _AdminReportsManagementScreenState
             const SizedBox(height: 16),
             Row(
               children: [
-                if (shopId.isNotEmpty) ...[
-                  FaIcon(
-                    FontAwesomeIcons.store,
-                    size: 14,
-                    color: Colors.grey[600],
+                Expanded(
+                  child: Row(
+                    children: [
+                      if (shopId.isNotEmpty) ...[
+                        FaIcon(
+                          FontAwesomeIcons.store,
+                          size: 14,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'admin_shop_label_prefix'.tr(context).replaceAll('{name}', _shopLabelFor(shopId)),
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                      ],
+                      if (userId.isNotEmpty) ...[
+                        FaIcon(
+                          FontAwesomeIcons.user,
+                          size: 14,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'admin_user_label_prefix'.tr(context).replaceAll('{name}', _userLabelFor(userId)),
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'admin_shop_id_prefix'.tr(context).replaceAll('{id}', shopId),
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                ],
-                if (userId.isNotEmpty) ...[
-                  FaIcon(
-                    FontAwesomeIcons.user,
-                    size: 14,
-                    color: Colors.grey[600],
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'admin_user_id_prefix'.tr(context).replaceAll('{id}', userId),
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-                const Spacer(),
+                ),
+                const SizedBox(width: 8),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -535,8 +623,26 @@ class _AdminReportsManagementScreenState
                     'admin_submitted'.tr(context),
                     DateFormat('MMM dd, yyyy HH:mm').format(createdAt),
                   ),
-                  _buildDetailRow(context, 'admin_shop_id'.tr(context), report['shopId'] ?? 'N/A'),
-                  _buildDetailRow(context, 'admin_user_id'.tr(context), report['userId'] ?? 'N/A'),
+                  _buildDetailRow(
+                    context,
+                    'admin_shop_id'.tr(context),
+                    (() {
+                      final id = (report['shopId'] ?? '').toString();
+                      if (id.isEmpty) return 'N/A';
+                      final name = _shopNameCache[id];
+                      return name != null && name != id ? '$name ($id)' : id;
+                    })(),
+                  ),
+                  _buildDetailRow(
+                    context,
+                    'admin_user_id'.tr(context),
+                    (() {
+                      final id = (report['userId'] ?? '').toString();
+                      if (id.isEmpty) return 'N/A';
+                      final name = _userNameCache[id];
+                      return name != null && name != id ? '$name ($id)' : id;
+                    })(),
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'admin_description_label'.tr(context),

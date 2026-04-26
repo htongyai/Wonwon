@@ -49,6 +49,16 @@ class RepairShop {
   final int totalContacts;
   final int totalShares;
 
+  // Sustainability fields
+  /// Admin-verified eco-badges. Values are known ids
+  /// (e.g. 'certified_repairer', 'uses_reclaimed_materials',
+  /// 'zero_waste_practice', 'lifetime_warranty', 'local_artisan').
+  final List<String> ecoBadges;
+
+  /// Short owner-written story for the shop detail page (max ~280 chars).
+  /// Rendered as an editorial pull-quote.
+  final String? ownerStory;
+
   RepairShop({
     required this.id,
     required this.name,
@@ -96,6 +106,8 @@ class RepairShop {
     this.totalDirections = 0,
     this.totalContacts = 0,
     this.totalShares = 0,
+    this.ecoBadges = const [],
+    this.ownerStory,
   });
 
   Map<String, dynamic> toMap() {
@@ -146,6 +158,8 @@ class RepairShop {
       'totalDirections': totalDirections,
       'totalContacts': totalContacts,
       'totalShares': totalShares,
+      'ecoBadges': ecoBadges,
+      'ownerStory': ownerStory,
     };
   }
 
@@ -262,6 +276,8 @@ class RepairShop {
       totalDirections: (map['totalDirections'] as num?)?.toInt() ?? 0,
       totalContacts: (map['totalContacts'] as num?)?.toInt() ?? 0,
       totalShares: (map['totalShares'] as num?)?.toInt() ?? 0,
+      ecoBadges: safeStringList(map['ecoBadges']),
+      ownerStory: map['ownerStory']?.toString(),
     );
   }
 }

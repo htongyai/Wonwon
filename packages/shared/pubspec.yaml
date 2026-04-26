@@ -1,7 +1,7 @@
 name: shared
 description: "Shared code for WonWon Repair Finder apps"
 publish_to: 'none'
-version: 2.2.3
+version: 2.2.4
 
 environment:
   sdk: ^3.7.2

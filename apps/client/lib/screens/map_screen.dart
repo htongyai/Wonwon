@@ -14,7 +14,7 @@ import 'package:shared/utils/app_logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:ui' as ui;
-import 'package:geolocator/geolocator.dart' show Geolocator;
+import 'package:geolocator/geolocator.dart' show Geolocator, LocationPermission;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
 import 'package:shared/services/saved_shop_service.dart';
@@ -92,16 +92,16 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _locationService = locationService;
     _loadShops();
     _createCustomMarkerIcon();
+    // Register the location listener synchronously so dispose() always has
+    // something to remove, regardless of how far _initLocationTracking got.
+    _locationService.addListener(_onLocationChanged);
     _initLocationTracking();
 
-    // Track sheet position to sync the arrow icon direction
-    _sheetController.addListener(() {
-      if (!_sheetController.isAttached) return;
-      final expanded = _sheetController.size > 0.2;
-      if (expanded != _isSheetExpanded && mounted) {
-        setState(() => _isSheetExpanded = expanded);
-      }
-    });
+    // Track sheet position to sync the arrow icon direction.
+    // Named method (not anonymous) so dispose() can remove it — otherwise
+    // the listener keeps firing on a disposed state when MainNavigation's
+    // IndexedStack restores this screen.
+    _sheetController.addListener(_onSheetChanged);
 
     // Delay map widget creation by one frame to avoid jank during the initial
     // screen transition / route animation.
@@ -123,10 +123,21 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     _searchDebounce?.cancel();
     _mapController?.dispose();
     _searchController.dispose();
+    _sheetController.removeListener(_onSheetChanged);
     _sheetController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _locationService.removeListener(_onLocationChanged);
     super.dispose();
+  }
+
+  /// Sheet size → arrow-icon direction sync. Must be a named method so it
+  /// can be balanced with `removeListener` in [dispose].
+  void _onSheetChanged() {
+    if (!_sheetController.isAttached) return;
+    final expanded = _sheetController.size > 0.2;
+    if (expanded != _isSheetExpanded && mounted) {
+      setState(() => _isSheetExpanded = expanded);
+    }
   }
 
   @override
@@ -138,12 +149,20 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   // Location helpers
   // ---------------------------------------------------------------------------
   Future<void> _checkPermissionsOnResume() async {
-    if (kIsWeb) {
-      if (!_locationService.isTracking) _startLocationTracking();
-      return;
+    // Silent re-check when the app resumes — don't re-prompt, just see if
+    // the user granted permission from system settings while we were
+    // backgrounded. Direct Geolocator call matches the simple pattern the
+    // rest of the app uses.
+    try {
+      final permission = await Geolocator.checkPermission();
+      final granted = permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always;
+      if (granted && !_locationService.isTracking) {
+        _startLocationTracking();
+      }
+    } catch (_) {
+      // Silent — resume-time probes shouldn't surface errors.
     }
-    final isGranted = await Permission.location.isGranted;
-    if (isGranted && !_locationService.isTracking) _startLocationTracking();
   }
 
   Future<void> _initLocationTracking() async {
@@ -157,7 +176,6 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       _animateToUserLocation();
     }
     _startLocationTracking();
-    _locationService.addListener(_onLocationChanged);
   }
 
   Future<void> _startLocationTracking() async {
@@ -223,18 +241,21 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
 
   void _updateUserLocationMarker() {
     final pos = _locationService.currentLatLng;
-    if (pos != null && mounted) {
-      setState(() {
-        _userMarker = Marker(
-          markerId: const MarkerId('user_location'),
-          position: pos,
-          icon: _userLocationIcon ??
-              BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-          infoWindow: InfoWindow(title: 'your_location'.tr(context)),
-          zIndex: 2,
-        );
-      });
-    }
+    if (pos == null || !mounted) return;
+    // Resolve the localized string BEFORE calling setState so we don't
+    // access `context` inside the setState closure — this method can fire
+    // from a ChangeNotifier tick arriving just after deactivation.
+    final title = 'your_location'.tr(context);
+    setState(() {
+      _userMarker = Marker(
+        markerId: const MarkerId('user_location'),
+        position: pos,
+        icon: _userLocationIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: InfoWindow(title: title),
+        zIndex: 2,
+      );
+    });
   }
 
   void _animateToUserLocation() {
@@ -291,7 +312,9 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
               Text(
                 'location_enable_instructions'.tr(context),
                 style: TextStyle(
-                    fontSize: 13, color: Colors.grey[700], height: 1.5),
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.5),
               ),
             ],
           ],
@@ -674,7 +697,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           // -- Loading overlay --
           if (!_isMapStyleLoaded)
             Container(
-              color: Colors.white,
+              color: Theme.of(context).scaffoldBackgroundColor,
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -693,7 +716,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
-                        color: AppConstants.darkColor,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -708,16 +731,91 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
           if (_selectedShop != null && _isMapStyleLoaded)
             _buildShopPreviewCard(),
 
-          // -- Draggable bottom sheet --
+          // -- Draggable bottom sheet (has its own ValueKey so positional
+          //    re-mounts don't trigger the controller-reattach assertion). --
           if (_isMapStyleLoaded) _buildDraggableSheet(),
 
           // -- FABs: My Location + Add Shop --
           if (_isMapStyleLoaded) _buildFabs(isLoggedIn),
 
           // -- "Search this area" pill (shows after user pans >300m) --
-          if (_isMapStyleLoaded && _showSearchHereButton && _selectedShop == null)
+          if (_isMapStyleLoaded &&
+              _showSearchHereButton &&
+              _selectedShop == null)
             _buildSearchHereButton(),
+
+          // -- "Location off" pill (shows when we don't have user pos) --
+          if (_isMapStyleLoaded &&
+              _locationService.currentLatLng == null &&
+              _selectedShop == null)
+            _buildLocationOffPill(),
         ],
+      ),
+    );
+  }
+
+  /// Subtle pill shown when we lack a user position. Gives a clear reason
+  /// the user's blue dot isn't on the map, plus a one-tap retry.
+  Widget _buildLocationOffPill() {
+    final topPadding = MediaQuery.of(context).padding.top;
+    return Positioned(
+      top: topPadding + 14,
+      right: 16,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () async {
+            // Retry: run the permission dance directly via Geolocator (same
+            // pattern as splash + home), then kick off tracking if granted.
+            try {
+              var permission = await Geolocator.checkPermission();
+              if (permission == LocationPermission.denied) {
+                permission = await Geolocator.requestPermission();
+              }
+              if (permission == LocationPermission.whileInUse ||
+                  permission == LocationPermission.always) {
+                _initLocationTracking();
+              } else if (permission == LocationPermission.deniedForever &&
+                  !kIsWeb) {
+                await Geolocator.openAppSettings();
+              }
+            } catch (e) {
+              appLog('Map location-off retry failed: $e');
+            }
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.location_off_rounded,
+                    size: 13, color: Colors.grey.shade700),
+                const SizedBox(width: 5),
+                Text(
+                  'location_off_short'.tr(context),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF4A5568),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -737,13 +835,14 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   void _showCategoryLegend() {
     final categories = RepairCategory.getCategories();
     HapticFeedback.selectionClick();
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: SafeArea(
           top: false,
@@ -755,7 +854,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: theme.dividerColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -765,10 +864,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   children: [
                     Text(
                       'map_legend_title'.tr(context),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1A1A),
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -1012,6 +1111,8 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   Widget _buildShopPreviewCard() {
     final shop = _selectedShop!;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Positioned(
       left: 16,
@@ -1019,7 +1120,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       bottom: bottomPadding + 130,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -1052,19 +1153,31 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                         child: Container(
                           width: 72,
                           height: 72,
-                          color: const Color(0xFFF0F0F0),
+                          color: isDark
+                              ? const Color(0xFF2A2A2A)
+                              : const Color(0xFFF0F0F0),
                           child: shop.photos.isNotEmpty
                               ? CachedNetworkImage(
                                   imageUrl: shop.photos.first,
                                   fit: BoxFit.cover,
                                   memCacheWidth: 144,
                                   memCacheHeight: 144,
-                                  placeholder: (_, __) => const ColoredBox(color: Color(0xFFF0F0F0)),
-                                  errorWidget: (_, __, ___) => const Icon(Icons.store_rounded,
-                                      color: Color(0xFFBDBDBD), size: 28),
+                                  placeholder: (_, __) => ColoredBox(
+                                    color: isDark
+                                        ? const Color(0xFF2A2A2A)
+                                        : const Color(0xFFF0F0F0),
+                                  ),
+                                  errorWidget: (_, __, ___) => Icon(
+                                    Icons.store_rounded,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                    size: 28,
+                                  ),
                                 )
-                              : const Icon(Icons.store_rounded,
-                                  color: Color(0xFFBDBDBD), size: 28),
+                              : Icon(
+                                  Icons.store_rounded,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  size: 28,
+                                ),
                         ),
                       ),
                       if (shop.rating > 0)
@@ -1112,10 +1225,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       children: [
                         Text(
                           shop.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF1A1A1A),
+                            color: theme.colorScheme.onSurface,
                             letterSpacing: -0.3,
                           ),
                           maxLines: 1,
@@ -1124,14 +1237,17 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(Icons.location_on_outlined,
-                                size: 13, color: Color(0xFF9E9E9E)),
+                            Icon(Icons.location_on_outlined,
+                                size: 13,
+                                color: theme.colorScheme.onSurfaceVariant),
                             const SizedBox(width: 2),
                             Expanded(
                               child: Text(
                                 _shopLocationText(shop),
-                                style: const TextStyle(
-                                    fontSize: 12, color: Color(0xFF757575)),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1151,7 +1267,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                         : Icons.bookmark_border_rounded,
                     tint: _savedShopIds.contains(shop.id)
                         ? _accent
-                        : const Color(0xFF9E9E9E),
+                        : theme.colorScheme.onSurfaceVariant,
                     onTap: () => _toggleSaveFromMap(shop),
                   ),
                   const SizedBox(width: 6),
@@ -1165,7 +1281,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   // Dismiss button
                   _previewActionButton(
                     icon: Icons.close_rounded,
-                    tint: const Color(0xFF9E9E9E),
+                    tint: theme.colorScheme.onSurfaceVariant,
                     onTap: _dismissSelectedShop,
                   ),
                 ],
@@ -1182,21 +1298,29 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
     required Color tint,
     required VoidCallback onTap,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(17),
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? theme.colorScheme.surfaceContainerHighest
+                    : const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(17),
+              ),
+              child: Icon(icon, size: 17, color: tint),
+            ),
           ),
-          child: Icon(icon, size: 17, color: tint),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1213,6 +1337,12 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
   // ---------------------------------------------------------------------------
   Widget _buildDraggableSheet() {
     return DraggableScrollableSheet(
+      // Stable key so Flutter matches the sheet widget by identity and not
+      // by child-index position. Without this, adding/removing siblings in
+      // the parent Stack (e.g. the preview card appearing on marker tap)
+      // re-mounts the sheet, which triggers the assertion:
+      //   "Draggable scrollable controller is already attached to a sheet."
+      key: const ValueKey('map_draggable_sheet'),
       controller: _sheetController,
       initialChildSize: 0.12,
       minChildSize: 0.12,
@@ -1221,10 +1351,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
       snapSizes: const [0.12, 0.4, 0.75],
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            boxShadow: [
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: const [
               BoxShadow(
                 color: Color(0x1A000000),
                 blurRadius: 20,
@@ -1246,7 +1376,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                       width: 48,
                       height: 5,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFCCCCCC),
+                        color: Theme.of(context).dividerColor,
                         borderRadius: BorderRadius.circular(3),
                       ),
                     ),
@@ -1258,10 +1388,10 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                             _isLoadingShops
                                 ? 'loading'.tr(context)
                                 : 'shops_count'.tr(context).replaceAll('{count}', '${_filteredShops.length}'),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF1A1A1A),
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
                           const Spacer(),
@@ -1269,9 +1399,11 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                             AnimatedRotation(
                               turns: _isSheetExpanded ? 0.5 : 0.0,
                               duration: const Duration(milliseconds: 200),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.keyboard_arrow_up_rounded,
-                                color: Color(0xFF999999),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                                 size: 28,
                               ),
                             ),
@@ -1281,7 +1413,7 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                   ],
                 ),
               ),
-              const Divider(height: 1, color: Color(0xFFF0F0F0)),
+              Divider(height: 1, color: Theme.of(context).dividerColor),
               // Shop list
               Expanded(
                 child: _isLoadingShops
@@ -1289,23 +1421,59 @@ class _MapScreenState extends State<MapScreen> with WidgetsBindingObserver {
                         child: CircularProgressIndicator(
                             color: _accent, strokeWidth: 2.5))
                     : _filteredShops.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.search_off_rounded,
-                                    size: 48, color: Colors.grey[300]),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'no_shops_found'.tr(context),
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    color: Colors.grey[500],
-                                    fontWeight: FontWeight.w500,
+                        // Wrap the empty-state in a LayoutBuilder +
+                        // SingleChildScrollView so the icon + label
+                        // never overflow when the bottom sheet is
+                        // collapsed at its smallest snap (~100px
+                        // visible). Below 110px we drop the icon
+                        // entirely and only show the label.
+                        ? LayoutBuilder(
+                            builder: (context, constraints) {
+                              final showIcon = constraints.maxHeight >= 110;
+                              return SingleChildScrollView(
+                                physics: const ClampingScrollPhysics(),
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    minHeight: constraints.maxHeight,
+                                  ),
+                                  child: Center(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12, horizontal: 16),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          if (showIcon) ...[
+                                            Icon(
+                                              Icons.search_off_rounded,
+                                              size: 48,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant
+                                                  .withValues(alpha: 0.4),
+                                            ),
+                                            const SizedBox(height: 12),
+                                          ],
+                                          Text(
+                                            'no_shops_found'.tr(context),
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              );
+                            },
                           )
                         : ListView.builder(
                             controller: scrollController,

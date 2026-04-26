@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:shared/constants/responsive_breakpoints.dart';
+import 'package:wonwonw2/constants/responsive_breakpoints.dart';
 import 'package:wonwonw2/screens/home_screen.dart';
 import 'package:wonwonw2/screens/map_screen.dart';
 import 'package:wonwonw2/screens/saved_locations_screen.dart';
 import 'package:wonwonw2/screens/profile_screen.dart';
 import 'package:wonwonw2/screens/forum_screen.dart';
-import 'package:shared/mixins/auth_state_mixin.dart';
+import 'package:wonwonw2/mixins/auth_state_mixin.dart';
 import 'package:wonwonw2/widgets/notification_overlay.dart';
 import 'package:wonwonw2/localization/app_localizations_wrapper.dart';
 import 'package:wonwonw2/localization/app_localizations.dart';
-import 'package:shared/constants/app_constants.dart';
+import 'package:wonwonw2/constants/app_constants.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:shared/utils/app_reload.dart';
+import 'package:wonwonw2/utils/app_reload.dart';
 
 class MainNavigation extends StatefulWidget {
   final int initialIndex;

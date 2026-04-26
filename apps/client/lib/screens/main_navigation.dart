@@ -12,8 +12,6 @@ import 'package:wonwon_client/localization/app_localizations.dart';
 import 'package:shared/constants/app_constants.dart';
 import 'package:shared/services/saved_shop_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:shared/utils/app_reload.dart';
 import 'package:shared/services/analytics_service.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -67,6 +65,13 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
     }
   }
 
+  /// Public-facing wrapper so child screens (e.g. the saved locations
+  /// list) can push the latest count into the bottom-nav badge after
+  /// they finish any cleanup work. Without this, the badge can drift
+  /// out of sync with the list — tester reported seeing a positive
+  /// count alongside an empty list.
+  Future<void> refreshSavedCount() => _refreshSavedCount();
+
   Future<void> _loadLocale() async {
     final locale = await AppLocalizationsService.getLocale();
     if (mounted) setState(() => _currentLocale = locale);
@@ -98,8 +103,9 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
   }
 
   Widget _buildDesktopLayout() {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Row(
         children: [
           // Desktop sidebar
@@ -120,12 +126,13 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
   }
 
   Widget _buildDesktopSidebar() {
+    final theme = Theme.of(context);
     return Container(
       width: 240,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         border: Border(
-          right: BorderSide(color: Colors.grey.shade200),
+          right: BorderSide(color: theme.dividerColor),
         ),
       ),
       child: Column(
@@ -137,12 +144,12 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
               children: [
                 Image.asset('assets/images/wwg.png', height: 36),
                 const SizedBox(width: 10),
-                const Text(
+                Text(
                   'WonWon',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF443616),
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
               ],
@@ -179,6 +186,7 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
       _NavItem(icon: FontAwesomeIcons.user, label: 'profile'.tr(context), index: 3),
     ];
 
+    final theme = Theme.of(context);
     return items.map((item) {
       final isSelected = _currentIndex == item.index;
       return Padding(
@@ -200,7 +208,9 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
                   FaIcon(
                     item.icon,
                     size: 18,
-                    color: isSelected ? AppConstants.primaryColor : const Color(0xFF757575),
+                    color: isSelected
+                        ? AppConstants.primaryColor
+                        : theme.colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(width: 14),
                   Text(
@@ -208,7 +218,9 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                      color: isSelected ? AppConstants.primaryColor : const Color(0xFF424242),
+                      color: isSelected
+                          ? AppConstants.primaryColor
+                          : theme.colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -221,14 +233,12 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
   }
 
   Widget _buildLangButton(String label, Locale locale) {
+    final theme = Theme.of(context);
     final isSelected = (_currentLocale ?? const Locale('th')).languageCode == locale.languageCode;
 
     return TextButton(
       onPressed: () async {
         await AppLocalizationsService.setLocale(locale.languageCode);
-        if (kIsWeb) {
-          reload();
-        }
         if (mounted) {
           setState(() => _currentLocale = locale);
         }
@@ -245,15 +255,18 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
         style: TextStyle(
           fontSize: 13,
           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-          color: isSelected ? AppConstants.primaryColor : Colors.grey[600],
+          color: isSelected
+              ? AppConstants.primaryColor
+              : theme.colorScheme.onSurfaceVariant,
         ),
       ),
     );
   }
 
   Widget _buildMobileLayout() {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: PageStorage(
         bucket: _pageStorageBucket,
         child: IndexedStack(
@@ -266,15 +279,17 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
   }
 
   Widget _buildBottomNav() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         border: Border(
-          top: BorderSide(color: Colors.grey.shade100, width: 1),
+          top: BorderSide(color: theme.dividerColor, width: 1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.04),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
@@ -298,7 +313,9 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
   }
 
   Widget _buildNavBarItem(IconData icon, String label, int index, {int badge = 0}) {
+    final theme = Theme.of(context);
     final isSelected = _currentIndex == index;
+    final inactiveColor = theme.colorScheme.onSurfaceVariant;
     return GestureDetector(
       onTap: () => onTap(index),
       behavior: HitTestBehavior.opaque,
@@ -329,7 +346,7 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
                   size: 19,
                   color: isSelected
                       ? AppConstants.primaryColor
-                      : const Color(0xFFC0C0C0),
+                      : inactiveColor,
                 ),
                 if (badge > 0)
                   Positioned(
@@ -341,7 +358,7 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
                       decoration: BoxDecoration(
                         color: AppConstants.primaryColor,
                         borderRadius: BorderRadius.circular(9),
-                        border: Border.all(color: Colors.white, width: 1.5),
+                        border: Border.all(color: theme.cardColor, width: 1.5),
                       ),
                       constraints: const BoxConstraints(
                         minWidth: 16,
@@ -368,7 +385,7 @@ class MainNavigationState extends State<MainNavigation> with AuthStateMixin {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                color: isSelected ? AppConstants.primaryColor : const Color(0xFFC0C0C0),
+                color: isSelected ? AppConstants.primaryColor : inactiveColor,
                 letterSpacing: isSelected ? 0.1 : 0,
               ),
               maxLines: 1,

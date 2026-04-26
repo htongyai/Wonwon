@@ -54,14 +54,16 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       height: 56,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -75,7 +77,7 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
             padding: const EdgeInsets.only(right: 12),
             child: FaIcon(
               FontAwesomeIcons.magnifyingGlass,
-              color: Colors.grey[400],
+              color: theme.colorScheme.onSurfaceVariant,
               size: 18,
             ),
           ),
@@ -87,7 +89,10 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
                 controller: _controller,
                 decoration: InputDecoration(
                   hintText: widget.hintText ?? 'search_shops_services'.tr(context),
-                  hintStyle: TextStyle(color: Colors.grey[500], fontSize: 16),
+                  hintStyle: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 16,
+                  ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -97,7 +102,10 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
                 },
                 onSubmitted: widget.onSearch,
                 textInputAction: TextInputAction.search,
-                style: const TextStyle(fontSize: 16),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: theme.colorScheme.onSurface,
+                ),
                 cursorColor: AppConstants.primaryColor,
               ),
             ),
@@ -108,7 +116,7 @@ class _AnimatedSearchBarState extends State<AnimatedSearchBar>
               icon: FaIcon(
                 FontAwesomeIcons.xmark,
                 size: 16,
-                color: Colors.grey[400],
+                color: theme.colorScheme.onSurfaceVariant,
               ),
               onPressed: () {
                 _controller.clear();

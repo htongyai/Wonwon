@@ -173,7 +173,9 @@ abstract class OptimizedScreenState<T extends OptimizedScreen> extends State<T>
                 'something_went_wrong_message'.tr(context),
                 style: Theme.of(
                   context,
-                ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                ).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -290,7 +292,9 @@ abstract class OptimizedLoadingScreen<T extends OptimizedScreen>
                 _loadingMessage!,
                 style: Theme.of(
                   context,
-                ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                ).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -323,7 +327,9 @@ abstract class OptimizedLoadingScreen<T extends OptimizedScreen>
                 _errorMessage ?? 'an_unexpected_error'.tr(context),
                 style: Theme.of(
                   context,
-                ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                ).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),

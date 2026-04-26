@@ -12,6 +12,13 @@
       }
     },
     {
+      "name": "client-built",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "${PORT}"],
+      "autoPort": true,
+      "cwd": "apps/client/build/web"
+    },
+    {
       "name": "dashboard",
       "runtimeExecutable": "flutter",
       "runtimeArgs": ["run", "-d", "chrome", "--web-port", "${PORT}"],

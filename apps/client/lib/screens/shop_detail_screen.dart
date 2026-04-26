@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:shared/constants/app_constants.dart';
 import 'package:shared/constants/responsive_breakpoints.dart';
@@ -29,6 +28,9 @@ import 'package:shared/services/shop_analytics_service.dart';
 import 'package:wonwon_client/widgets/common/branded_snackbar.dart';
 import 'package:wonwon_client/widgets/skeletons/shop_detail_skeleton.dart';
 import 'package:wonwon_client/widgets/common/animated_bookmark.dart';
+import 'package:wonwon_client/widgets/sustainability/eco_badges.dart';
+import 'package:shared/constants/eco_palette.dart';
+import 'package:shared/constants/editorial_typography.dart';
 
 /// Shop detail screen with a clean, modern card-based layout.
 /// Displays shop photos, info, services, hours, reviews, and a mini map.
@@ -285,29 +287,93 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   Future<void> _launchUrl(String url) async {
     try {
       final uri = Uri.parse(url);
-      if (!['https', 'http', 'tel', 'mailto'].contains(uri.scheme)) {
+      // Allow the schemes we actually use: web links, phone, email, and the
+      // social app deep links that are whitelisted in iOS Info.plist.
+      const allowedSchemes = <String>{
+        'https', 'http', 'tel', 'mailto', 'line', 'fb', 'instagram',
+      };
+      if (!allowedSchemes.contains(uri.scheme)) {
         appLog('Blocked URL launch: unsupported scheme ${uri.scheme}');
         return;
       }
-      if (kIsWeb && uri.scheme == 'tel') {
+
+      // Try to launch first — on mobile Safari a `tel:` link opens the dialer
+      // natively, so we should not pre-empt it by copying to clipboard.
+      // Fall back to clipboard only for `tel:` when launching fails (desktop
+      // browsers typically cannot dial).
+      final launched = await _tryLaunch(uri);
+      if (launched) return;
+
+      if (uri.scheme == 'tel') {
         final number = uri.path;
         await Clipboard.setData(ClipboardData(text: number));
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('number_copied'.tr(context).replaceAll('{number}', number)),
-              duration: const Duration(seconds: 2),
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'number_copied'.tr(context).replaceAll('{number}', number),
             ),
-          );
-        }
-        return;
-      }
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
       appLog('Error launching URL: $e');
     }
+  }
+
+  /// Attempt to launch a URL via url_launcher, returning whether it succeeded.
+  /// Centralises the try/catch so callers can cleanly implement fallbacks.
+  ///
+  /// On mobile Safari and some Android browsers `canLaunchUrl` returns false
+  /// for `tel:`, `mailto:`, and even `https:` even though `launchUrl` would
+  /// succeed — the browser just can't introspect external handlers. For these
+  /// universally-handled schemes we skip the canLaunch probe and call
+  /// launchUrl directly.
+  Future<bool> _tryLaunch(Uri uri) async {
+    const alwaysLaunchable = <String>{'tel', 'mailto', 'http', 'https'};
+    try {
+      if (alwaysLaunchable.contains(uri.scheme)) {
+        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      if (await canLaunchUrl(uri)) {
+        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      appLog('launchUrl failed for ${uri.scheme}: $e');
+    }
+    return false;
+  }
+
+  /// Normalize a user-entered social handle into a launchable https URL.
+  /// Accepts: full URLs, bare usernames, "@handle".
+  /// Returns null if the input cannot be normalized.
+  String? _normalizeSocialUrl(String raw, {required String baseUrl}) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    // Already a full URL — use as-is.
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    // Strip leading @ then prefix the platform base URL.
+    final handle = trimmed.startsWith('@') ? trimmed.substring(1) : trimmed;
+    if (handle.isEmpty) return null;
+    return '$baseUrl$handle';
+  }
+
+  /// Normalize a LINE identifier. If the value is already a URL we use it
+  /// directly; otherwise we wrap it with the standard line.me/ti/p path.
+  String _normalizeLineUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('line://') || trimmed.startsWith('line:')) {
+      return trimmed;
+    }
+    final handle =
+        trimmed.startsWith('@') ? trimmed.substring(1) : trimmed;
+    return 'https://line.me/ti/p/$handle';
   }
 
   Future<void> _openDirections() async {
@@ -412,7 +478,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                               : Icons.star_border_rounded,
                           color: i < selectedRating
                               ? _starColor
-                              : Colors.grey[400],
+                              : Theme.of(context).dividerColor,
                           size: 36,
                         ),
                         onPressed: () =>
@@ -442,37 +508,117 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
 
     if (rating == null) return;
 
-    String? comment;
-    final result = await showDialog<String>(
+    final result = await showDialog<({String comment, bool anonymous})>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('add_comment'.tr(context)),
-        content: TextField(
-          decoration: InputDecoration(
-            hintText: 'enter_comment'.tr(context),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ),
-          maxLines: 3,
-          onChanged: (value) => comment = value,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('cancel'.tr(context)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, comment),
-            child: Text('submit'.tr(context)),
-          ),
-        ],
-      ),
+      builder: (context) {
+        String draft = '';
+        bool anonymous = false;
+        String? validationError;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: Text('add_comment'.tr(context)),
+              // Scrollable so the anonymous checkbox stays reachable when the
+              // iOS keyboard is up — tester reported the option appeared
+              // "missing" because it was hidden below the keyboard.
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: 'enter_comment'.tr(context),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        errorText: validationError,
+                      ),
+                      maxLines: 3,
+                      autofocus: true,
+                      onChanged: (value) => setDialogState(() {
+                        draft = value;
+                        if (validationError != null &&
+                            value.trim().isNotEmpty) {
+                          validationError = null;
+                        }
+                      }),
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () =>
+                          setDialogState(() => anonymous = !anonymous),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: anonymous,
+                              onChanged: (v) => setDialogState(
+                                  () => anonymous = v ?? false),
+                              activeColor: AppConstants.primaryColor,
+                            ),
+                            Expanded(
+                              child: Text('post_anonymously'.tr(context)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('cancel'.tr(context)),
+                ),
+                // Always enabled — show inline validation if empty so the
+                // user understands why submission is rejected (tester
+                // reported a disabled button looked like "nothing happens").
+                TextButton(
+                  onPressed: () {
+                    final trimmed = draft.trim();
+                    if (trimmed.isEmpty) {
+                      setDialogState(() {
+                        validationError = 'comment_required'.tr(context);
+                      });
+                      return;
+                    }
+                    Navigator.pop(
+                      context,
+                      (comment: trimmed, anonymous: anonymous),
+                    );
+                  },
+                  child: Text('submit'.tr(context)),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
 
-    comment = result;
-    if (comment?.isEmpty ?? true) return;
+    if (result == null || result.comment.isEmpty) return;
+    final comment = result.comment;
+    final isAnonymous = result.anonymous;
+
+    // Defensive validation — the UI dialog only emits 1..5, but we
+    // double-check here so that any future caller (or accidental
+    // mutation) cannot push an out-of-range rating into the service
+    // layer where it would surface as an ArgumentError caught by the
+    // generic handler below. This produces a clear, actionable message
+    // instead of "Error adding review".
+    if (rating < 1 || rating > 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('invalid_rating_range'.tr(context)),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -483,9 +629,10 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         userId: user.uid,
         userName: user.displayName ?? 'anonymous'.tr(context),
         rating: rating.toDouble(),
-        comment: comment ?? '',
+        comment: comment,
         createdAt: DateTime.now(),
         replies: [],
+        isAnonymous: isAnonymous,
       );
 
       await _reviewService.addReview(review);
@@ -501,11 +648,176 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           backgroundColor: Colors.green,
         ),
       );
+    } on ArgumentError catch (e) {
+      // ReviewService.addReview throws ArgumentError for invalid
+      // rating / empty comment. Surface the specific reason rather
+      // than the generic "error" message — these are user-correctable.
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message?.toString() ?? 'invalid_rating_range'.tr(context)),
+          backgroundColor: Colors.red,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('error_adding_review'.tr(context)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reply to review
+  // ---------------------------------------------------------------------------
+
+  Future<void> _showReplyDialog(Review review) async {
+    if (!_isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('please_login_to_review'.tr(context)),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final text = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        String draft = '';
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final canSubmit = draft.trim().isNotEmpty;
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              title: Text('add_reply'.tr(context)),
+              content: TextField(
+                decoration: InputDecoration(
+                  hintText: 'reply_hint'.tr(context),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                maxLines: 3,
+                autofocus: true,
+                onChanged: (value) =>
+                    setDialogState(() => draft = value),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('cancel'.tr(context)),
+                ),
+                TextButton(
+                  onPressed: canSubmit
+                      ? () => Navigator.pop(context, draft.trim())
+                      : null,
+                  child: Text('submit'.tr(context)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (text == null || text.isEmpty) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final reply = ReviewReply(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: user.uid,
+        userName: user.displayName ?? 'anonymous'.tr(context),
+        comment: text,
+        createdAt: DateTime.now(),
+      );
+      await _reviewService.addReplyToReview(
+        shopId: widget.shopId,
+        reviewId: review.id,
+        reply: reply,
+      );
+      if (!mounted) return;
+      _loadReviews();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('reply_posted'.tr(context)),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_posting_reply'.tr(context)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Delete own review
+  // ---------------------------------------------------------------------------
+
+  Future<void> _showDeleteReviewConfirmation(Review review) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        title: Text('delete_review'.tr(ctx)),
+        content: Text('confirm_delete_review'.tr(ctx)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('cancel'.tr(ctx)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text('delete'.tr(ctx)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final success = await _reviewService.deleteReview(
+        widget.shopId,
+        review.id,
+        review.userId,
+      );
+      if (!mounted) return;
+      if (success) {
+        _loadReviews();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('review_deleted'.tr(context)),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('error_deleting_review'.tr(context)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('error_deleting_review'.tr(context)),
           backgroundColor: Colors.red,
         ),
       );
@@ -648,7 +960,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     final isDesktop = screenWidth >= ResponsiveBreakpoints.desktop;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: isDesktop ? _buildDesktopLayout() : _buildMobileLayout(),
       ),
@@ -729,7 +1041,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 width: isLarge ? 520 : 440,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.06),
@@ -766,7 +1078,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               // Right column: map + reviews
               Expanded(
                 child: Container(
-                  color: const Color(0xFFF8F8F8),
+                  color: Theme.of(context).scaffoldBackgroundColor,
                   child: ListView(
                     padding: const EdgeInsets.all(24),
                     children: [
@@ -786,10 +1098,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   }
 
   Widget _buildDesktopTopBar() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
@@ -811,7 +1124,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               style: GoogleFonts.inter(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color: Colors.black87,
+                color: theme.colorScheme.onSurface,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1051,6 +1364,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   // ===========================================================================
 
   Widget _buildShopHeader() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1060,7 +1374,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           style: GoogleFonts.inter(
             fontSize: 24,
             fontWeight: FontWeight.w700,
-            color: Colors.black87,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
@@ -1074,13 +1388,13 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               style: GoogleFonts.inter(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: Colors.black87,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(width: 6),
             Text(
               '(${_shop!.reviewCount} ${'reviews_label'.tr(context)})',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurfaceVariant),
             ),
             if (HoursFormatter.isShopOpen(_shop!.hours)) ...[
               const SizedBox(width: 12),
@@ -1110,16 +1424,21 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(Icons.location_on_outlined,
-                size: 18, color: Colors.grey.shade500),
+                size: 18, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(width: 4),
             Expanded(
               child: Text(
                 _buildFullAddress(),
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurfaceVariant),
               ),
             ),
           ],
         ),
+        // Eco-badges (if any)
+        if (_shop!.ecoBadges.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          EcoBadgesRow(badgeIds: _shop!.ecoBadges),
+        ],
         // Description
         if (_shop!.description.isNotEmpty) ...[
           const SizedBox(height: 12),
@@ -1127,12 +1446,60 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
             _shop!.description,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade700,
+              color: theme.colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),
         ],
+        // Owner story (editorial pull-quote)
+        if (_shop!.ownerStory != null && _shop!.ownerStory!.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _buildOwnerStory(),
+        ],
       ],
+    );
+  }
+
+  Widget _buildOwnerStory() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: EcoPalette.surfaceLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: EcoPalette.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 22,
+                height: 1,
+                color: EcoPalette.inkMuted,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'shop_story_eyebrow'.tr(context),
+                style: EditorialTypography.eyebrow,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '"${_shop!.ownerStory!}"',
+            style: EditorialTypography.displayQuote,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '— ${_shop!.name}',
+            style: EditorialTypography.caption.copyWith(
+              color: EcoPalette.inkSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1181,7 +1548,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               icon: Icons.chat_outlined,
               label: 'line_contact'.tr(context),
               onTap: () {
-                _launchUrl('https://line.me/ti/p/$lineId');
+                _launchUrl(_normalizeLineUrl(lineId));
                 ShopAnalyticsService().recordContact(widget.shopId);
               },
             ),
@@ -1205,6 +1572,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     required String label,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(right: 10),
       child: OutlinedButton.icon(
@@ -1212,8 +1580,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
         icon: Icon(icon, size: 18),
         label: Text(label, style: const TextStyle(fontSize: 13)),
         style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.grey.shade800,
-          side: BorderSide(color: Colors.grey.shade300),
+          foregroundColor: theme.colorScheme.onSurface,
+          side: BorderSide(color: theme.dividerColor),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1282,7 +1650,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                                 width: 5,
                                 height: 5,
                                 decoration: BoxDecoration(
-                                  color: Colors.grey.shade400,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -1292,7 +1660,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                                   'subservice_${category}_$sub'.tr(context),
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Colors.grey.shade700,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ),
@@ -1357,7 +1725,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(_sectionRadius),
           ),
           child: Column(
@@ -1365,6 +1733,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               final dayKey = shortKeys[i];
               final hours = _shop!.hours[dayKey];
               final isToday = _isToday(dayKey);
+              final theme = Theme.of(context);
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
@@ -1380,7 +1749,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                               isToday ? FontWeight.w700 : FontWeight.w500,
                           color: isToday
                               ? AppConstants.primaryColor
-                              : Colors.grey.shade700,
+                              : theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -1413,8 +1782,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                         color: isToday
                             ? AppConstants.primaryColor
                             : (hours != null
-                                ? Colors.grey.shade800
-                                : Colors.grey.shade500),
+                                ? theme.colorScheme.onSurface
+                                : theme.colorScheme.onSurfaceVariant),
                         fontStyle:
                             hours == null ? FontStyle.italic : FontStyle.normal,
                       ),
@@ -1470,7 +1839,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(_sectionRadius),
           ),
           child: Column(
@@ -1483,17 +1852,30 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 }),
               if (shop.facebookPage != null &&
                   shop.facebookPage!.isNotEmpty)
-                _contactRow(Icons.facebook, shop.facebookPage!,
-                    onTap: () => _launchUrl(shop.facebookPage!)),
+                _contactRow(Icons.facebook, shop.facebookPage!, onTap: () {
+                  final url = _normalizeSocialUrl(shop.facebookPage!,
+                      baseUrl: 'https://www.facebook.com/');
+                  if (url != null) {
+                    _launchUrl(url);
+                    ShopAnalyticsService().recordContact(widget.shopId);
+                  }
+                }),
               if (shop.instagramPage != null &&
                   shop.instagramPage!.isNotEmpty)
                 _contactRow(Icons.camera_alt_outlined, shop.instagramPage!,
-                    onTap: () => _launchUrl(shop.instagramPage!)),
+                    onTap: () {
+                  final url = _normalizeSocialUrl(shop.instagramPage!,
+                      baseUrl: 'https://www.instagram.com/');
+                  if (url != null) {
+                    _launchUrl(url);
+                    ShopAnalyticsService().recordContact(widget.shopId);
+                  }
+                }),
               if (shop.lineId != null && shop.lineId!.isNotEmpty)
                 _contactRow(Icons.chat_outlined,
                     '${'line_id_label'.tr(context)}: ${shop.lineId}',
                     onTap: () {
-                  _launchUrl('https://line.me/ti/p/${shop.lineId}');
+                  _launchUrl(_normalizeLineUrl(shop.lineId!));
                   ShopAnalyticsService().recordContact(widget.shopId);
                 }),
               if (shop.otherContacts != null &&
@@ -1508,20 +1890,28 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   }
 
   Widget _contactRow(IconData icon, String text, {VoidCallback? onTap}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    // Use a softer link color in dark mode — Material blue is harsh
+    // on a #1E1E1E surface and was the QA's "blue link still bright
+    // in dark mode" complaint.
+    final linkColor = onTap == null
+        ? theme.colorScheme.onSurface
+        : (isDark ? const Color(0xFF82B5FF) : Colors.blue.shade700);
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: Colors.grey.shade600),
+            Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 text,
                 style: TextStyle(
                   fontSize: 14,
-                  color: onTap != null ? Colors.blue.shade700 : Colors.grey.shade800,
+                  color: linkColor,
                   decoration:
                       onTap != null ? TextDecoration.underline : null,
                 ),
@@ -1547,7 +1937,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(_sectionRadius),
           ),
           child: Column(
@@ -1589,6 +1979,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   }
 
   Widget _infoRow(String label, String value) {
+    final theme = Theme.of(context);
     final isNoInfo = value == 'no_information'.tr(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1602,7 +1993,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -1612,7 +2003,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               value,
               style: TextStyle(
                 fontSize: 13,
-                color: isNoInfo ? Colors.grey.shade400 : Colors.grey.shade800,
+                color: isNoInfo ? theme.colorScheme.onSurfaceVariant : theme.colorScheme.onSurface,
                 fontStyle: isNoInfo ? FontStyle.italic : FontStyle.normal,
               ),
             ),
@@ -1656,24 +2047,35 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               default:
                 icon = Icons.payment;
             }
+            final isDark =
+                Theme.of(context).brightness == Brightness.dark;
+            final chipBg = isDark
+                ? Colors.blue.withValues(alpha: 0.18)
+                : Colors.blue.shade50;
+            final chipBorder = isDark
+                ? Colors.blue.withValues(alpha: 0.32)
+                : Colors.blue.shade100;
+            final chipFg = isDark
+                ? const Color(0xFF82B5FF)
+                : Colors.blue.shade700;
             return Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: chipBg,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.blue.shade100),
+                border: Border.all(color: chipBorder),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: 15, color: Colors.blue.shade700),
+                  Icon(icon, size: 15, color: chipFg),
                   const SizedBox(width: 6),
                   Text(
                     _localizePayment(method),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.blue.shade700,
+                      color: chipFg,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -1744,7 +2146,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                       _localizeFeature(entry.key),
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey.shade700,
+                        color: Theme.of(context).colorScheme.onSurface,
                         decoration:
                             entry.value ? null : TextDecoration.lineThrough,
                       ),
@@ -1823,7 +2225,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                   style: GoogleFonts.inter(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: AppConstants.darkColor,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1832,7 +2234,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 13,
-                    color: Colors.grey.shade600,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -1899,13 +2301,17 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   }
 
   Widget _buildReviewCard(Review review) {
+    final theme = Theme.of(context);
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final isOwnReview =
+        currentUser != null && review.userId == currentUser.uid;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1943,7 +2349,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
               Text(
                 _formatDate(review.createdAt),
                 style:
-                    TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -1956,7 +2362,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                     ? Icons.star_rounded
                     : Icons.star_border_rounded,
                 size: 16,
-                color: i < review.rating ? _starColor : Colors.grey.shade300,
+                color: i < review.rating ? _starColor : theme.dividerColor,
               );
             }),
           ),
@@ -1966,8 +2372,71 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
             review.comment,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade800,
+              color: theme.colorScheme.onSurface,
               height: 1.4,
+            ),
+          ),
+          // Action row: Reply (always) + Delete (own reviews only).
+          // Buttons use full default tap targets with a top divider so they
+          // are visually obvious — tester reported the previous compact
+          // buttons appeared as "nothing happens when clicking the review".
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: theme.dividerColor),
+                ),
+              ),
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: () => _showReplyDialog(review),
+                    icon: Icon(
+                      Icons.reply_rounded,
+                      size: 18,
+                      color: AppConstants.primaryColor,
+                    ),
+                    label: Text(
+                      'reply'.tr(context),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppConstants.primaryColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                  if (isOwnReview) ...[
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () =>
+                          _showDeleteReviewConfirmation(review),
+                      icon: Icon(
+                        Icons.delete_outline_rounded,
+                        size: 18,
+                        color: Colors.red.shade400,
+                      ),
+                      label: Text(
+                        'delete'.tr(context),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.red.shade400,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
           // Replies
@@ -1976,7 +2445,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -1988,13 +2457,14 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                       children: [
                         CircleAvatar(
                           radius: 12,
-                          backgroundColor: Colors.grey.shade400,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.onSurfaceVariant,
                           child: Text(
                             reply.userName.isNotEmpty
                                 ? reply.userName[0].toUpperCase()
                                 : 'U',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.surface,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                             ),
@@ -2009,14 +2479,22 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                                 reply.userName.isNotEmpty
                                     ? reply.userName
                                     : 'anonymous'.tr(context),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 12,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface,
                                 ),
                               ),
                               Text(
                                 reply.comment,
-                                style: const TextStyle(fontSize: 12),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface,
+                                ),
                               ),
                             ],
                           ),
@@ -2123,11 +2601,12 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   // ===========================================================================
 
   Widget _buildBottomBar() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        color: theme.cardColor,
+        border: Border(top: BorderSide(color: theme.dividerColor)),
       ),
       child: SafeArea(
         top: false,
@@ -2170,7 +2649,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
             // Save button with bounce animation on toggle
             Container(
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: IconButton(
@@ -2181,7 +2660,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
                 icon: AnimatedBookmark(
                   isActive: _isSaved,
                   activeColor: _starColor,
-                  inactiveColor: Colors.grey.shade700,
+                  inactiveColor: theme.colorScheme.onSurfaceVariant,
                   size: 22,
                 ),
               ),
@@ -2208,14 +2687,16 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     required VoidCallback onTap,
     Color? color,
   }) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
       ),
       child: IconButton(
         onPressed: onTap,
-        icon: Icon(icon, color: color ?? Colors.grey.shade700, size: 22),
+        icon: Icon(icon,
+            color: color ?? theme.colorScheme.onSurfaceVariant, size: 22),
       ),
     );
   }
@@ -2230,7 +2711,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
       style: GoogleFonts.inter(
         fontSize: 18,
         fontWeight: FontWeight.w700,
-        color: Colors.black87,
+        color: Theme.of(context).colorScheme.onSurface,
       ),
     );
   }
@@ -2238,7 +2719,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
   Widget _buildDivider() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Divider(height: 1, color: Colors.grey.shade200),
+      child: Divider(height: 1, color: Theme.of(context).dividerColor),
     );
   }
 
@@ -2248,10 +2729,11 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
     bool light = false,
     Color? iconColor,
   }) {
+    final theme = Theme.of(context);
     return Material(
       color: light
           ? Colors.black.withValues(alpha: 0.3)
-          : Colors.grey.shade100,
+          : theme.colorScheme.surfaceContainerHighest,
       shape: const CircleBorder(),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -2261,7 +2743,8 @@ class _ShopDetailScreenState extends State<ShopDetailScreen>
           child: Icon(
             icon,
             size: 22,
-            color: iconColor ?? (light ? Colors.white : Colors.black87),
+            color: iconColor ??
+                (light ? Colors.white : theme.colorScheme.onSurface),
           ),
         ),
       ),

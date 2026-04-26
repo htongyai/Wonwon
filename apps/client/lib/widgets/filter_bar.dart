@@ -122,6 +122,12 @@ class FilterBar extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Chips
 
+// Shared neutral background for the non-active state of every filter chip.
+// Theme-aware so dark mode gets a correspondingly dim surface instead of the
+// old hardcoded light grey.
+Color _chipIdleBg(ThemeData theme) =>
+    theme.colorScheme.surfaceContainerHighest;
+
 class _SortChip extends StatelessWidget {
   final ShopSortMode sortMode;
   final VoidCallback onTap;
@@ -130,6 +136,7 @@ class _SortChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -138,27 +145,26 @@ class _SortChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: _chipIdleBg(theme),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE8E8E8)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.swap_vert_rounded,
-                  size: 15, color: AppConstants.darkColor),
+                  size: 15, color: theme.colorScheme.onSurface),
               const SizedBox(width: 6),
               Text(
                 sortMode.key.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppConstants.darkColor,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(width: 4),
               Icon(Icons.keyboard_arrow_down_rounded,
-                  size: 16, color: Colors.grey.shade500),
+                  size: 16, color: theme.colorScheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -182,6 +188,7 @@ class _ToggleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -193,13 +200,8 @@ class _ToggleChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: active
                 ? AppConstants.primaryColor
-                : Colors.white,
+                : _chipIdleBg(theme),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: active
-                  ? AppConstants.primaryColor
-                  : const Color(0xFFE8E8E8),
-            ),
             boxShadow: active
                 ? [
                     BoxShadow(
@@ -214,8 +216,11 @@ class _ToggleChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 15,
-                    color: active ? Colors.white : AppConstants.darkColor),
+                Icon(icon,
+                    size: 15,
+                    color: active
+                        ? Colors.white
+                        : theme.colorScheme.onSurface),
                 const SizedBox(width: 6),
               ],
               Text(
@@ -223,7 +228,9 @@ class _ToggleChip extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: active ? Colors.white : AppConstants.darkColor,
+                  color: active
+                      ? Colors.white
+                      : theme.colorScheme.onSurface,
                 ),
               ),
             ],
@@ -242,6 +249,7 @@ class _MoreFiltersChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final active = badge > 0;
     return Material(
       color: Colors.transparent,
@@ -251,27 +259,26 @@ class _MoreFiltersChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: active ? AppConstants.primaryColor : Colors.white,
+            color: active ? AppConstants.primaryColor : _chipIdleBg(theme),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: active
-                  ? AppConstants.primaryColor
-                  : const Color(0xFFE8E8E8),
-            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.tune_rounded,
                   size: 15,
-                  color: active ? Colors.white : AppConstants.darkColor),
+                  color: active
+                      ? Colors.white
+                      : theme.colorScheme.onSurface),
               const SizedBox(width: 6),
               Text(
                 'filter_more'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: active ? Colors.white : AppConstants.darkColor,
+                  color: active
+                      ? Colors.white
+                      : theme.colorScheme.onSurface,
                 ),
               ),
               if (badge > 0) ...[

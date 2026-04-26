@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:async';
 import 'package:shared/services/activity_service.dart';
 import 'package:shared/services/analytics_service.dart';
+import 'package:shared/services/cache_service.dart';
 
 // Password strength enum
 enum PasswordStrength { none, weak, fair, good, strong }
@@ -640,6 +641,16 @@ class AuthService {
       await prefs.remove(_userIdKey);
       await prefs.remove(_userEmailKey);
       await prefs.remove(_userNameKey);
+
+      // Wipe in-memory + persistent caches so the next user (or
+      // re-login of the same user on a stale session) does not see
+      // the previous account's cached shop list, profile photo, etc.
+      // Failures here are non-fatal — sign-out has already happened.
+      try {
+        await CacheService().clear();
+      } catch (e) {
+        appLog('Logout: cache clear failed (non-fatal): $e');
+      }
     } on FirebaseAuthException catch (e) {
       appLog('Logout error (Firebase Auth): ${e.code} - ${e.message}');
     } catch (e) {

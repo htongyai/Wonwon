@@ -1,21 +1,21 @@
 #!/bin/bash
 
-echo "🔧 Building Admin Portal..."
+set -e
 
-# Auto-increment version (optional - comment out if you want to manage versions manually)
-# CURRENT_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//')
-# NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
-# ./update_version.sh $NEW_VERSION
+echo "🔧 Building Admin Portal from apps/dashboard..."
 
-# Build the web app with admin-only mode
-flutter build web --release --dart-define=FORCE_ADMIN_MODE=true --dart-define=DEPLOYMENT_MODE=admin
+# Build the dashboard app (new monorepo location)
+cd apps/dashboard
+flutter pub get
+flutter build web --release
+cd ../..
 
 # Upload to admin subdomain via FTP
 echo "📤 Deploying to admin subdomain..."
 lftp -u htongyai@fixwonwon.com,Stark3963./ ftp://198.54.116.191:21 <<EOF
 set ssl:verify-certificate no
 cd admin
-mirror -R build/web .
+mirror -R apps/dashboard/build/web .
 quit
 EOF
 

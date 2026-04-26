@@ -147,7 +147,9 @@ class TopShopsSection extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'n_reviews_count'.tr(context).replaceAll('{count}', '${shop['reviewCount']}'),
+                              shop['reviewCount'] == 1
+                                  ? 'one_review'.tr(context)
+                                  : 'n_reviews_count'.tr(context).replaceAll('{count}', '${shop['reviewCount']}'),
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: const Color(0xFF64748B),

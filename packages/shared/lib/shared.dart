@@ -14,6 +14,8 @@ export 'constants/design_tokens.dart';
 export 'constants/map_constants.dart';
 export 'constants/responsive_breakpoints.dart';
 export 'constants/app_text_styles.dart';
+export 'constants/eco_palette.dart';
+export 'constants/editorial_typography.dart';
 
 // Models
 export 'models/user.dart';
@@ -37,7 +39,11 @@ export 'localization/app_localizations_wrapper.dart';
 
 // Utils
 export 'utils/app_logger.dart';
-export 'utils/performance_utils.dart';
+// `OptimizedListView` and `OptimizedGridView` are also defined in
+// widgets/optimized_widget.dart. We hide the utils versions here so the single
+// canonical symbols come from the widget file — resolves ambiguous_export
+// errors when both libraries are re-exported.
+export 'utils/performance_utils.dart' hide OptimizedListView, OptimizedGridView;
 export 'utils/error_handler.dart';
 export 'utils/validation_utils.dart';
 export 'utils/date_utils.dart';
@@ -45,6 +51,7 @@ export 'utils/responsive_size.dart';
 export 'utils/asset_helpers.dart';
 export 'utils/icon_helper.dart';
 export 'utils/hours_formatter.dart';
+export 'utils/repair_impact.dart';
 
 // Services
 export 'services/auth_service.dart';

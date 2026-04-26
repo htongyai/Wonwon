@@ -21,6 +21,7 @@ class _NotificationIconState extends State<NotificationIcon> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return StreamBuilder<int>(
       stream: _unreadStream,
       builder: (context, snapshot) {
@@ -37,7 +38,7 @@ class _NotificationIconState extends State<NotificationIcon> {
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: AppConstants.primaryColor.withValues(alpha: 0.2),
@@ -63,7 +64,8 @@ class _NotificationIconState extends State<NotificationIcon> {
                       decoration: BoxDecoration(
                         color: Colors.red,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white, width: 2),
+                        border:
+                            Border.all(color: theme.cardColor, width: 2),
                       ),
                       constraints: const BoxConstraints(
                         minWidth: 16,

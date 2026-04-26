@@ -15,6 +15,7 @@ class FormProgressHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final total = sections.fold<int>(0, (n, s) => n + s.required);
     final done = sections.fold<int>(0, (n, s) => n + s.completed);
     final percent = total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
@@ -25,7 +26,7 @@ class FormProgressHeader extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isComplete
@@ -63,7 +64,7 @@ class FormProgressHeader extends StatelessWidget {
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: AppConstants.darkColor,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -85,7 +86,7 @@ class FormProgressHeader extends StatelessWidget {
             child: LinearProgressIndicator(
               minHeight: 6,
               value: percent,
-              backgroundColor: Colors.grey.shade200,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
               valueColor: AlwaysStoppedAnimation<Color>(
                 isComplete
                     ? Colors.green.shade500
@@ -102,7 +103,7 @@ class FormProgressHeader extends StatelessWidget {
                     .replaceFirst('{n}', '$remaining'),
             style: GoogleFonts.inter(
               fontSize: 12,
-              color: Colors.grey.shade600,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 12),
@@ -126,17 +127,21 @@ class _SectionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final done = section.completed >= section.required;
-    final color = done ? Colors.green.shade500 : Colors.grey.shade500;
+    final color = done
+        ? Colors.green.shade500
+        : theme.colorScheme.onSurfaceVariant;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: done
-            ? Colors.green.shade50
-            : Colors.grey.shade50,
+            ? (isDark ? Colors.green.shade900.withValues(alpha: 0.3) : Colors.green.shade50)
+            : theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: done ? Colors.green.shade200 : Colors.grey.shade300,
+          color: done ? Colors.green.shade200 : theme.dividerColor,
         ),
       ),
       child: Row(
@@ -154,8 +159,8 @@ class _SectionChip extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: done
-                  ? Colors.green.shade700
-                  : Colors.grey.shade700,
+                  ? (isDark ? Colors.green.shade300 : Colors.green.shade700)
+                  : theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],

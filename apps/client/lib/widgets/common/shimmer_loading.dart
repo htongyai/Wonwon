@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
-const _baseColor = Color(0xFFE0E0E0);
-const _highlightColor = Color(0xFFF5F5F5);
+/// Returns the shimmer base/highlight colors appropriate to the current theme.
+/// Light mode uses the original greys; dark mode uses darker surfaces so the
+/// shimmer doesn't glow bright white on a dark background.
+({Color base, Color highlight}) _shimmerColors(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  if (isDark) {
+    return (base: const Color(0xFF2A2A2A), highlight: const Color(0xFF3A3A3A));
+  }
+  return (base: const Color(0xFFE0E0E0), highlight: const Color(0xFFF5F5F5));
+}
 
 class ShimmerBox extends StatelessWidget {
   final double width;
@@ -18,14 +26,15 @@ class ShimmerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _shimmerColors(context);
     return Shimmer.fromColors(
-      baseColor: _baseColor,
-      highlightColor: _highlightColor,
+      baseColor: colors.base,
+      highlightColor: colors.highlight,
       child: Container(
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: _baseColor,
+          color: colors.base,
           borderRadius: BorderRadius.circular(borderRadius),
         ),
       ),
@@ -45,9 +54,10 @@ class ShimmerProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _shimmerColors(context);
     return Shimmer.fromColors(
-      baseColor: _baseColor,
-      highlightColor: _highlightColor,
+      baseColor: colors.base,
+      highlightColor: colors.highlight,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -56,8 +66,8 @@ class ShimmerProfileCard extends StatelessWidget {
             Container(
               width: avatarRadius * 2,
               height: avatarRadius * 2,
-              decoration: const BoxDecoration(
-                color: _baseColor,
+              decoration: BoxDecoration(
+                color: colors.base,
                 shape: BoxShape.circle,
               ),
             ),
@@ -67,7 +77,7 @@ class ShimmerProfileCard extends StatelessWidget {
               width: 160,
               height: 20,
               decoration: BoxDecoration(
-                color: _baseColor,
+                color: colors.base,
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -77,7 +87,7 @@ class ShimmerProfileCard extends StatelessWidget {
               width: 200,
               height: 14,
               decoration: BoxDecoration(
-                color: _baseColor,
+                color: colors.base,
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -96,7 +106,7 @@ class ShimmerProfileCard extends StatelessWidget {
                           width: 40,
                           height: 20,
                           decoration: BoxDecoration(
-                            color: _baseColor,
+                            color: colors.base,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -105,7 +115,7 @@ class ShimmerProfileCard extends StatelessWidget {
                           width: 60,
                           height: 12,
                           decoration: BoxDecoration(
-                            color: _baseColor,
+                            color: colors.base,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -121,7 +131,7 @@ class ShimmerProfileCard extends StatelessWidget {
               width: double.infinity,
               height: 44,
               decoration: BoxDecoration(
-                color: _baseColor,
+                color: colors.base,
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
@@ -137,13 +147,15 @@ class ShimmerShopCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = _shimmerColors(context);
     return Shimmer.fromColors(
-      baseColor: _baseColor,
-      highlightColor: _highlightColor,
+      baseColor: colors.base,
+      highlightColor: colors.highlight,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -152,9 +164,9 @@ class ShimmerShopCard extends StatelessWidget {
             // Image placeholder
             Container(
               height: 120,
-              decoration: const BoxDecoration(
-                color: _baseColor,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              decoration: BoxDecoration(
+                color: colors.base,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               ),
             ),
             Padding(
@@ -168,8 +180,8 @@ class ShimmerShopCard extends StatelessWidget {
                       Container(
                         width: 14,
                         height: 14,
-                        decoration: const BoxDecoration(
-                          color: _baseColor,
+                        decoration: BoxDecoration(
+                          color: colors.base,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -178,7 +190,7 @@ class ShimmerShopCard extends StatelessWidget {
                         width: 60,
                         height: 14,
                         decoration: BoxDecoration(
-                          color: _baseColor,
+                          color: colors.base,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
@@ -191,8 +203,8 @@ class ShimmerShopCard extends StatelessWidget {
                       Container(
                         width: 14,
                         height: 14,
-                        decoration: const BoxDecoration(
-                          color: _baseColor,
+                        decoration: BoxDecoration(
+                          color: colors.base,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -201,7 +213,7 @@ class ShimmerShopCard extends StatelessWidget {
                         child: Container(
                           height: 14,
                           decoration: BoxDecoration(
-                            color: _baseColor,
+                            color: colors.base,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
@@ -219,7 +231,7 @@ class ShimmerShopCard extends StatelessWidget {
                           width: 64,
                           height: 24,
                           decoration: BoxDecoration(
-                            color: _baseColor,
+                            color: colors.base,
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
@@ -248,9 +260,10 @@ class ShimmerListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = _shimmerColors(context);
     return Shimmer.fromColors(
-      baseColor: _baseColor,
-      highlightColor: _highlightColor,
+      baseColor: colors.base,
+      highlightColor: colors.highlight,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
@@ -260,7 +273,7 @@ class ShimmerListTile extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: _baseColor,
+                  color: colors.base,
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
@@ -273,7 +286,7 @@ class ShimmerListTile extends StatelessWidget {
                     width: double.infinity,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: _baseColor,
+                      color: colors.base,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -282,7 +295,7 @@ class ShimmerListTile extends StatelessWidget {
                     width: 150,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: _baseColor,
+                      color: colors.base,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -295,7 +308,7 @@ class ShimmerListTile extends StatelessWidget {
                 width: 60,
                 height: 12,
                 decoration: BoxDecoration(
-                  color: _baseColor,
+                  color: colors.base,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),

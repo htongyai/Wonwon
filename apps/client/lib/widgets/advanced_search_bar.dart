@@ -194,6 +194,8 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
   }
 
   Widget _buildSuggestionsList({double? maxHeight}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final screenSize = MediaQuery.of(context).size;
     final isMobile = ResponsiveBreakpoints.isMobile(screenSize.width);
     final effectiveMaxHeight = maxHeight ??
@@ -202,11 +204,12 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
     return Container(
       constraints: BoxConstraints(maxHeight: effectiveMaxHeight),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(isMobile ? 8 : 12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isMobile ? 0.05 : 0.1),
+            color: Colors.black.withValues(
+                alpha: isDark ? 0.3 : (isMobile ? 0.05 : 0.1)),
             blurRadius: isMobile ? 4 : 8,
             offset: Offset(0, isMobile ? 2 : 4),
           ),
@@ -253,10 +256,11 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
   }
 
   Widget _buildSectionHeader(String title, IconData icon) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(12),
           topRight: Radius.circular(12),
@@ -264,14 +268,14 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
       ),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: Colors.grey.shade600),
+          Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 8),
           Text(
             title,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -280,6 +284,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
   }
 
   Widget _buildSuggestionItem(String suggestion, bool isHistory, bool isLast) {
+    final theme = Theme.of(context);
     final screenSize = MediaQuery.of(context).size;
     final isMobile = ResponsiveBreakpoints.isMobile(screenSize.width);
 
@@ -291,17 +296,16 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
           vertical: isMobile ? 16 : 12, // Larger touch targets on mobile
         ),
         decoration: BoxDecoration(
-          border:
-              isLast
-                  ? null
-                  : Border(bottom: BorderSide(color: Colors.grey.shade100)),
+          border: isLast
+              ? null
+              : Border(bottom: BorderSide(color: theme.dividerColor)),
         ),
         child: Row(
           children: [
             Icon(
               isHistory ? Icons.history : Icons.search,
               size: isMobile ? 20 : 18,
-              color: Colors.grey.shade500,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
             SizedBox(width: isMobile ? 16 : 12),
             Expanded(
@@ -310,6 +314,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
                 style: TextStyle(
                   fontSize: isMobile ? 16 : 14,
                   fontWeight: FontWeight.w400,
+                  color: theme.colorScheme.onSurface,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -325,7 +330,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
                   child: Icon(
                     Icons.close,
                     size: isMobile ? 18 : 16,
-                    color: Colors.grey.shade400,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -336,24 +341,26 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
   }
 
   Widget _buildClearHistoryButton() {
+    final theme = Theme.of(context);
     return InkWell(
       onTap: _clearHistory,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: Colors.grey.shade100)),
+          border: Border(top: BorderSide(color: theme.dividerColor)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.clear_all, size: 16, color: Colors.grey.shade500),
+            Icon(Icons.clear_all,
+                size: 16, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(width: 8),
             Text(
               'clear_search_history'.tr(context),
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey.shade600,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -396,18 +403,20 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return CompositedTransformTarget(
       link: _layerLink,
       child: Container(
         height: 52,
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(26),
         ),
         child: Row(
           children: [
             const SizedBox(width: 20),
-            Icon(Icons.search, color: Colors.grey.shade500, size: 24),
+            Icon(Icons.search,
+                color: theme.colorScheme.onSurfaceVariant, size: 24),
             const SizedBox(width: 12),
             Expanded(
               child: TextField(
@@ -416,15 +425,16 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
                 decoration: InputDecoration(
                   hintText: widget.hintText ?? 'search_shops_services'.tr(context),
                   hintStyle: TextStyle(
-                    color: Colors.grey.shade500,
+                    color: theme.colorScheme.onSurfaceVariant,
                     fontSize: 16,
                   ),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.zero,
                 ),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w400,
+                  color: theme.colorScheme.onSurface,
                 ),
                 textInputAction: TextInputAction.search,
                 onSubmitted: (_) => _performSearch(),
@@ -442,7 +452,7 @@ class _AdvancedSearchBarState extends State<AdvancedSearchBar>
                   child: Center(
                     child: Icon(
                       Icons.clear,
-                      color: Colors.grey.shade500,
+                      color: theme.colorScheme.onSurfaceVariant,
                       size: 20,
                     ),
                   ),

@@ -11,7 +11,6 @@ import 'package:wonwon_client/screens/main_navigation.dart';
 import 'package:wonwon_client/screens/shop_detail_screen.dart';
 
 import 'package:shared/services/saved_shop_service.dart';
-import 'package:shared/services/shop_service.dart';
 import 'package:wonwon_client/localization/app_localizations_wrapper.dart';
 import 'package:wonwon_client/widgets/shop_card.dart';
 import 'package:shared/utils/app_logger.dart';
@@ -25,7 +24,6 @@ class SavedLocationsScreen extends StatefulWidget {
 
 class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
   final SavedShopService _savedShopService = SavedShopService();
-  final ShopService _shopService = ShopService();
 
 
   List<RepairShop> _savedShops = [];
@@ -35,6 +33,10 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
   bool _isLoading = true;
   bool _hasError = false;
   bool _isLoggedIn = false;
+  // Number of saved IDs that couldn't be loaded this session (rules
+  // denied / network error / transient). Surfaced in a notice banner so
+  // the user understands why the list appears smaller than the badge.
+  int _unresolvedCount = 0;
   StreamSubscription<User?>? _authSubscription;
 
   @override
@@ -74,28 +76,43 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
     });
 
     try {
-      final savedShopIds = await _savedShopService.getSavedShopIds();
-      final shops = await _shopService.getShopsByIds(savedShopIds);
+      // Resolve saved shops with per-ID `doc.get()` — this lets us
+      // distinguish shops that are definitely missing (safe to cleanup)
+      // from shops that simply couldn't be loaded this time (permission
+      // denied, offline, transient). The previous `whereIn` path
+      // silently dropped the latter and then deleted them as "orphans",
+      // leaving the tester with a badge count > 0 and an empty list.
+      final result = await _savedShopService.resolveSavedShopsSafely();
 
-      // Clean up orphaned IDs
-      final loadedIds = shops.map((s) => s.id).toSet();
-      final orphanedIds =
-          savedShopIds.where((id) => !loadedIds.contains(id)).toList();
-      if (orphanedIds.isNotEmpty) {
-        appLog('Cleaning up ${orphanedIds.length} orphaned saved shop IDs');
+      // Only cleanup IDs we have positive confirmation are gone. Leave
+      // unresolved IDs alone — they may load on the next fetch.
+      if (result.confirmedMissing.isNotEmpty) {
+        appLog(
+            'Cleaning up ${result.confirmedMissing.length} confirmed-missing saved shop IDs');
         try {
-          await _savedShopService.cleanupOrphanedShops(orphanedIds);
+          await _savedShopService.cleanupOrphanedShops(result.confirmedMissing);
         } catch (e) {
           appLog('Failed to cleanup orphaned saved shop IDs: $e');
         }
       }
+      if (result.unresolved.isNotEmpty) {
+        appLog(
+            '${result.unresolved.length} saved shop IDs unresolved this load (kept for retry)');
+      }
 
       if (mounted) {
         setState(() {
-          _savedShops = shops;
+          _savedShops = result.shops;
+          _unresolvedCount = result.unresolved.length;
           _applyFilters();
           _isLoading = false;
         });
+        // Push the latest count into the bottom-nav badge so it stays
+        // consistent with what's actually in the list. Without this,
+        // the badge can sit on a stale value until the user navigates
+        // away and back.
+        final mainNav = MainNavigationState.of(context);
+        await mainNav?.refreshSavedCount();
       }
     } catch (e) {
       appLog('Error loading saved shops: $e');
@@ -127,11 +144,12 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
   }
 
   void _applyFilters() {
+    // Only drop entries that are structurally broken (empty id). A shop
+    // with an empty name is still shown — the UI will render "Unnamed"
+    // rather than silently hiding a saved shop (which was part of the
+    // QA regression: users seeing the badge count but zero shops).
     List<RepairShop> result = _savedShops.where((shop) {
-      return shop.id != 'not-found' &&
-          shop.name.isNotEmpty &&
-          shop.name != 'Not Found' &&
-          shop.id.isNotEmpty;
+      return shop.id.isNotEmpty && shop.id != 'not-found';
     }).toList();
 
     if (_selectedCategoryId != 'all') {
@@ -207,24 +225,32 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final scaffoldBg =
+        isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8F9FA);
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         title: Text(
           'saved_locations'.tr(context),
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 20,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         centerTitle: false,
-        backgroundColor: Colors.white,
+        backgroundColor: theme.cardColor,
         elevation: 0,
         scrolledUnderElevation: .5,
         actions: [
           if (_isLoggedIn && _savedShops.isNotEmpty)
             IconButton(
-              icon: Icon(Icons.refresh_rounded, color: Colors.grey[600]),
+              icon: Icon(
+                Icons.refresh_rounded,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               onPressed: _loadSavedShops,
               tooltip: 'refresh'.tr(context),
             ),
@@ -246,24 +272,78 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
       return _buildErrorState();
     }
 
+    // Tester-reported (§4.1): "menu icon shows count but list shows no shops".
+    // This happens when every saved ID couldn't be resolved (rules denied,
+    // offline, or transient Firestore error). Don't fall through to the
+    // generic empty state — that's misleading because the user does have
+    // saved shops. Show a dedicated retry state explaining the situation.
+    if (_savedShops.isEmpty && _unresolvedCount > 0) {
+      return _buildAllUnresolvedState();
+    }
+
     if (_savedShops.isEmpty) {
       return _buildEmptyState();
     }
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Column(
       children: [
+        // Unresolved banner — shown when some saved IDs couldn't be
+        // loaded this time (usually rules-denied / transient network).
+        // Gives the tester a clear explanation of why the list might
+        // be smaller than the nav badge count, and a retry action.
+        if (_unresolvedCount > 0)
+          Container(
+            color: theme.cardColor,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _loadSavedShops,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: Colors.amber.withValues(alpha: 0.35)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded,
+                          size: 18, color: Colors.amber[800]),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'saved_unresolved_notice'
+                              .tr(context)
+                              .replaceAll('{count}', '$_unresolvedCount'),
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.amber[900]),
+                        ),
+                      ),
+                      Icon(Icons.refresh_rounded,
+                          size: 16, color: Colors.amber[800]),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         // Search bar
         Container(
-          color: Colors.white,
+          color: theme.cardColor,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.cardColor,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE8E8E8), width: 1),
+              border: Border.all(color: theme.dividerColor, width: 1),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
+                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
                   blurRadius: 8,
                   offset: const Offset(0, 1),
                 ),
@@ -271,10 +351,18 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
             ),
             child: TextField(
               onChanged: _handleSearch,
+              style: TextStyle(color: theme.colorScheme.onSurface),
               decoration: InputDecoration(
                 hintText: 'search_saved_locations'.tr(context),
-                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[400], size: 20),
+                hintStyle: TextStyle(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 14,
+                ),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 border: InputBorder.none,
               ),
@@ -284,7 +372,7 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
 
         // Category chips
         Container(
-          color: Colors.white,
+          color: theme.cardColor,
           padding: const EdgeInsets.fromLTRB(0, 8, 0, 12),
           child: _buildCategoriesSection(),
         ),
@@ -303,6 +391,7 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
   // Login required
   // ---------------------------------------------------------------------------
   Widget _buildLoginRequired() {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -324,10 +413,11 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
             const SizedBox(height: 28),
             Text(
               'login_required'.tr(context),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.3,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -336,7 +426,10 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
               child: Text(
                 'login_to_view_saved'.tr(context),
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
             const SizedBox(height: 32),
@@ -372,6 +465,7 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
   // Error state
   // ---------------------------------------------------------------------------
   Widget _buildErrorState() {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -393,9 +487,10 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
             const SizedBox(height: 20),
             Text(
               'error_loading_saved'.tr(context),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 20),
@@ -424,6 +519,7 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
   // Empty state
   // ---------------------------------------------------------------------------
   Widget _buildEmptyState() {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -445,17 +541,21 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
             const SizedBox(height: 24),
             Text(
               'no_saved_locations'.tr(context),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.3,
+                color: theme.colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               'locations_will_appear'.tr(context),
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              style: TextStyle(
+                fontSize: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 28),
@@ -493,9 +593,10 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // No matching category
+  // All saved shops unresolved (badge count > 0 but list empty)
   // ---------------------------------------------------------------------------
-  Widget _buildNoMatchingCategory() {
+  Widget _buildAllUnresolvedState() {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -505,28 +606,99 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: Colors.amber.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.cloud_off_rounded,
+                size: 48,
+                color: Colors.amber[800],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'saved_unresolved_title'.tr(context),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'saved_unresolved_notice'
+                  .tr(context)
+                  .replaceAll('{count}', '$_unresolvedCount'),
+              style: TextStyle(
+                fontSize: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 44,
+              child: ElevatedButton.icon(
+                onPressed: _loadSavedShops,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: Text('try_again'.tr(context)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppConstants.primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // No matching category
+  // ---------------------------------------------------------------------------
+  Widget _buildNoMatchingCategory() {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.filter_list_off_rounded,
                 size: 40,
-                color: Colors.grey[400],
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 20),
             Text(
               'no_matching_category'.tr(context),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               'try_different_category'.tr(context),
-              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              style: TextStyle(
+                fontSize: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -669,7 +841,9 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
   }
 
   Widget _buildCategoryChip(RepairCategory category) {
+    final theme = Theme.of(context);
     final isSelected = _selectedCategoryId == category.id;
+    final idleFg = theme.colorScheme.onSurface;
 
     return Material(
       color: Colors.transparent,
@@ -683,7 +857,7 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
           decoration: BoxDecoration(
             color: isSelected
                 ? AppConstants.primaryColor
-                : Colors.grey.shade100,
+                : theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
@@ -691,7 +865,7 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
             children: [
               Icon(
                 _getCategoryIcon(category.id),
-                color: isSelected ? Colors.white : Colors.grey[700],
+                color: isSelected ? Colors.white : idleFg,
                 size: 14,
               ),
               const SizedBox(width: 6),
@@ -700,7 +874,7 @@ class _SavedLocationsScreenState extends State<SavedLocationsScreen> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white : Colors.grey[700],
+                  color: isSelected ? Colors.white : idleFg,
                 ),
               ),
             ],

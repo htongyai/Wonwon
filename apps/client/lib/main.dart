@@ -31,7 +31,7 @@ import 'package:shared/utils/remove_loading_stub.dart'
 void main() async {
   PerformanceUtils.startMeasurement('app_startup');
   WidgetsFlutterBinding.ensureInitialized();
-  GoogleFonts.config.allowRuntimeFetching = false;
+  GoogleFonts.config.allowRuntimeFetching = true;
 
   try {
     if (kIsWeb) {
@@ -131,25 +131,32 @@ class WonWonClientApp extends StatelessWidget {
         ],
         child: Consumer<AppStateManager>(
           builder: (context, appState, child) {
-            return MaterialApp(
-              title: 'WonWon Repair Finder',
-              debugShowCheckedModeBanner: false,
-              navigatorObservers: [AnalyticsService().observer],
-              theme: _buildTheme(false),
-              darkTheme: _buildTheme(true),
-              themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-              locale: initialLocale,
-              localizationsDelegates: const [
-                AppLocalizations.delegate,
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
-              supportedLocales: const [Locale('th', ''), Locale('en', '')],
-              localeResolutionCallback: (locale, supportedLocales) {
-                return initialLocale;
+            return StreamBuilder<Locale>(
+              stream: AppLocalizationsService().localeStream,
+              initialData: initialLocale,
+              builder: (context, snapshot) {
+                final currentLocale = snapshot.data ?? initialLocale;
+                return MaterialApp(
+                  title: 'WonWon Repair Finder',
+                  debugShowCheckedModeBanner: false,
+                  navigatorObservers: [AnalyticsService().observer],
+                  theme: _buildTheme(false),
+                  darkTheme: _buildTheme(true),
+                  themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+                  locale: currentLocale,
+                  localizationsDelegates: const [
+                    AppLocalizations.delegate,
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  supportedLocales: const [Locale('th', ''), Locale('en', '')],
+                  localeResolutionCallback: (locale, supportedLocales) {
+                    return currentLocale;
+                  },
+                  home: const ForceUpdateChecker(child: AuthGate()),
+                );
               },
-              home: const ForceUpdateChecker(child: AuthGate()),
             );
           },
         ),
@@ -178,32 +185,50 @@ class WonWonClientApp extends StatelessWidget {
             surfaceContainerHighest: Colors.grey.shade50,
           );
 
+    // Palette derived from isDark — every sub-theme below should use these
+    // rather than hardcoded Colors.white / Colors.black87. That's why the
+    // dark-mode toggle previously only flipped scaffold + body text but left
+    // the app bar, cards, chips, and bottom nav frozen light.
+    final Color surface = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final Color scaffoldBg = isDark ? const Color(0xFF121212) : Colors.white;
+    final Color onSurface = isDark ? Colors.white : Colors.black87;
+    final Color borderColor =
+        isDark ? Colors.white.withValues(alpha: 0.12) : Colors.grey.shade200;
+    final Color inputBorder =
+        isDark ? Colors.white.withValues(alpha: 0.18) : Colors.grey.shade300;
+    final Color chipBg =
+        isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey.shade100;
+    final Color unselected =
+        isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
+      scaffoldBackgroundColor: scaffoldBg,
       visualDensity: kIsWeb ? VisualDensity.standard : VisualDensity.adaptivePlatformDensity,
       textTheme: const TextTheme().apply(
         fontFamily: kIsWeb ? WebConstants.primaryFontWeb : 'Roboto',
-        bodyColor: isDark ? Colors.white : Colors.black87,
-        displayColor: isDark ? Colors.white : Colors.black87,
+        bodyColor: onSurface,
+        displayColor: onSurface,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
+        backgroundColor: surface,
+        foregroundColor: onSurface,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        titleTextStyle: const TextStyle(color: Colors.black87, fontSize: 20, fontWeight: FontWeight.w600),
+        systemOverlayStyle:
+            isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        iconTheme: IconThemeData(color: onSurface),
+        titleTextStyle: TextStyle(
+            color: onSurface, fontSize: 20, fontWeight: FontWeight.w600),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        color: Colors.white,
+        color: surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.grey.shade200, width: 1),
+          side: BorderSide(color: borderColor, width: 1),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -218,16 +243,16 @@ class WonWonClientApp extends StatelessWidget {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+        fillColor: surface,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: inputBorder)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: inputBorder)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppConstants.primaryColor, width: 2)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: Colors.white,
+        backgroundColor: surface,
         selectedItemColor: AppConstants.primaryColor,
-        unselectedItemColor: Colors.grey.shade600,
+        unselectedItemColor: unselected,
         elevation: 8,
         type: BottomNavigationBarType.fixed,
       ),
@@ -237,22 +262,38 @@ class WonWonClientApp extends StatelessWidget {
         elevation: 4,
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: Colors.grey.shade100,
+        backgroundColor: chipBg,
         selectedColor: AppConstants.primaryColor.withAlpha(25),
-        labelStyle: const TextStyle(color: Colors.black87),
-        side: BorderSide(color: Colors.grey.shade300),
+        labelStyle: TextStyle(color: onSurface),
+        side: BorderSide(color: inputBorder),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return AppConstants.primaryColor;
-          return Colors.grey.shade400;
+          return isDark ? Colors.grey.shade500 : Colors.grey.shade400;
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) return AppConstants.primaryColor.withAlpha(76);
-          return Colors.grey.shade300;
+          return isDark ? Colors.grey.shade700 : Colors.grey.shade300;
         }),
       ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: surface,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: TextStyle(
+            color: onSurface, fontSize: 18, fontWeight: FontWeight.w600),
+        contentTextStyle: TextStyle(color: onSurface, fontSize: 14),
+      ),
       progressIndicatorTheme: ProgressIndicatorThemeData(color: AppConstants.primaryColor),
+      // Force the same border color we use everywhere so default
+      // `Divider()` widgets don't pop bright in dark mode (M3's
+      // outlineVariant default is too light against #1E1E1E cards).
+      dividerColor: borderColor,
+      dividerTheme: DividerThemeData(
+        color: borderColor,
+        space: 0,
+        thickness: 0.5,
+      ),
     );
   }
 }

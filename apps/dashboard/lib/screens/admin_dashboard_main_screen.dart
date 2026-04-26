@@ -271,10 +271,13 @@ class _AdminDashboardMainScreenState
     // Process users data
     final usersDocs = (usersSnapshot?.docs ?? []).cast<QueryDocumentSnapshot<Map<String, dynamic>>>();
     final totalUsers = usersDocs.length;
+    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
     final activeUsers =
-        usersDocs
-            .where((doc) => doc.data()['status'] == 'active')
-            .length;
+        usersDocs.where((doc) {
+          final lastLoginAt = doc.data()['lastLoginAt'];
+          return lastLoginAt is Timestamp &&
+              lastLoginAt.toDate().isAfter(thirtyDaysAgo);
+        }).length;
     final recentUsers =
         usersDocs.where((doc) {
           final createdAt = doc.data()['createdAt'];
@@ -446,15 +449,16 @@ class _AdminDashboardMainScreenState
           margin: const EdgeInsets.symmetric(horizontal: 16),
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
-            color: AppConstants.primaryColor.withValues(alpha: 0.08),
+            color: const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           child: Row(
             children: [
-              Icon(FontAwesomeIcons.userShield, color: AppConstants.primaryColor, size: 14),
+              Icon(FontAwesomeIcons.userShield, color: const Color(0xFF64748B), size: 14),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('admin_panel'.tr(context), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppConstants.primaryColor)),
+                child: Text('admin_panel'.tr(context), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF475569))),
               ),
             ],
           ),
@@ -635,7 +639,7 @@ class _AdminDashboardMainScreenState
         trend: 'neutral',
       ),
       DashboardStat(
-        title: 'admin_users_count'.tr(context).replaceAll('{count}', ''),
+        title: 'total_users'.tr(context),
         value: _dashboardStats['totalUsers']?.toString() ?? '0',
         subtitle: 'n_new_this_week'.tr(context).replaceAll('{count}', '${_dashboardStats['recentUsers'] ?? 0}'),
         icon: FontAwesomeIcons.users,
@@ -653,7 +657,9 @@ class _AdminDashboardMainScreenState
       DashboardStat(
         title: 'average_rating'.tr(context),
         value: (_dashboardStats['averageRating'] ?? 0.0).toStringAsFixed(1),
-        subtitle: 'from_n_reviews'.tr(context).replaceAll('{count}', '${_dashboardStats['totalReviews'] ?? 0}'),
+        subtitle: ((_dashboardStats['totalReviews'] ?? 0) == 1)
+            ? 'one_review_from'.tr(context)
+            : 'from_n_reviews'.tr(context).replaceAll('{count}', '${_dashboardStats['totalReviews'] ?? 0}'),
         icon: FontAwesomeIcons.star,
         color: const Color(0xFF8B5CF6),
         trend: 'neutral',
@@ -831,12 +837,13 @@ class _AdminDashboardMainScreenState
         LayoutBuilder(
           builder: (context, constraints) {
             final crossAxisCount = constraints.maxWidth > 900 ? 4 : (constraints.maxWidth > 500 ? 2 : 1);
+            final aspect = crossAxisCount == 1 ? 3.5 : (crossAxisCount == 2 ? 2.2 : 1.6);
             return GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
-                childAspectRatio: 1.2,
+                childAspectRatio: aspect,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
               ),

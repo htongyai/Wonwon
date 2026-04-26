@@ -191,6 +191,8 @@ class _NotificationSidebarState extends State<NotificationSidebar>
       sidebarWidth = 400; // Fixed width for desktop
     }
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
@@ -219,10 +221,11 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                 child: Container(
                   width: sidebarWidth,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: theme.cardColor,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
+                        color: Colors.black
+                            .withValues(alpha: isDark ? 0.4 : 0.1),
                         blurRadius: 20,
                         offset: const Offset(-5, 0),
                       ),
@@ -246,12 +249,13 @@ class _NotificationSidebarState extends State<NotificationSidebar>
   }
 
   Widget _buildHeader() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         border: Border(
-          bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2), width: 1),
+          bottom: BorderSide(color: theme.dividerColor, width: 1),
         ),
       ),
       child: Row(
@@ -267,7 +271,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
             style: GoogleFonts.montserrat(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: AppConstants.darkColor,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const Spacer(),
@@ -318,7 +322,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
             onPressed: widget.onClose,
             icon: const Icon(Icons.close),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.grey[100],
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
               shape: const CircleBorder(),
             ),
           ),
@@ -328,6 +332,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
   }
 
   Widget _buildNotificationsList() {
+    final theme = Theme.of(context);
     return StreamBuilder<List<NotificationModel>>(
       stream: NotificationService.getUserNotifications(),
       builder: (context, snapshot) {
@@ -340,13 +345,17 @@ class _NotificationSidebarState extends State<NotificationSidebar>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
+                Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'no_notifications_available'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 16,
-                    color: Colors.grey[600],
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -354,7 +363,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                   'notifications_appear_here'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 12,
-                    color: Colors.grey[500],
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -373,7 +382,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                 Icon(
                   Icons.notifications_none,
                   size: 64,
-                  color: Colors.grey[400],
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -381,7 +390,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                   style: GoogleFonts.montserrat(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -389,7 +398,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                   'notifications_appear_here'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 14,
-                    color: Colors.grey[500],
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -411,21 +420,27 @@ class _NotificationSidebarState extends State<NotificationSidebar>
   }
 
   Widget _buildNotificationItem(NotificationModel notification) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: notification.isRead ? Colors.grey[50] : Colors.white,
+        color: notification.isRead
+            ? (isDark
+                ? theme.colorScheme.surfaceContainerHighest
+                : Colors.grey[50])
+            : theme.cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color:
               notification.isRead
-                  ? Colors.grey.withValues(alpha: 0.1)
+                  ? theme.dividerColor
                   : notification.color.withValues(alpha: 0.2),
           width: notification.isRead ? 1 : 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -475,8 +490,8 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                                         : FontWeight.w600,
                                 color:
                                     notification.isRead
-                                        ? Colors.grey[600]
-                                        : AppConstants.darkColor,
+                                        ? theme.colorScheme.onSurfaceVariant
+                                        : theme.colorScheme.onSurface,
                               ),
                             ),
                           ),
@@ -496,7 +511,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                         _localizedMessage(notification),
                         style: GoogleFonts.montserrat(
                           fontSize: 13,
-                          color: Colors.grey[700],
+                          color: theme.colorScheme.onSurfaceVariant,
                           height: 1.4,
                         ),
                         maxLines: 2,
@@ -507,7 +522,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                         _localizedTimeAgo(notification),
                         style: GoogleFonts.montserrat(
                           fontSize: 11,
-                          color: Colors.grey[500],
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -546,7 +561,7 @@ class _NotificationSidebarState extends State<NotificationSidebar>
                       ],
                   icon: Icon(
                     Icons.more_vert,
-                    color: Colors.grey[500],
+                    color: theme.colorScheme.onSurfaceVariant,
                     size: 20,
                   ),
                 ),
@@ -639,48 +654,50 @@ class _NotificationSidebarState extends State<NotificationSidebar>
   void _showNotificationDialog(NotificationModel notification) {
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(notification.icon, color: notification.color, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _localizedTitle(notification),
-                    style: GoogleFonts.montserrat(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _localizedMessage(notification),
-                  style: GoogleFonts.montserrat(fontSize: 14, height: 1.5),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _localizedTimeAgo(notification),
+      builder: (context) {
+        final theme = Theme.of(context);
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(notification.icon, color: notification.color, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _localizedTitle(notification),
                   style: GoogleFonts.montserrat(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text('close_button'.tr(context)),
               ),
             ],
           ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _localizedMessage(notification),
+                style: GoogleFonts.montserrat(fontSize: 14, height: 1.5),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _localizedTimeAgo(notification),
+                style: GoogleFonts.montserrat(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('close_button'.tr(context)),
+            ),
+          ],
+        );
+      },
     );
   }
 }

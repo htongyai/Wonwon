@@ -18,6 +18,16 @@ class HoursFormatter {
     // Clean up the hours string
     String cleanHours = hours.trim();
 
+    // Already displayed as "24 hours" / "Open 24h" (case-insensitive)
+    final lower = cleanHours.toLowerCase();
+    if (lower == '24 hours' ||
+        lower == '24h' ||
+        lower == 'open 24 hours' ||
+        lower == 'open 24h' ||
+        lower == '24/7') {
+      return 'open_24_hours'.tr(context);
+    }
+
     // Handle various formats and ensure proper display
     if (cleanHours.contains('-')) {
       // Split on dash and clean up each part
@@ -30,12 +40,38 @@ class HoursFormatter {
         final formattedOpen = _formatTime(openTime);
         final formattedClose = _formatTime(closeTime);
 
+        // Detect 24-hour operation: open time equals close time (e.g.
+        // "00:00-00:00" or "12:00 AM - 12:00 AM"), or explicit full-day
+        // span (00:00-23:59).
+        if (_isTwentyFourHours(formattedOpen, formattedClose)) {
+          return 'open_24_hours'.tr(context);
+        }
+
         return '$formattedOpen - $formattedClose';
       }
     }
 
     // Return as-is if no dash found or formatting fails
     return cleanHours.isNotEmpty ? cleanHours : 'day_closed'.tr(context);
+  }
+
+  /// Returns true when [open] and [close] describe a 24-hour-a-day
+  /// operation. Accepts both "00:00-00:00" (same time) and
+  /// "00:00-23:59" (full-day span).
+  static bool _isTwentyFourHours(String open, String close) {
+    int? openMin;
+    int? closeMin;
+    try {
+      openMin = _parseTime(open);
+      closeMin = _parseTime(close);
+    } catch (_) {
+      return false;
+    }
+    // Same open and close = treated as 24 hours (common convention).
+    if (openMin == closeMin) return true;
+    // 00:00 open and 23:59 close = effectively 24 hours.
+    if (openMin == 0 && closeMin == 23 * 60 + 59) return true;
+    return false;
   }
 
   /// Formats individual time strings to HH:MM format
@@ -129,14 +165,30 @@ class HoursFormatter {
       return false;
     }
 
+    // Explicit 24-hour strings always count as open.
+    final lower = todayHours.toLowerCase();
+    if (lower == '24 hours' ||
+        lower == '24h' ||
+        lower == 'open 24 hours' ||
+        lower == 'open 24h' ||
+        lower == '24/7') {
+      return true;
+    }
+
     if (todayHours.contains('-')) {
       final parts = todayHours.split('-');
       if (parts.length == 2) {
         try {
           final openTime = _parseTime(parts[0].trim());
           final closeTime = _parseTime(parts[1].trim());
+          // Same open/close time = 24 hours (always open).
+          if (openTime == closeTime) return true;
           final currentTime = now.hour * 60 + now.minute;
 
+          // Handle "past midnight" shifts (e.g. 18:00-02:00).
+          if (closeTime < openTime) {
+            return currentTime >= openTime || currentTime < closeTime;
+          }
           return currentTime >= openTime && currentTime <= closeTime;
         } catch (e) {
           return false;

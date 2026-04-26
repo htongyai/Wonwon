@@ -1,10 +1,10 @@
 {
   "projects": {},
   "targets": {
-    "nexus-962bd": {
+    "wonwon-29fe3": {
       "hosting": {
         "admin": [
-          "nexus-962bd"
+          "wonwon-29fe3"
         ]
       }
     }

@@ -7,7 +7,6 @@ import 'package:shared/models/forum_reply.dart';
 import 'package:shared/services/forum_service.dart';
 import 'package:shared/services/content_management_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
 import 'package:wonwon_client/screens/login_screen.dart';
 import 'package:wonwon_client/screens/forum_screen.dart';
 import 'package:shared/services/analytics_service.dart';
@@ -15,8 +14,15 @@ import 'package:shared/services/analytics_service.dart';
 class ForumTopicDetailScreen extends StatefulWidget {
   final String topicId;
 
-  const ForumTopicDetailScreen({Key? key, required this.topicId})
-      : super(key: key);
+  /// When provided, the screen is being rendered inline (e.g. desktop two-pane
+  /// layout) and should call this instead of popping the navigator to go back.
+  final VoidCallback? onBack;
+
+  const ForumTopicDetailScreen({
+    Key? key,
+    required this.topicId,
+    this.onBack,
+  }) : super(key: key);
 
   @override
   State<ForumTopicDetailScreen> createState() => _ForumTopicDetailScreenState();
@@ -87,7 +93,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
     if (diff.inMinutes < 60) return 'time_minutes_ago'.tr(context).replaceAll('{count}', '${diff.inMinutes}');
     if (diff.inHours < 24) return 'time_hours_ago'.tr(context).replaceAll('{count}', '${diff.inHours}');
     if (diff.inDays < 7) return 'time_short_days_ago'.tr(context).replaceAll('{count}', '${diff.inDays}');
-    return DateFormat('MMM dd, yyyy').format(dateTime);
+    return 'time_short_weeks_ago'.tr(context).replaceAll('{count}', '${(diff.inDays / 7).floor()}');
   }
 
   // ---------------------------------------------------------------------------
@@ -124,23 +130,37 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final onBack = widget.onBack;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor:
+          isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8FAFC),
       appBar: AppBar(
+        automaticallyImplyLeading: onBack == null,
+        leading: onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: onBack,
+              )
+            : null,
         title: Text(
           _topic?.title ?? 'forum'.tr(context),
           style: GoogleFonts.montserrat(
             fontSize: 17,
             fontWeight: FontWeight.w600,
-            color: AppConstants.darkColor,
+            color:
+                isDark ? theme.colorScheme.onSurface : AppConstants.darkColor,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: theme.cardColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: AppConstants.darkColor),
+        iconTheme: IconThemeData(
+            color:
+                isDark ? theme.colorScheme.onSurface : AppConstants.darkColor),
         actions: [
           if (_topic != null &&
               _topic!.authorId == FirebaseAuth.instance.currentUser?.uid)
@@ -189,6 +209,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildBody() {
+    final theme = Theme.of(context);
     if (_isLoadingTopic) {
       return Center(
         child: Column(
@@ -205,7 +226,8 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
             const SizedBox(height: 16),
             Text(
               'loading'.tr(context),
-              style: GoogleFonts.montserrat(fontSize: 14, color: Colors.grey[500]),
+              style: GoogleFonts.montserrat(
+                  fontSize: 14, color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -221,12 +243,16 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
             const SizedBox(height: 12),
             Text(
               'error_loading_topic'.tr(context),
-              style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[600]),
+              style: GoogleFonts.montserrat(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 6),
             Text(
               'please_try_again'.tr(context),
-              style: GoogleFonts.montserrat(fontSize: 13, color: Colors.grey[400]),
+              style: GoogleFonts.montserrat(
+                  fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
@@ -250,11 +276,15 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.forum_outlined, size: 48, color: Colors.grey[300]),
+            Icon(Icons.forum_outlined,
+                size: 48, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 12),
             Text(
               'topic_not_found'.tr(context),
-              style: GoogleFonts.montserrat(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.grey[500]),
+              style: GoogleFonts.montserrat(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -269,13 +299,15 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildTopicContent(ForumTopic topic) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,7 +330,8 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
             style: GoogleFonts.montserrat(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: AppConstants.darkColor,
+              color:
+                  isDark ? theme.colorScheme.onSurface : AppConstants.darkColor,
               height: 1.3,
             ),
           ),
@@ -328,12 +361,14 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                       style: GoogleFonts.montserrat(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Colors.grey[800],
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     Text(
                       _formatRelativeTime(topic.createdAt),
-                      style: GoogleFonts.montserrat(fontSize: 12, color: Colors.grey[500]),
+                      style: GoogleFonts.montserrat(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -357,7 +392,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Divider(color: Colors.grey.shade200, height: 1),
+          Divider(color: theme.dividerColor, height: 1),
           const SizedBox(height: 16),
           // Content
           Text(
@@ -365,7 +400,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
             style: GoogleFonts.montserrat(
               fontSize: 15,
               height: 1.7,
-              color: Colors.grey[800],
+              color: theme.colorScheme.onSurface,
             ),
           ),
           // Tags
@@ -396,33 +431,43 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
             ),
           ],
           const SizedBox(height: 14),
-          Divider(color: Colors.grey.shade200, height: 1),
+          Divider(color: theme.dividerColor, height: 1),
           const SizedBox(height: 12),
           // Stats row
           Row(
             children: [
-              Icon(Icons.chat_bubble_outline, size: 14, color: Colors.grey[400]),
+              Icon(Icons.chat_bubble_outline,
+                  size: 14, color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(width: 4),
               Text(
                 '${topic.replies}',
-                style: GoogleFonts.montserrat(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[600]),
+                style: GoogleFonts.montserrat(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurfaceVariant),
               ),
               const SizedBox(width: 4),
               Text(
                 'forum_replies_label'.tr(context),
-                style: GoogleFonts.montserrat(fontSize: 13, color: Colors.grey[500]),
+                style: GoogleFonts.montserrat(
+                    fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
               ),
               const SizedBox(width: 20),
-              Icon(Icons.visibility_outlined, size: 14, color: Colors.grey[400]),
+              Icon(Icons.visibility_outlined,
+                  size: 14, color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(width: 4),
               Text(
                 '${topic.views}',
-                style: GoogleFonts.montserrat(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey[600]),
+                style: GoogleFonts.montserrat(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.onSurfaceVariant),
               ),
               const SizedBox(width: 4),
               Text(
                 'forum_views_label'.tr(context),
-                style: GoogleFonts.montserrat(fontSize: 13, color: Colors.grey[500]),
+                style: GoogleFonts.montserrat(
+                    fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -470,7 +515,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                   style: GoogleFonts.montserrat(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: Colors.grey[800],
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -506,21 +551,27 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
   }
 
   Widget _buildEmptyReplies() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 40),
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.chat_bubble_outline, size: 40, color: Colors.grey[300]),
+            Icon(Icons.chat_bubble_outline,
+                size: 40, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 12),
             Text(
               'no_replies_yet'.tr(context),
-              style: GoogleFonts.montserrat(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.grey[500]),
+              style: GoogleFonts.montserrat(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 4),
             Text(
               'be_first_to_reply'.tr(context),
-              style: GoogleFonts.montserrat(fontSize: 13, color: Colors.grey[400]),
+              style: GoogleFonts.montserrat(
+                  fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -529,6 +580,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
   }
 
   Widget _buildErrorState() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 32),
       child: Center(
@@ -538,7 +590,10 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
             const SizedBox(height: 12),
             Text(
               'error_loading_replies'.tr(context),
-              style: GoogleFonts.montserrat(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey[600]),
+              style: GoogleFonts.montserrat(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
@@ -562,6 +617,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildReplyCard(ForumReply reply, ForumTopic topic, {List<ForumReply> nestedReplies = const []}) {
+    final theme = Theme.of(context);
     final currentUser = FirebaseAuth.instance.currentUser;
     final isAuthor = currentUser?.uid == reply.authorId;
     final isTopicAuthor = currentUser?.uid == topic.authorId;
@@ -571,10 +627,10 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: reply.isSolution ? Colors.green.shade300 : Colors.grey.shade200,
+          color: reply.isSolution ? Colors.green.shade300 : theme.dividerColor,
           width: reply.isSolution ? 1.5 : 1,
         ),
       ),
@@ -610,7 +666,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                           style: GoogleFonts.montserrat(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
+                            color: theme.colorScheme.onSurface,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -663,11 +719,14 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                 ),
                 Text(
                   _formatRelativeTime(reply.createdAt),
-                  style: GoogleFonts.montserrat(fontSize: 12, color: Colors.grey[400]),
+                  style: GoogleFonts.montserrat(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant),
                 ),
                 if (isTopicAuthor || isAuthor)
                   PopupMenuButton<String>(
-                    icon: Icon(Icons.more_horiz, size: 18, color: Colors.grey[400]),
+                    icon: Icon(Icons.more_horiz,
+                        size: 18, color: theme.colorScheme.onSurfaceVariant),
                     padding: EdgeInsets.zero,
                     onSelected: (value) => _handleReplyAction(value, reply, topic),
                     itemBuilder: (context) => [
@@ -717,7 +776,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
               style: GoogleFonts.montserrat(
                 fontSize: 14,
                 height: 1.6,
-                color: Colors.grey[800],
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ),
@@ -730,10 +789,13 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                 if (!topic.isLocked)
                   TextButton.icon(
                     onPressed: () => _showNestedReplyInput(reply.id),
-                    icon: Icon(Icons.reply, size: 16, color: Colors.grey[500]),
+                    icon: Icon(Icons.reply,
+                        size: 16, color: theme.colorScheme.onSurfaceVariant),
                     label: Text(
                       'reply_tooltip'.tr(context),
-                      style: GoogleFonts.montserrat(fontSize: 12, color: Colors.grey[500]),
+                      style: GoogleFonts.montserrat(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant),
                     ),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -753,7 +815,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                         Icon(
                           isLiked ? Icons.favorite : Icons.favorite_border,
                           size: 16,
-                          color: isLiked ? Colors.red : Colors.grey[400],
+                          color: isLiked
+                              ? Colors.red
+                              : theme.colorScheme.onSurfaceVariant,
                         ),
                         if (reply.likes > 0) ...[
                           const SizedBox(width: 4),
@@ -762,7 +826,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                             style: GoogleFonts.montserrat(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: isLiked ? Colors.red : Colors.grey[500],
+                              color: isLiked
+                                  ? Colors.red
+                                  : theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -782,7 +848,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
               margin: const EdgeInsets.fromLTRB(20, 0, 16, 12),
               decoration: BoxDecoration(
                 border: Border(
-                  left: BorderSide(color: Colors.grey.shade300, width: 2),
+                  left: BorderSide(color: theme.dividerColor, width: 2),
                 ),
               ),
               child: Column(
@@ -804,6 +870,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildNestedReply(ForumReply reply, {bool isTopicLocked = false, String? parentReplyId, String? parentAuthorName}) {
+    final theme = Theme.of(context);
     final currentUser = FirebaseAuth.instance.currentUser;
     final isLiked = currentUser != null && reply.likedBy.contains(currentUser.uid);
 
@@ -828,14 +895,14 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                 child: Row(
                   children: [
                     Icon(Icons.subdirectory_arrow_right_rounded,
-                        size: 12, color: Colors.grey[500]),
+                        size: 12, color: theme.colorScheme.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Text(
                       '${'replying_to'.tr(context)} @$parentAuthorName',
                       style: GoogleFonts.montserrat(
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
-                        color: Colors.grey[500],
+                        color: theme.colorScheme.onSurfaceVariant,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -863,19 +930,21 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                   style: GoogleFonts.montserrat(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
+                    color: theme.colorScheme.onSurface,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               Text(
                 _formatRelativeTime(reply.createdAt),
-                style: GoogleFonts.montserrat(fontSize: 11, color: Colors.grey[400]),
+                style: GoogleFonts.montserrat(
+                    fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
               ),
               if (reply.authorId == currentUser?.uid)
                 IconButton(
                   onPressed: () => _deleteReply(reply.id, reply.authorId),
-                  icon: Icon(Icons.close, size: 14, color: Colors.grey[400]),
+                  icon: Icon(Icons.close,
+                      size: 14, color: theme.colorScheme.onSurfaceVariant),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                   tooltip: 'delete_tooltip'.tr(context),
@@ -889,7 +958,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
               style: GoogleFonts.montserrat(
                 fontSize: 13,
                 height: 1.5,
-                color: Colors.grey[700],
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ),
@@ -908,11 +977,15 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.reply, size: 14, color: Colors.grey[400]),
+                          Icon(Icons.reply,
+                              size: 14,
+                              color: theme.colorScheme.onSurfaceVariant),
                           const SizedBox(width: 4),
                           Text(
                             'reply_tooltip'.tr(context),
-                            style: GoogleFonts.montserrat(fontSize: 11, color: Colors.grey[400]),
+                            style: GoogleFonts.montserrat(
+                                fontSize: 11,
+                                color: theme.colorScheme.onSurfaceVariant),
                           ),
                         ],
                       ),
@@ -931,7 +1004,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                         Icon(
                           isLiked ? Icons.favorite : Icons.favorite_border,
                           size: 14,
-                          color: isLiked ? Colors.red : Colors.grey[400],
+                          color: isLiked
+                              ? Colors.red
+                              : theme.colorScheme.onSurfaceVariant,
                         ),
                         if (reply.likes > 0) ...[
                           const SizedBox(width: 3),
@@ -940,7 +1015,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                             style: GoogleFonts.montserrat(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: isLiked ? Colors.red : Colors.grey[500],
+                              color: isLiked
+                                  ? Colors.red
+                                  : theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -962,11 +1039,12 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildReplyInput() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        color: theme.cardColor,
+        border: Border(top: BorderSide(color: theme.dividerColor)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -975,7 +1053,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
             child: Container(
               constraints: const BoxConstraints(maxHeight: 120),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: TextField(
@@ -985,7 +1063,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                 },
                 decoration: InputDecoration(
                   hintText: 'write_reply_hint'.tr(context),
-                  hintStyle: GoogleFonts.montserrat(fontSize: 14, color: Colors.grey[400]),
+                  hintStyle: GoogleFonts.montserrat(
+                      fontSize: 14,
+                      color: theme.colorScheme.onSurfaceVariant),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 ),
@@ -993,13 +1073,18 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                 minLines: 1,
                 maxLength: 5000,
                 buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
-                style: GoogleFonts.montserrat(fontSize: 14, height: 1.5),
+                style: GoogleFonts.montserrat(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: theme.colorScheme.onSurface),
               ),
             ),
           ),
           const SizedBox(width: 8),
           Material(
-            color: _replyCharCount > 0 ? AppConstants.primaryColor : Colors.grey[300],
+            color: _replyCharCount > 0
+                ? AppConstants.primaryColor
+                : theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(10),
             child: InkWell(
               onTap: _isSubmittingReply || _replyCharCount == 0 ? null : _submitReply,
@@ -1020,7 +1105,9 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                     : Icon(
                         Icons.send_rounded,
                         size: 18,
-                        color: _replyCharCount > 0 ? Colors.white : Colors.grey[500],
+                        color: _replyCharCount > 0
+                            ? Colors.white
+                            : theme.colorScheme.onSurfaceVariant,
                       ),
               ),
             ),
@@ -1031,20 +1118,23 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
   }
 
   Widget _buildLockedBanner() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        color: theme.colorScheme.surfaceContainerHighest,
+        border: Border(top: BorderSide(color: theme.dividerColor)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.lock_outline, size: 15, color: Colors.grey[500]),
+          Icon(Icons.lock_outline,
+              size: 15, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 8),
           Text(
             'topic_locked_no_replies'.tr(context),
-            style: GoogleFonts.montserrat(fontSize: 13, color: Colors.grey[600]),
+            style: GoogleFonts.montserrat(
+                fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -1056,6 +1146,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildNestedReplyInput(String parentReplyId) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(
@@ -1063,7 +1154,7 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppConstants.primaryColor.withValues(alpha: 0.2)),
               ),
@@ -1071,14 +1162,17 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
                 controller: _nestedReplyController,
                 decoration: InputDecoration(
                   hintText: 'write_reply_short'.tr(context),
-                  hintStyle: GoogleFonts.montserrat(fontSize: 13, color: Colors.grey[400]),
+                  hintStyle: GoogleFonts.montserrat(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurfaceVariant),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
                 maxLines: null,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _submitNestedReply(parentReplyId),
-                style: GoogleFonts.montserrat(fontSize: 13),
+                style: GoogleFonts.montserrat(
+                    fontSize: 13, color: theme.colorScheme.onSurface),
               ),
             ),
           ),
@@ -1116,7 +1210,8 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
               width: 34,
               height: 34,
               alignment: Alignment.center,
-              child: Icon(Icons.close, size: 16, color: Colors.grey[500]),
+              child: Icon(Icons.close,
+                  size: 16, color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
         ],
@@ -1280,7 +1375,11 @@ class _ForumTopicDetailScreenState extends State<ForumTopicDetailScreen> {
       await ForumService.deleteTopic(widget.topicId);
       if (!mounted) return;
       _showSnack('topic_deleted'.tr(context), Colors.green);
-      Navigator.of(context).pop();
+      if (widget.onBack != null) {
+        widget.onBack!();
+      } else {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       if (!mounted) return;
       _showSnack('error_deleting_topic'.tr(context), Colors.red);

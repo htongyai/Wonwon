@@ -41,7 +41,7 @@ class RatingDistributionChart extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Text(
-                'Rating Distribution',
+                'rating_distribution_title'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -106,7 +106,30 @@ class RatingDistributionChart extends StatelessWidget {
                             ),
                           ),
                           leftTitles: AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 36,
+                              interval: (() {
+                                final maxVal = data.values.isEmpty
+                                    ? 10
+                                    : data.values.reduce((a, b) => a > b ? a : b);
+                                final step = (maxVal / 4).ceilToDouble();
+                                return step < 1 ? 1.0 : step;
+                              })(),
+                              getTitlesWidget: (value, meta) {
+                                if (value < 0) return const SizedBox.shrink();
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Text(
+                                    value.toInt().toString(),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      color: const Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                           topTitles: AxisTitles(
                             sideTitles: SideTitles(showTitles: false),

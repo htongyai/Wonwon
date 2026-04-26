@@ -65,10 +65,11 @@ class _ForceUpdateCheckerState extends State<ForceUpdateChecker> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     // Show a brief loading indicator while checking version
     if (_isChecking) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: Center(
           child: CircularProgressIndicator(
             color: AppConstants.primaryColor,
@@ -84,8 +85,10 @@ class _ForceUpdateCheckerState extends State<ForceUpdateChecker> {
   }
 
   Widget _buildUpdateScreen() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -111,19 +114,19 @@ class _ForceUpdateCheckerState extends State<ForceUpdateChecker> {
               // Title (localized)
               Text(
                 'force_update_title'.tr(context),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
                 'force_update_subtitle'.tr(context),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF64748B),
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 16),
@@ -133,9 +136,11 @@ class _ForceUpdateCheckerState extends State<ForceUpdateChecker> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: isDark
+                      ? theme.colorScheme.surfaceContainerHighest
+                      : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: theme.dividerColor),
                 ),
                 child: Column(
                   children: [
@@ -144,8 +149,9 @@ class _ForceUpdateCheckerState extends State<ForceUpdateChecker> {
                       children: [
                         Text(
                           'force_update_current'.tr(context),
-                          style: const TextStyle(
-                              fontSize: 13, color: Color(0xFF94A3B8)),
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: theme.colorScheme.onSurfaceVariant),
                         ),
                         Text(
                           'v$_currentVersion',
@@ -163,8 +169,9 @@ class _ForceUpdateCheckerState extends State<ForceUpdateChecker> {
                       children: [
                         Text(
                           'force_update_latest'.tr(context),
-                          style: const TextStyle(
-                              fontSize: 13, color: Color(0xFF94A3B8)),
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: theme.colorScheme.onSurfaceVariant),
                         ),
                         Text(
                           'v$_requiredVersion',
@@ -185,9 +192,9 @@ class _ForceUpdateCheckerState extends State<ForceUpdateChecker> {
               Text(
                 'force_update_message'.tr(context),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF64748B),
+                  color: theme.colorScheme.onSurfaceVariant,
                   height: 1.5,
                 ),
               ),

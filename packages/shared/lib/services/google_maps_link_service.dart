@@ -158,13 +158,34 @@ class GoogleMapsLinkService {
     receiveTimeout: const Duration(seconds: 10),
   ));
 
-  /// Optional Cloud Function URL for resolving shortened URLs on web.
-  /// Set this to your deployed Firebase Function URL.
-  /// Example: 'https://us-central1-YOUR-PROJECT.cloudfunctions.net/resolveShortUrl'
+  /// Cloud Function URL for resolving shortened URLs on web.
+  /// Defaults to the deployed `resolveShortUrl` function in
+  /// project `wonwon-29fe3`. Override at build time with
+  /// `--dart-define=RESOLVE_URL_FUNCTION=https://...`
   static const String _resolveUrlFunctionUrl = String.fromEnvironment(
     'RESOLVE_URL_FUNCTION',
-    defaultValue: '',
+    defaultValue:
+        'https://us-central1-wonwon-29fe3.cloudfunctions.net/resolveShortUrl',
   );
+
+  /// Thailand bounding box used for the soft import geo-fence warning.
+  /// Latitude/longitude ranges loosely cover the whole country plus a
+  /// small buffer; coords inside the box do not trigger the warning,
+  /// while coords outside (e.g. Tokyo, NYC) flag a UI notice so the
+  /// admin can confirm they really meant to import a non-Thai shop.
+  static const double _thBoundsLatMin = 5.5;
+  static const double _thBoundsLatMax = 20.6;
+  static const double _thBoundsLngMin = 97.3;
+  static const double _thBoundsLngMax = 105.7;
+
+  /// Returns true when the lat/lng pair falls inside the loose
+  /// Thailand bounding box used by the import geo-fence check.
+  static bool isInsideThailandBounds(double lat, double lng) {
+    return lat >= _thBoundsLatMin &&
+        lat <= _thBoundsLatMax &&
+        lng >= _thBoundsLngMin &&
+        lng <= _thBoundsLngMax;
+  }
 
   /// Check if a string looks like a Google Maps URL
   static bool isGoogleMapsUrl(String text) {
@@ -187,28 +208,43 @@ class GoogleMapsLinkService {
   /// Returns null only if coordinates cannot be extracted.
   Future<GoogleMapsLinkResult?> parseUrl(String url) async {
     try {
+      appLog('[MapsImport] === parseUrl start === $url');
       String fullUrl = url.trim();
 
       // Step 1: Resolve shortened URLs
       if (_isShortenedUrl(fullUrl)) {
+        appLog('[MapsImport] URL is shortened, resolving…');
         final resolved = await _resolveShortUrl(fullUrl);
-        if (resolved == null) return null;
+        if (resolved == null) {
+          appLog('[MapsImport] ❌ short URL resolution failed — aborting');
+          return null;
+        }
+        appLog('[MapsImport] ✓ resolved to: $resolved');
         fullUrl = resolved;
       }
 
       // Step 2: Extract coordinates from URL
       final coords = _extractCoordinates(fullUrl);
-      if (coords == null) return null;
+      if (coords == null) {
+        appLog('[MapsImport] ❌ no coordinates found in URL — aborting');
+        return null;
+      }
 
       final lat = coords.$1;
       final lng = coords.$2;
+      appLog('[MapsImport] ✓ coords: $lat, $lng');
 
       // Validate coordinates
-      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        appLog('[MapsImport] ❌ invalid coord range — aborting');
+        return null;
+      }
 
       // Step 3: Extract what we can from the URL itself
       String? placeName = _extractPlaceName(fullUrl);
       String? placeId = _extractPlaceId(fullUrl);
+      appLog(
+          '[MapsImport] from URL — name: $placeName, placeId: $placeId');
 
       // Step 4: Enhanced geocoding (Nominatim + native)
       String? fullAddress;
@@ -222,7 +258,10 @@ class GoogleMapsLinkService {
       String? landmark;
 
       // Try Nominatim first (richer data for Thailand)
+      appLog('[MapsImport] calling Nominatim…');
       final nominatimResult = await _reverseGeocodeNominatim(lat, lng);
+      appLog(
+          '[MapsImport] Nominatim: ${nominatimResult == null ? "null" : "${nominatimResult.length} fields"}');
       if (nominatimResult != null) {
         fullAddress = nominatimResult['display_name'];
         street = nominatimResult['road'];
@@ -273,8 +312,11 @@ class GoogleMapsLinkService {
       List<String>? weekdayDescriptions;
       List<String>? photoUrls;
 
+      appLog('[MapsImport] calling Places API…');
       final placesData =
           await _fetchPlacesApiData(lat, lng, placeName, placeId);
+      appLog(
+          '[MapsImport] Places API: ${placesData == null ? "null" : "OK — keys: ${placesData.keys.toList()}"}');
       if (placesData != null) {
         // Use Places API name if we didn't get one from URL, or if Places gives a better one
         if (placesData['name'] != null) {
@@ -315,7 +357,7 @@ class GoogleMapsLinkService {
         }
       }
 
-      return GoogleMapsLinkResult(
+      final result = GoogleMapsLinkResult(
         latitude: lat,
         longitude: lng,
         placeName: placeName,
@@ -337,8 +379,12 @@ class GoogleMapsLinkService {
         weekdayDescriptions: weekdayDescriptions,
         photoUrls: photoUrls,
       );
-    } catch (e) {
-      appLog('GoogleMapsLinkService: Failed to parse URL: $e');
+      appLog(
+          '[MapsImport] ✓ done — ${result.extractedFieldCount} fields, '
+          'photos: ${photoUrls?.length ?? 0}');
+      return result;
+    } catch (e, st) {
+      appLog('[MapsImport] ❌ parseUrl threw: $e\n$st');
       return null;
     }
   }
@@ -574,6 +620,13 @@ class GoogleMapsLinkService {
     double lng,
   ) async {
     try {
+      // Browsers forbid setting User-Agent from JS, so only send it on
+      // native platforms. Nominatim accepts anonymous requests anyway,
+      // but their policy prefers identified clients.
+      final headers = <String, String>{};
+      if (!kIsWeb) {
+        headers['User-Agent'] = 'WonWon-App/2.2';
+      }
       final response = await _apiDio.get(
         'https://nominatim.openstreetmap.org/reverse',
         queryParameters: {
@@ -585,7 +638,7 @@ class GoogleMapsLinkService {
           'addressdetails': 1,
         },
         options: Options(
-          headers: {'User-Agent': 'WonWon-App/2.2'},
+          headers: headers,
           receiveTimeout: const Duration(seconds: 5),
         ),
       );
@@ -714,8 +767,15 @@ class GoogleMapsLinkService {
       if (response.statusCode == 200 && response.data != null) {
         return _parsePlacesApiResponse(response.data);
       }
+      appLog(
+          '[MapsImport] Place details non-200: ${response.statusCode} ${response.statusMessage}');
+    } on DioException catch (e) {
+      appLog(
+          '[MapsImport] Place details DioException: '
+          '${e.response?.statusCode} ${e.response?.statusMessage} '
+          'body=${e.response?.data} msg=${e.message}');
     } catch (e) {
-      appLog('GoogleMapsLinkService: Place details failed: $e');
+      appLog('[MapsImport] Place details failed: $e');
     }
     return null;
   }
@@ -756,11 +816,21 @@ class GoogleMapsLinkService {
       if (response.statusCode == 200 && response.data != null) {
         final places = response.data['places'] as List<dynamic>?;
         if (places != null && places.isNotEmpty) {
+          appLog('[MapsImport] Text search ✓ found ${places.length} places');
           return _parsePlacesApiResponse(places.first);
         }
+        appLog('[MapsImport] Text search returned zero places');
+      } else {
+        appLog(
+            '[MapsImport] Text search non-200: ${response.statusCode} ${response.statusMessage}');
       }
+    } on DioException catch (e) {
+      appLog(
+          '[MapsImport] Text search DioException: '
+          '${e.response?.statusCode} ${e.response?.statusMessage} '
+          'body=${e.response?.data} msg=${e.message}');
     } catch (e) {
-      appLog('GoogleMapsLinkService: Text search failed: $e');
+      appLog('[MapsImport] Text search failed: $e');
     }
     return null;
   }
@@ -799,11 +869,22 @@ class GoogleMapsLinkService {
       if (response.statusCode == 200 && response.data != null) {
         final places = response.data['places'] as List<dynamic>?;
         if (places != null && places.isNotEmpty) {
+          appLog(
+              '[MapsImport] Nearby search ✓ found ${places.length} places');
           return _parsePlacesApiResponse(places.first);
         }
+        appLog('[MapsImport] Nearby search returned zero places');
+      } else {
+        appLog(
+            '[MapsImport] Nearby search non-200: ${response.statusCode} ${response.statusMessage}');
       }
+    } on DioException catch (e) {
+      appLog(
+          '[MapsImport] Nearby search DioException: '
+          '${e.response?.statusCode} ${e.response?.statusMessage} '
+          'body=${e.response?.data} msg=${e.message}');
     } catch (e) {
-      appLog('GoogleMapsLinkService: Nearby search failed: $e');
+      appLog('[MapsImport] Nearby search failed: $e');
     }
     return null;
   }

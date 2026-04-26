@@ -124,7 +124,7 @@ class _PerformanceLoadingWidgetState extends State<PerformanceLoadingWidget>
               style: GoogleFonts.montserrat(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey[600],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -181,6 +181,11 @@ class _SkeletonLoadingWidgetState extends State<SkeletonLoadingWidget>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseColor =
+        isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0);
+    final highlightColor =
+        isDark ? const Color(0xFF3A3A3A) : const Color(0xFFF5F5F5);
     return AnimatedBuilder(
       animation: _shimmerAnimation,
       builder: (context, child) {
@@ -192,7 +197,7 @@ class _SkeletonLoadingWidgetState extends State<SkeletonLoadingWidget>
             gradient: LinearGradient(
               begin: Alignment(_shimmerAnimation.value - 1, 0),
               end: Alignment(_shimmerAnimation.value, 0),
-              colors: [const Color(0xFFE0E0E0), const Color(0xFFF5F5F5), const Color(0xFFE0E0E0)],
+              colors: [baseColor, highlightColor, baseColor],
               stops: const [0.0, 0.5, 1.0],
             ),
           ),
@@ -283,6 +288,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     if (_hasError) {
       return Center(
         child: Column(
@@ -295,7 +301,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
               style: GoogleFonts.montserrat(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 8),
@@ -303,7 +309,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
               _errorMessage ?? 'unknown_error'.tr(context),
               style: GoogleFonts.montserrat(
                 fontSize: 14,
-                color: Colors.grey[500],
+                color: theme.colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -329,7 +335,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -360,7 +366,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
               style: GoogleFonts.montserrat(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppConstants.darkColor,
+                color: theme.colorScheme.onSurface,
               ),
             ),
 
@@ -392,7 +398,7 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
                                           ? Colors.green
                                           : isCurrent
                                           ? AppConstants.primaryColor
-                                          : Colors.grey[300],
+                                          : theme.colorScheme.surfaceContainerHighest,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child:
@@ -419,10 +425,11 @@ class _ProgressiveLoadingWidgetState extends State<ProgressiveLoadingWidget>
                                   fontSize: 14,
                                   color:
                                       isCompleted
-                                          ? Colors.grey[600]
+                                          ? theme.colorScheme.onSurfaceVariant
                                           : isCurrent
-                                          ? AppConstants.darkColor
-                                          : Colors.grey[400],
+                                          ? theme.colorScheme.onSurface
+                                          : theme.colorScheme.onSurfaceVariant
+                                              .withValues(alpha: 0.6),
                                   fontWeight:
                                       isCurrent
                                           ? FontWeight.w500
@@ -540,6 +547,7 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     if (_hasError) {
       return widget.errorWidget ??
           Center(
@@ -553,7 +561,7 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
                   style: GoogleFonts.montserrat(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -561,7 +569,7 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
                   _errorMessage ?? 'unknown_error'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 14,
-                    color: Colors.grey[500],
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -588,14 +596,18 @@ class _OptimizedLoadingListState extends State<OptimizedLoadingList> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
+                Icon(
+                  Icons.inbox_outlined,
+                  size: 64,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'no_items_found'.tr(context),
                   style: GoogleFonts.montserrat(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
               ],

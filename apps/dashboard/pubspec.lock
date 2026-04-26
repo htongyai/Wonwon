@@ -1187,7 +1187,7 @@ packages:
       path: "../../packages/shared"
       relative: true
     source: path
-    version: "2.2.3"
+    version: "2.2.4"
   shared_preferences:
     dependency: "direct main"
     description:

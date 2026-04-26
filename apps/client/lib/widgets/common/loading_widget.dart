@@ -21,6 +21,7 @@ class LoadingWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: padding ?? const EdgeInsets.all(20),
       child: Column(
@@ -42,7 +43,7 @@ class LoadingWidget extends StatelessWidget {
               message!,
               style: GoogleFonts.montserrat(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
@@ -67,8 +68,9 @@ class FullScreenLoadingWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: backgroundColor ?? Colors.white,
+      backgroundColor: backgroundColor ?? theme.scaffoldBackgroundColor,
       body: Center(
         child: LoadingWidget(
           message: message ?? 'Loading...',
@@ -96,6 +98,7 @@ class LoadingOverlayWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Stack(
       children: [
         child,
@@ -106,7 +109,7 @@ class LoadingOverlayWidget extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.cardColor,
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
@@ -175,6 +178,11 @@ class _SkeletonWidgetState extends State<SkeletonWidget>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final defaultBase =
+        isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0);
+    final defaultHighlight =
+        isDark ? const Color(0xFF3A3A3A) : const Color(0xFFF5F5F5);
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
@@ -187,9 +195,9 @@ class _SkeletonWidgetState extends State<SkeletonWidget>
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               colors: [
-                widget.baseColor ?? const Color(0xFFE0E0E0),
-                widget.highlightColor ?? const Color(0xFFF5F5F5),
-                widget.baseColor ?? const Color(0xFFE0E0E0),
+                widget.baseColor ?? defaultBase,
+                widget.highlightColor ?? defaultHighlight,
+                widget.baseColor ?? defaultBase,
               ],
               stops: [
                 _animation.value - 0.3,
@@ -222,10 +230,15 @@ class ShimmerLoadingWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!isLoading) return child;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final defaultBase =
+        isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0);
+    final defaultHighlight =
+        isDark ? const Color(0xFF3A3A3A) : const Color(0xFFF5F5F5);
 
     return Shimmer(
-      baseColor: baseColor ?? const Color(0xFFE0E0E0),
-      highlightColor: highlightColor ?? const Color(0xFFF5F5F5),
+      baseColor: baseColor ?? defaultBase,
+      highlightColor: highlightColor ?? defaultHighlight,
       child: child,
     );
   }

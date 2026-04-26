@@ -263,23 +263,24 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(
           'select_location'.tr(context),
           style: GoogleFonts.montserrat(
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
+        backgroundColor: theme.cardColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios,
             size: 20,
-            color: Colors.black87,
+            color: theme.colorScheme.onSurface,
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -330,7 +331,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
           // Primary loading indicator - when fetching location
           if (_isLoading)
             Container(
-              color: Colors.white,
+              color: theme.scaffoldBackgroundColor,
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -349,7 +350,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                       style: GoogleFonts.montserrat(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
-                        color: Colors.black87,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -360,7 +361,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
           // Secondary loading overlay - when map style is loading
           if (!_isLoading && (!_isMapStyleLoaded || !_showMap))
             Container(
-              color: Colors.white,
+              color: theme.scaffoldBackgroundColor,
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -379,7 +380,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                       style: GoogleFonts.montserrat(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
-                        color: Colors.black87,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -395,7 +396,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
               child: FloatingActionButton(
                 heroTag: 'myLocationButton',
                 mini: true,
-                backgroundColor: Colors.white,
+                backgroundColor: theme.cardColor,
                 foregroundColor: AppConstants.primaryColor,
                 elevation: 4,
                 onPressed: () async {
@@ -487,7 +488,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                   bottom: 20 + MediaQuery.of(context).padding.bottom,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: theme.cardColor,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.1),
@@ -508,7 +509,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
-                        color: Colors.grey[300],
+                        color: theme.dividerColor,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -517,9 +518,9 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey[300]!),
+                        border: Border.all(color: theme.dividerColor),
                       ),
                       child: Row(
                         children: [
@@ -538,7 +539,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                                   style: GoogleFonts.montserrat(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 16,
-                                    color: Colors.black87,
+                                    color: theme.colorScheme.onSurface,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -560,7 +561,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                                         'resolving_address'.tr(context),
                                         style: TextStyle(
                                           fontSize: 13,
-                                          color: Colors.grey[500],
+                                          color: theme.colorScheme.onSurfaceVariant,
                                           fontStyle: FontStyle.italic,
                                         ),
                                       ),
@@ -573,7 +574,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
-                                      color: Colors.grey[800],
+                                      color: theme.colorScheme.onSurface,
                                     ),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
@@ -584,7 +585,7 @@ class _MapPickerScreenState extends State<MapPickerScreen> {
                                   '${_selectedLocation!.longitude.toStringAsFixed(5)}',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.grey[500],
+                                    color: theme.colorScheme.onSurfaceVariant,
                                     fontFeatures: const [
                                       FontFeature.tabularFigures(),
                                     ],

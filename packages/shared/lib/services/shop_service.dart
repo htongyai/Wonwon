@@ -125,6 +125,81 @@ class ShopService {
     }
   }
 
+  /// Paginated variant of [getMoreShops] that also returns the last
+  /// [DocumentSnapshot] in the page plus a `hasMore` flag. Consumers can
+  /// thread the returned cursor back in for the next page and stop
+  /// scrolling when `hasMore` is false.
+  Future<({List<RepairShop> shops, DocumentSnapshot? lastDoc, bool hasMore})>
+      getMoreShopsPage({
+    required DocumentSnapshot lastDoc,
+    int limit = 20,
+  }) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('shops')
+          .where('approved', isEqualTo: true)
+          .startAfterDocument(lastDoc)
+          .limit(limit)
+          .get();
+
+      final shops = snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return RepairShop.fromMap(data);
+      }).toList();
+
+      return (
+        shops: shops,
+        lastDoc: snapshot.docs.isEmpty ? null : snapshot.docs.last,
+        hasMore: snapshot.docs.length >= limit,
+      );
+    } catch (e) {
+      appLog('Error getting more shops page: $e');
+      rethrow;
+    }
+  }
+
+  /// Always-fresh first page with cursor. Unlike [getAllShops] (which
+  /// hits the memory/SharedPreferences cache and returns a plain list),
+  /// this method guarantees a live Firestore query so callers can page
+  /// forward from [lastDoc]. Updates the shop cache as a side effect.
+  Future<({List<RepairShop> shops, DocumentSnapshot? lastDoc, bool hasMore})>
+      getShopsFirstPage({int limit = 50}) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('shops')
+          .where('approved', isEqualTo: true)
+          .limit(limit)
+          .get();
+
+      // Dedupe by id (matches getAllShops behaviour).
+      final dedup = <String, RepairShop>{};
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        dedup.putIfAbsent(doc.id, () => RepairShop.fromMap(data));
+      }
+      final list = dedup.values.toList();
+
+      // Refresh the cache so subsequent cached reads (other screens) stay
+      // consistent with what the home screen just rendered.
+      try {
+        await ShopCacheService.cacheShops(list);
+      } catch (e) {
+        appLog('Failed to update shop cache after first page fetch: $e');
+      }
+
+      return (
+        shops: list,
+        lastDoc: snapshot.docs.isEmpty ? null : snapshot.docs.last,
+        hasMore: snapshot.docs.length >= limit,
+      );
+    } catch (e) {
+      appLog('Error getting first page of shops: $e');
+      rethrow;
+    }
+  }
+
   // Get unapproved shops
   Future<List<RepairShop>> getUnapprovedShops() async {
     try {

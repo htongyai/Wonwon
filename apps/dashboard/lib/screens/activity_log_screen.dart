@@ -21,6 +21,17 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
   List<Map<String, dynamic>> _activities = [];
   bool _isLoading = true;
 
+  String _humanizeKey(String key) {
+    if (key.isEmpty) return key;
+    final withSpaces = key.replaceAllMapped(
+      RegExp(r'([a-z0-9])([A-Z])'),
+      (match) => '${match.group(1)} ${match.group(2)}',
+    );
+    final normalized = withSpaces.replaceAll('_', ' ').trim();
+    if (normalized.isEmpty) return normalized;
+    return normalized[0].toUpperCase() + normalized.substring(1);
+  }
+
   Map<String, String> _getActivityFilters(BuildContext context) => {
     'all': 'filter_all_activities'.tr(context),
     'user': 'filter_user_activities'.tr(context),
@@ -139,10 +150,13 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
             ),
           ],
         ),
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
-        ),
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+              )
+            : null,
+        automaticallyImplyLeading: Navigator.canPop(context),
         actions: [
           IconButton(
             onPressed: _loadActivityLog,
@@ -358,33 +372,39 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      FaIcon(
-                        FontAwesomeIcons.clock,
-                        size: 12,
-                        color: const Color(0xFF94A3B8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FaIcon(
+                            FontAwesomeIcons.clock,
+                            size: 12,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            timestamp != null
+                                ? DateFormat(
+                                  'MMM dd, yyyy HH:mm',
+                                ).format(timestamp.toDate())
+                                : 'unknown_time'.tr(context),
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        timestamp != null
-                            ? DateFormat(
-                              'MMM dd, yyyy HH:mm',
-                            ).format(timestamp.toDate())
-                            : 'unknown_time'.tr(context),
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: const Color(0xFF94A3B8),
-                        ),
-                      ),
-                      if (activity['metadata'] != null) ...[
-                        const SizedBox(width: 16),
+                      if (activity['metadata'] != null)
                         ...((activity['metadata'] as Map<String, dynamic>)
                             .entries
                             .take(2)
                             .map((entry) {
                               return Container(
-                                margin: const EdgeInsets.only(right: 8),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 6,
                                   vertical: 2,
@@ -396,7 +416,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  '${entry.key}: ${entry.value}',
+                                  '${_humanizeKey(entry.key)}: ${entry.value}',
                                   style: GoogleFonts.inter(
                                     fontSize: 10,
                                     color: const Color(0xFF64748B),
@@ -404,7 +424,6 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                                 ),
                               );
                             })),
-                      ],
                     ],
                   ),
                 ],
@@ -585,7 +604,7 @@ class _ActivityLogScreenState extends State<ActivityLogScreen> {
                   const SizedBox(height: 12),
                   ...metadata.entries.map((entry) {
                     return _buildDetailRow(
-                      entry.key,
+                      _humanizeKey(entry.key),
                       entry.value?.toString() ?? 'not_available'.tr(context),
                     );
                   }),

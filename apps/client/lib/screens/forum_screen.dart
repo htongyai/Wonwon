@@ -78,6 +78,9 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   Timer? _searchDebounceTimer;
   int _topicLimit = 20;
   bool _hasMoreTopics = false;
+  // Desktop-only: selected topic rendered inline in the right column so the
+  // app sidebar and forum category rail stay visible.
+  String? _selectedTopicId;
 
   @override
   void initState() {
@@ -270,8 +273,11 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   Widget build(BuildContext context) {
     final isTablet = ResponsiveSize.isTablet(context);
     final isDesktop = ResponsiveSize.isDesktop(context);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor:
+          isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8FAFC),
       body: SafeArea(
         child: isDesktop
             ? _buildDesktopLayout()
@@ -301,9 +307,11 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   // ---------------------------------------------------------------------------
 
   Widget _buildHeader() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
-      color: Colors.white,
+      color: theme.cardColor,
       child: Row(
         children: [
           Text(
@@ -311,7 +319,8 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
             style: GoogleFonts.montserrat(
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: AppConstants.darkColor,
+              color:
+                  isDark ? theme.colorScheme.onSurface : AppConstants.darkColor,
             ),
           ),
           const Spacer(),
@@ -334,7 +343,7 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
             },
             icon: Icon(
               _isSearchVisible ? Icons.close : Icons.search,
-              color: Colors.grey[700],
+              color: theme.colorScheme.onSurfaceVariant,
               size: 22,
             ),
             tooltip: 'forum_search_topics'.tr(context),
@@ -345,25 +354,32 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   }
 
   Widget _buildSearchField() {
+    final theme = Theme.of(context);
     return AnimatedSize(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
       child: _isSearchVisible
           ? Container(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-              color: Colors.white,
+              color: theme.cardColor,
               child: TextField(
                 controller: _searchController,
                 focusNode: _searchFocusNode,
                 onChanged: _onSearchChanged,
-                style: GoogleFonts.montserrat(fontSize: 14),
+                style: GoogleFonts.montserrat(
+                    fontSize: 14, color: theme.colorScheme.onSurface),
                 decoration: InputDecoration(
                   hintText: 'forum_search_topics'.tr(context),
-                  hintStyle: GoogleFonts.montserrat(fontSize: 14, color: Colors.grey[400]),
-                  prefixIcon: Icon(Icons.search, color: Colors.grey[400], size: 20),
+                  hintStyle: GoogleFonts.montserrat(
+                      fontSize: 14,
+                      color: theme.colorScheme.onSurfaceVariant),
+                  prefixIcon: Icon(Icons.search,
+                      color: theme.colorScheme.onSurfaceVariant, size: 20),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear, size: 18, color: Colors.grey[400]),
+                          icon: Icon(Icons.clear,
+                              size: 18,
+                              color: theme.colorScheme.onSurfaceVariant),
                           onPressed: () {
                             _searchController.clear();
                             _onSearchChanged('');
@@ -371,7 +387,7 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
                         )
                       : null,
                   filled: true,
-                  fillColor: const Color(0xFFF1F5F9),
+                  fillColor: theme.colorScheme.surfaceContainerHighest,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -389,12 +405,13 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   // ---------------------------------------------------------------------------
 
   Widget _buildCategoryTabs() {
+    final theme = Theme.of(context);
     return Container(
       height: 46,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         border: Border(
-          bottom: BorderSide(color: Colors.grey.shade200),
+          bottom: BorderSide(color: theme.dividerColor),
         ),
       ),
       child: ListView.separated(
@@ -417,7 +434,9 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
                 duration: const Duration(milliseconds: 180),
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppConstants.primaryColor : const Color(0xFFF1F5F9),
+                  color: isSelected
+                      ? AppConstants.primaryColor
+                      : theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 alignment: Alignment.center,
@@ -426,7 +445,9 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
                   style: GoogleFonts.montserrat(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? Colors.white : Colors.grey[700],
+                    color: isSelected
+                        ? Colors.white
+                        : theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -476,6 +497,7 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   }
 
   Widget _sortChip(_ForumSort mode, String label, IconData icon) {
+    final theme = Theme.of(context);
     final active = _sortMode == mode;
     return Material(
       color: Colors.transparent,
@@ -492,14 +514,10 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: active
-                ? AppConstants.primaryColor
-                : Colors.white,
+            color: active ? AppConstants.primaryColor : theme.cardColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: active
-                  ? AppConstants.primaryColor
-                  : Colors.grey.shade300,
+              color: active ? AppConstants.primaryColor : theme.dividerColor,
             ),
           ),
           child: Row(
@@ -507,14 +525,18 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
             children: [
               Icon(icon,
                   size: 13,
-                  color: active ? Colors.white : Colors.grey.shade700),
+                  color: active
+                      ? Colors.white
+                      : theme.colorScheme.onSurfaceVariant),
               const SizedBox(width: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: active ? Colors.white : Colors.grey.shade700,
+                  color: active
+                      ? Colors.white
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -529,6 +551,8 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   // ---------------------------------------------------------------------------
 
   Widget _buildDesktopLayout() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final screenWidth = MediaQuery.of(context).size.width;
     final sidebarWidth = ResponsiveBreakpoints.isDesktop(screenWidth) ? 280.0 : 260.0;
 
@@ -538,8 +562,8 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
         Container(
           width: sidebarWidth,
           decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(right: BorderSide(color: Colors.grey.shade200)),
+            color: theme.cardColor,
+            border: Border(right: BorderSide(color: theme.dividerColor)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -552,7 +576,9 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
                   style: GoogleFonts.montserrat(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
-                    color: AppConstants.darkColor,
+                    color: isDark
+                        ? theme.colorScheme.onSurface
+                        : AppConstants.darkColor,
                   ),
                 ),
               ),
@@ -562,14 +588,20 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
                 child: TextField(
                   controller: _searchController,
                   onChanged: _onSearchChanged,
-                  style: GoogleFonts.montserrat(fontSize: 14),
+                  style: GoogleFonts.montserrat(
+                      fontSize: 14, color: theme.colorScheme.onSurface),
                   decoration: InputDecoration(
                     hintText: 'forum_search_topics'.tr(context),
-                    hintStyle: GoogleFonts.montserrat(fontSize: 13, color: Colors.grey[400]),
-                    prefixIcon: Icon(Icons.search, size: 18, color: Colors.grey[400]),
+                    hintStyle: GoogleFonts.montserrat(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurfaceVariant),
+                    prefixIcon: Icon(Icons.search,
+                        size: 18, color: theme.colorScheme.onSurfaceVariant),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: Icon(Icons.clear, size: 16, color: Colors.grey[400]),
+                            icon: Icon(Icons.clear,
+                                size: 16,
+                                color: theme.colorScheme.onSurfaceVariant),
                             onPressed: () {
                               _searchController.clear();
                               _onSearchChanged('');
@@ -577,7 +609,7 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
                           )
                         : null,
                     filled: true,
-                    fillColor: const Color(0xFFF1F5F9),
+                    fillColor: theme.colorScheme.surfaceContainerHighest,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -594,7 +626,7 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
                   style: GoogleFonts.montserrat(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[500],
+                    color: theme.colorScheme.onSurfaceVariant,
                     letterSpacing: 1,
                   ),
                 ),
@@ -639,7 +671,9 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
                                     style: GoogleFonts.montserrat(
                                       fontSize: 14,
                                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                                      color: isSelected ? AppConstants.primaryColor : Colors.grey[700],
+                                      color: isSelected
+                                          ? AppConstants.primaryColor
+                                          : theme.colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 ),
@@ -679,66 +713,77 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
         ),
         // Main content
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top bar
-              Container(
-                padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-                ),
-                child: Row(
+          child: _selectedTopicId != null
+              ? ForumTopicDetailScreen(
+                  key: ValueKey(_selectedTopicId),
+                  topicId: _selectedTopicId!,
+                  onBack: () => setState(() => _selectedTopicId = null),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _selectedCategory == 'all'
-                          ? 'forum_all_topics'.tr(context)
-                          : (_categories.firstWhere(
-                              (cat) => cat['id'] == _selectedCategory,
-                              orElse: () => _categories.isNotEmpty
-                                  ? _categories.first
-                                  : {
-                                      'id': 'all',
-                                      'nameKey': 'forum_all_topics',
-                                      'icon': FontAwesomeIcons.globe,
-                                      'color': const Color(0xFF6366F1),
-                                    },
-                            )['nameKey'] as String)
-                              .tr(context),
-                      style: GoogleFonts.montserrat(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: AppConstants.darkColor,
+                    // Top bar
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
+                      decoration: BoxDecoration(
+                        color: theme.cardColor,
+                        border: Border(
+                            bottom: BorderSide(color: theme.dividerColor)),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            _selectedCategory == 'all'
+                                ? 'forum_all_topics'.tr(context)
+                                : (_categories.firstWhere(
+                                    (cat) => cat['id'] == _selectedCategory,
+                                    orElse: () => _categories.isNotEmpty
+                                        ? _categories.first
+                                        : {
+                                            'id': 'all',
+                                            'nameKey': 'forum_all_topics',
+                                            'icon': FontAwesomeIcons.globe,
+                                            'color': const Color(0xFF6366F1),
+                                          },
+                                  )['nameKey'] as String)
+                                    .tr(context),
+                            style: GoogleFonts.montserrat(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? theme.colorScheme.onSurface
+                                  : AppConstants.darkColor,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${_filteredTopics.length}',
+                              style: GoogleFonts.montserrat(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '${_filteredTopics.length}',
-                        style: GoogleFonts.montserrat(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey[600],
-                        ),
+                    Expanded(
+                      child: Container(
+                        color: isDark
+                            ? theme.scaffoldBackgroundColor
+                            : const Color(0xFFF8FAFC),
+                        child: _buildTopicsList(isDesktop: true),
                       ),
                     ),
                   ],
                 ),
-              ),
-              Expanded(
-                child: Container(
-                  color: const Color(0xFFF8FAFC),
-                  child: _buildTopicsList(isDesktop: true),
-                ),
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -756,6 +801,7 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
       );
     }
 
+    final theme = Theme.of(context);
     if (_loadError != null) {
       return Center(
         child: Padding(
@@ -763,14 +809,15 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 56, color: Colors.grey[400]),
+              Icon(Icons.error_outline,
+                  size: 56, color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(height: 16),
               Text(
                 'error_loading_topics'.tr(context),
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey[600],
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -799,14 +846,15 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.forum_outlined, size: 56, color: Colors.grey[300]),
+            Icon(Icons.forum_outlined,
+                size: 56, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
             Text(
               'forum_no_topics'.tr(context),
               style: GoogleFonts.montserrat(
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[500],
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 6),
@@ -814,7 +862,8 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
               _searchQuery.isNotEmpty
                   ? 'forum_try_adjusting_search'.tr(context)
                   : 'forum_be_first'.tr(context),
-              style: GoogleFonts.montserrat(fontSize: 14, color: Colors.grey[400]),
+              style: GoogleFonts.montserrat(
+                  fontSize: 14, color: theme.colorScheme.onSurfaceVariant),
             ),
             if (_searchQuery.isEmpty && isDesktop) ...[
               const SizedBox(height: 24),
@@ -875,15 +924,17 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   // ---------------------------------------------------------------------------
 
   Widget _buildTopicCard(ForumTopic topic, {bool isDesktop = false}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final category = _getCategoryForTopic(topic);
     final catColor = category['color'] as Color;
 
     return Container(
       margin: EdgeInsets.only(bottom: isDesktop ? 12 : 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Material(
         color: Colors.transparent,
@@ -891,11 +942,15 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => ForumTopicDetailScreen(topicId: topic.id),
-              ),
-            );
+            if (isDesktop) {
+              setState(() => _selectedTopicId = topic.id);
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ForumTopicDetailScreen(topicId: topic.id),
+                ),
+              );
+            }
           },
           child: Padding(
             padding: EdgeInsets.all(isDesktop ? 20 : 14),
@@ -921,7 +976,9 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
                   style: GoogleFonts.montserrat(
                     fontSize: isDesktop ? 16 : 15,
                     fontWeight: FontWeight.w600,
-                    color: AppConstants.darkColor,
+                    color: isDark
+                        ? theme.colorScheme.onSurface
+                        : AppConstants.darkColor,
                     height: 1.3,
                   ),
                   maxLines: 2,
@@ -953,7 +1010,7 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
                         style: GoogleFonts.montserrat(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -962,21 +1019,31 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
                     _dot(),
                     Text(
                       _formatTimeAgo(topic.lastActivity),
-                      style: GoogleFonts.montserrat(fontSize: 12, color: Colors.grey[500]),
+                      style: GoogleFonts.montserrat(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant),
                     ),
                     _dot(),
-                    Icon(Icons.chat_bubble_outline, size: 13, color: Colors.grey[400]),
+                    Icon(Icons.chat_bubble_outline,
+                        size: 13, color: theme.colorScheme.onSurfaceVariant),
                     const SizedBox(width: 3),
                     Text(
                       '${topic.replies}',
-                      style: GoogleFonts.montserrat(fontSize: 12, color: Colors.grey[500], fontWeight: FontWeight.w500),
+                      style: GoogleFonts.montserrat(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500),
                     ),
                     _dot(),
-                    Icon(Icons.visibility_outlined, size: 13, color: Colors.grey[400]),
+                    Icon(Icons.visibility_outlined,
+                        size: 13, color: theme.colorScheme.onSurfaceVariant),
                     const SizedBox(width: 3),
                     Text(
                       '${topic.views}',
-                      style: GoogleFonts.montserrat(fontSize: 12, color: Colors.grey[500], fontWeight: FontWeight.w500),
+                      style: GoogleFonts.montserrat(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -1048,11 +1115,15 @@ class _ForumScreenState extends State<ForumScreen> with AuthStateMixin {
   // ---------------------------------------------------------------------------
 
   Widget _dot() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Text(
         '\u00B7',
-        style: TextStyle(fontSize: 14, color: Colors.grey[400], fontWeight: FontWeight.w900),
+        style: TextStyle(
+            fontSize: 14,
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w900),
       ),
     );
   }

@@ -16,6 +16,7 @@ import 'package:shared/models/repair_sub_service.dart';
 import 'package:shared/mixins/auth_state_mixin.dart';
 import 'package:shared/services/analytics_service.dart';
 import 'package:shared/utils/app_logger.dart';
+import 'package:wonwon_client/screens/repair_celebration_screen.dart';
 
 class LogRepairScreen extends StatefulWidget {
   final RepairShop shop;
@@ -70,6 +71,25 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
     super.dispose();
   }
 
+  /// Fetches the number of repair records the user has logged this calendar
+  /// year. Used by the celebration screen for the "N repairs this year" line.
+  Future<int> _fetchYearRepairCount(String uid) async {
+    try {
+      final startOfYear = DateTime(DateTime.now().year, 1, 1);
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('repairRecords')
+          .where('date',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfYear))
+          .count()
+          .get();
+      return snap.count ?? 1;
+    } catch (_) {
+      return 1;
+    }
+  }
+
   Duration? _parsedDuration() {
     final days = int.tryParse(_durationDaysController.text.trim()) ?? 0;
     final hours = int.tryParse(_durationHoursController.text.trim()) ?? 0;
@@ -84,7 +104,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
       final picker = ImagePicker();
       final picked = await showModalBottomSheet<ImageSource>(
         context: context,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
@@ -98,7 +118,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: Theme.of(context).dividerColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -198,17 +218,24 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
           .doc(record.id)
           .set(record.toMap());
       if (mounted) {
-        HapticFeedback.mediumImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('repair_logged'.tr(context)),
-            backgroundColor: Colors.green,
-          ),
-        );
         _submittedSuccessfully = true;
         AnalyticsService.safeLog(
             () => AnalyticsService().logLogRepair(widget.shop.id));
-        Navigator.pop(context, true);
+
+        // Fetch this year's repair count for the celebration screen.
+        final yearTotal = await _fetchYearRepairCount(currentUserUid);
+
+        if (!mounted) return;
+        // Push the celebration screen, then return to the previous screen
+        // with `true` to signal success.
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => RepairCelebrationScreen(
+              record: record,
+              totalYearRepairs: yearTotal,
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -291,7 +318,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
           title: Text('log_repair'.tr(context)),
           backgroundColor: AppConstants.primaryColor,
@@ -370,12 +397,13 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
   // ── Pieces ────────────────────────────────────────────────────────────────
 
   Widget _buildShopCard() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEEEEE)),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,7 +413,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
             style: GoogleFonts.inter(
               fontSize: 17,
               fontWeight: FontWeight.w700,
-              color: AppConstants.darkColor,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -402,16 +430,17 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
   }
 
   Widget _infoRow(IconData icon, String text) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
-          Icon(icon, size: 15, color: Colors.grey[600]),
+          Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(color: Colors.grey[700], fontSize: 13),
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -467,10 +496,11 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
   }
 
   Widget _buildDateField() {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFE0E0E0)),
+        border: Border.all(color: theme.dividerColor),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
@@ -510,6 +540,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
   }
 
   Widget _buildDurationFields() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -518,7 +549,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
           style: GoogleFonts.inter(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Colors.grey[700],
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 8),
@@ -552,6 +583,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
   }
 
   Widget _buildPhotosSection() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -562,7 +594,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: AppConstants.darkColor,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(width: 6),
@@ -570,7 +602,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
               '${_photos.length}/$_maxPhotos',
               style: GoogleFonts.inter(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -591,6 +623,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
   }
 
   Widget _photoTile(int index) {
+    final theme = Theme.of(context);
     final slot = _photos[index];
     return Padding(
       padding: const EdgeInsets.only(right: 10),
@@ -601,12 +634,12 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
             height: 86,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade300),
+              border: Border.all(color: theme.dividerColor),
             ),
             clipBehavior: Clip.antiAlias,
             child: slot.bytes != null
                 ? Image.memory(slot.bytes!, fit: BoxFit.cover)
-                : Container(color: Colors.grey.shade100),
+                : Container(color: theme.colorScheme.surfaceContainerHighest),
           ),
           Positioned(
             top: 2,
@@ -672,6 +705,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
   }
 
   Widget _buildSatisfactionSection() {
+    final theme = Theme.of(context);
     final labels = [
       'satisfaction_bad',
       'satisfaction_poor',
@@ -688,7 +722,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
           style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: AppConstants.darkColor,
+            color: theme.colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 12),
@@ -715,12 +749,12 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
                       decoration: BoxDecoration(
                         color: selected
                             ? AppConstants.primaryColor.withValues(alpha: 0.12)
-                            : Colors.grey.shade50,
+                            : theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: selected
                               ? AppConstants.primaryColor
-                              : Colors.grey.shade200,
+                              : theme.dividerColor,
                         ),
                       ),
                       child: Column(
@@ -741,7 +775,7 @@ class _LogRepairScreenState extends State<LogRepairScreen> with AuthStateMixin {
                                   selected ? FontWeight.w700 : FontWeight.w500,
                               color: selected
                                   ? AppConstants.primaryColor
-                                  : Colors.grey.shade700,
+                                  : theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],

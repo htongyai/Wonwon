@@ -140,7 +140,9 @@ class CategoryPerformanceSection extends StatelessWidget {
                             ),
                             const SizedBox(width: 16),
                             Text(
-                              'n_reviews_count'.tr(context).replaceAll('{count}', '$totalReviews'),
+                              totalReviews == 1
+                                  ? 'one_review'.tr(context)
+                                  : 'n_reviews_count'.tr(context).replaceAll('{count}', '$totalReviews'),
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: const Color(0xFF64748B),

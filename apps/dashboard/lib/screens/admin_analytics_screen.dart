@@ -488,7 +488,9 @@ class _AdminAnalyticsScreenState
       AnalyticsMetric(
         title: 'average_rating'.tr(context),
         value: (_analyticsData['averageRating'] ?? 0.0).toStringAsFixed(1),
-        subtitle: 'from_n_reviews'.tr(context).replaceAll('{count}', '${_analyticsData['totalReviews'] ?? 0}'),
+        subtitle: ((_analyticsData['totalReviews'] ?? 0) == 1)
+            ? 'one_review_from'.tr(context)
+            : 'from_n_reviews'.tr(context).replaceAll('{count}', '${_analyticsData['totalReviews'] ?? 0}'),
         icon: FontAwesomeIcons.star,
         color: const Color(0xFFF59E0B),
         trend: 0.0,
@@ -507,13 +509,15 @@ class _AdminAnalyticsScreenState
       children: [
         LayoutBuilder(
           builder: (context, constraints) {
-            final cols = constraints.maxWidth > 1100 ? 4 : (constraints.maxWidth > 700 ? 2 : 1);
+            final cols = constraints.maxWidth > 1100
+                ? 4
+                : (constraints.maxWidth > 500 ? 2 : 1);
             return GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: cols,
-                childAspectRatio: cols == 1 ? 2.5 : 1.3,
+                childAspectRatio: cols == 1 ? 2.5 : 1.5,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
               ),

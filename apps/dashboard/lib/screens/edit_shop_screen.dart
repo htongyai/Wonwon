@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared/constants/app_constants.dart';
-import 'package:shared/constants/app_colors.dart';
 import 'package:shared/constants/app_text_styles.dart';
 import 'package:shared/models/repair_shop.dart';
 import 'package:wonwon_dashboard/screens/map_picker_screen.dart';
@@ -386,14 +385,16 @@ class _EditShopScreenState extends State<EditShopScreen> {
         }
       },
       child: Scaffold(
-      backgroundColor: AppColors.background,
+      // Don't pin to AppColors.background (hard-coded white) — let
+      // ThemeData.scaffoldBackgroundColor flip with dark mode.
       appBar: AppBar(
         title: Text(
           'admin_edit_shop'.tr(context),
-          style: AppTextStyles.heading.copyWith(color: AppColors.text),
+          style: AppTextStyles.heading
+              .copyWith(color: Theme.of(context).colorScheme.onSurface),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
+        // AppBarTheme handles backgroundColor across light/dark.
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 20),
@@ -894,19 +895,28 @@ class _EditShopScreenState extends State<EditShopScreen> {
   }
 
   Widget _buildSectionCard({required Widget child}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: ResponsiveSize.getScaledPadding(const EdgeInsets.all(16)),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        // Use the themed card color so this section flips with
+        // dark mode instead of staying pure white.
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: isDark
+            ? Border.all(color: theme.dividerColor, width: 0.5)
+            : null,
+        boxShadow: isDark
+            ? const [] // shadows are invisible in dark mode
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: child,
     );

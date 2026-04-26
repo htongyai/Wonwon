@@ -57,6 +57,7 @@ class CommonFormField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return TextFormField(
       controller: controller,
       focusNode: focusNode,
@@ -84,7 +85,7 @@ class CommonFormField extends StatelessWidget {
             ? IconButton(
                 icon: Icon(
                   suffixIcon,
-                  color: Colors.grey,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
                 onPressed: onSuffixPressed,
               )
@@ -92,13 +93,13 @@ class CommonFormField extends StatelessWidget {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: borderColor ?? Colors.grey.shade300,
+            color: borderColor ?? theme.dividerColor,
           ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: borderColor ?? Colors.grey.shade300,
+            color: borderColor ?? theme.dividerColor,
           ),
         ),
         focusedBorder: OutlineInputBorder(
@@ -128,7 +129,7 @@ class CommonFormField extends StatelessWidget {
               horizontal: 16,
             ),
         filled: filled,
-        fillColor: fillColor ?? Colors.grey.shade50,
+        fillColor: fillColor ?? theme.colorScheme.surfaceContainerHighest,
         counterText: '', // Hide character counter
       ),
     );
@@ -263,6 +264,7 @@ class CommonLoadingWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -279,7 +281,7 @@ class CommonLoadingWidget extends StatelessWidget {
               message!,
               style: GoogleFonts.montserrat(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: theme.colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -305,6 +307,7 @@ class CommonErrorWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -322,7 +325,7 @@ class CommonErrorWidget extends StatelessWidget {
               style: GoogleFonts.montserrat(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
+                color: theme.colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -331,7 +334,7 @@ class CommonErrorWidget extends StatelessWidget {
               message,
               style: GoogleFonts.montserrat(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: theme.colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -369,6 +372,7 @@ class CommonEmptyWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -378,7 +382,7 @@ class CommonEmptyWidget extends StatelessWidget {
             Icon(
               icon ?? Icons.inbox_outlined,
               size: 64,
-              color: Colors.grey[400],
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 16),
             Text(
@@ -386,7 +390,7 @@ class CommonEmptyWidget extends StatelessWidget {
               style: GoogleFonts.montserrat(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
+                color: theme.colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -395,7 +399,7 @@ class CommonEmptyWidget extends StatelessWidget {
               message,
               style: GoogleFonts.montserrat(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: theme.colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),

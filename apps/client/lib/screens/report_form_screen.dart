@@ -162,7 +162,7 @@ class _ReportFormScreenState extends State<ReportFormScreen>
       child: Scaffold(
       appBar: AppBar(
         title: Text('report_incorrect'.tr(context)),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
       ),
       body: Center(

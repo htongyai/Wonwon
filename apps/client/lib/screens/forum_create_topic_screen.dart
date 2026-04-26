@@ -194,8 +194,12 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
           Navigator.of(context).pop();
         }
       },
-      child: Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      child: Builder(builder: (context) {
+        final theme = Theme.of(context);
+        final isDark = theme.brightness == Brightness.dark;
+        return Scaffold(
+      backgroundColor:
+          isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
           'create_new_topic'.tr(context),
@@ -204,9 +208,11 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: theme.cardColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: AppConstants.darkColor),
+        iconTheme: IconThemeData(
+            color:
+                isDark ? theme.colorScheme.onSurface : AppConstants.darkColor),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: _handleBackButton,
@@ -259,11 +265,13 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
       ),
     ),
   ),
-),
+);
+      }),
     );
   }
 
   Widget _buildCategorySection() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -272,15 +280,15 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
           style: GoogleFonts.montserrat(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.grey[800],
+            color: theme.colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.cardColor,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+            border: Border.all(color: theme.dividerColor),
           ),
           child: Column(
             children:
@@ -294,6 +302,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
   }
 
   Widget _buildCategoryOption(Map<String, dynamic> category) {
+    final theme = Theme.of(context);
     final isSelected = _selectedCategory == category['id'];
 
     return Material(
@@ -349,14 +358,14 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
                         color:
                             isSelected
                                 ? AppConstants.primaryColor
-                                : Colors.grey[800],
+                                : theme.colorScheme.onSurface,
                       ),
                     ),
                     Text(
                       _getCategoryDescription(category['id']),
                       style: GoogleFonts.montserrat(
                         fontSize: 12,
-                        color: Colors.grey[600],
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -393,6 +402,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
   }
 
   Widget _buildTitleField() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -401,7 +411,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
           style: GoogleFonts.montserrat(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.grey[800],
+            color: theme.colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
@@ -411,18 +421,18 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
             hintText: 'topic_title_hint'.tr(context),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+              borderSide: BorderSide(color: theme.dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+              borderSide: BorderSide(color: theme.dividerColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: AppConstants.primaryColor),
             ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: theme.cardColor,
             contentPadding: const EdgeInsets.all(16),
           ),
           validator: (value) {
@@ -444,6 +454,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
   }
 
   Widget _buildContentField() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -452,7 +463,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
           style: GoogleFonts.montserrat(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.grey[800],
+            color: theme.colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
@@ -462,18 +473,18 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
             hintText: 'topic_content_hint'.tr(context),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+              borderSide: BorderSide(color: theme.dividerColor),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+              borderSide: BorderSide(color: theme.dividerColor),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: AppConstants.primaryColor),
             ),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: theme.cardColor,
             contentPadding: const EdgeInsets.all(16),
           ),
           validator: (value) {
@@ -493,6 +504,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
   }
 
   Widget _buildTagsSection() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -501,13 +513,14 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
           style: GoogleFonts.montserrat(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.grey[800],
+            color: theme.colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           'forum_tags_help'.tr(context),
-          style: GoogleFonts.montserrat(fontSize: 12, color: Colors.grey[600]),
+          style: GoogleFonts.montserrat(
+              fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 12),
         // Tag input
@@ -520,18 +533,18 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
                   hintText: 'tags_hint'.tr(context),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+                    borderSide: BorderSide(color: theme.dividerColor),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+                    borderSide: BorderSide(color: theme.dividerColor),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: AppConstants.primaryColor),
                   ),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: theme.cardColor,
                   contentPadding: const EdgeInsets.all(12),
                 ),
                 onSubmitted: (value) => _addTag(value),
@@ -607,26 +620,31 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
   }
 
   Widget _buildGuidelines() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final labelColor = isDark ? Colors.lightBlue[200] : Colors.blue[600];
+    final bodyColor = isDark ? Colors.lightBlue[100] : Colors.blue[700];
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.withValues(alpha: 0.05),
+        color: Colors.blue.withValues(alpha: isDark ? 0.12 : 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+        border: Border.all(
+            color: Colors.blue.withValues(alpha: isDark ? 0.35 : 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline, color: Colors.blue[600], size: 20),
+              Icon(Icons.info_outline, color: labelColor, size: 20),
               const SizedBox(width: 8),
               Text(
                 'community_guidelines'.tr(context),
                 style: GoogleFonts.montserrat(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Colors.blue[600],
+                  color: labelColor,
                 ),
               ),
             ],
@@ -636,7 +654,7 @@ class _ForumCreateTopicScreenState extends State<ForumCreateTopicScreen> {
             'forum_guidelines_text'.tr(context),
             style: GoogleFonts.montserrat(
               fontSize: 12,
-              color: Colors.blue[700],
+              color: bodyColor,
               height: 1.4,
             ),
           ),

@@ -18,11 +18,27 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wonwon_client/localization/app_localizations_wrapper.dart';
 import 'package:wonwon_client/widgets/section_title.dart';
 import 'package:wonwon_client/widgets/form_progress_header.dart';
+import 'package:wonwon_client/widgets/google_maps_import_dialog.dart';
+import 'package:shared/constants/eco_palette.dart';
+import 'package:shared/services/google_maps_link_service.dart';
 import 'package:shared/utils/responsive_size.dart';
 import 'package:shared/services/analytics_service.dart';
 
 class AddShopScreen extends StatefulWidget {
-  const AddShopScreen({Key? key}) : super(key: key);
+  /// Optional pre-filled data from a Google Maps import. When present, the
+  /// form's controllers are populated in `initState` and the user lands on
+  /// a partially filled form rather than a blank one.
+  final GoogleMapsLinkResult? prefillData;
+
+  /// Optional shop photo bytes from the same import. Wired into the same
+  /// upload pipeline a manual photo pick uses.
+  final Uint8List? prefillPhoto;
+
+  const AddShopScreen({
+    Key? key,
+    this.prefillData,
+    this.prefillPhoto,
+  }) : super(key: key);
 
   @override
   State<AddShopScreen> createState() => _AddShopScreenState();
@@ -225,6 +241,19 @@ class _AddShopScreenState extends State<AddShopScreen> {
   String? _selectedProvince;
 
   @override
+  void initState() {
+    super.initState();
+    // Apply prefill from Google Maps import if the screen was launched
+    // via the "Add by Google Maps link" path. Done in initState (before
+    // first build) so the user lands on a populated form, not an empty
+    // one that flashes then fills in.
+    final prefill = widget.prefillData;
+    if (prefill != null) {
+      _applyParsedData(prefill, widget.prefillPhoto);
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
@@ -325,14 +354,171 @@ class _AddShopScreenState extends State<AddShopScreen> {
     }
   }
 
+  /// Pill-shaped button that opens the Google Maps import dialog.
+  /// Rendered above the form progress header so it's the first thing the
+  /// user sees when creating a shop.
+  Widget _buildImportFromMapsButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _importFromGoogleMaps,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: EcoPalette.leafWash,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: EcoPalette.leaf.withValues(alpha: 0.25),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                  color: EcoPalette.leaf,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.auto_awesome_rounded,
+                    color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'import_from_maps'.tr(context),
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: EcoPalette.leaf,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'import_button_subtitle'.tr(context),
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: EcoPalette.inkSecondary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: EcoPalette.leaf, size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Open the Google Maps import dialog and apply the returned data to
+  /// the form fields. Silently no-ops if the user cancels.
+  Future<void> _importFromGoogleMaps() async {
+    final result = await showModalBottomSheet<GoogleMapsImportResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const GoogleMapsImportDialog(),
+    );
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _applyParsedData(result.parsed, result.photoBytes);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text('import_applied'.tr(context)),
+        duration: const Duration(seconds: 2),
+        backgroundColor: EcoPalette.leaf,
+      ),
+    );
+  }
+
+  /// Apply Google Maps parse results to the form's controllers and selection
+  /// state. Used both by `initState` (when the screen was opened via the
+  /// "Add by Google Maps link" chooser path) and by `_importFromGoogleMaps`
+  /// (mid-form import button). Caller is responsible for `setState()` —
+  /// `initState` mutates directly, the import button wraps in setState.
+  void _applyParsedData(GoogleMapsLinkResult parsed, Uint8List? photoBytes) {
+    // Name
+    if (parsed.placeName != null && _nameController.text.trim().isEmpty) {
+      _nameController.text = parsed.placeName!;
+    }
+    // Coordinates — always overwrite, the import is the user's choice.
+    _latitudeController.text = parsed.latitude.toStringAsFixed(6);
+    _longitudeController.text = parsed.longitude.toStringAsFixed(6);
+
+    // Address components (only fill empty ones so we don't clobber user input)
+    if (parsed.buildingNumber != null &&
+        _buildingNumberController.text.trim().isEmpty) {
+      _buildingNumberController.text = parsed.buildingNumber!;
+    }
+    if (parsed.street != null && _soiController.text.trim().isEmpty) {
+      _soiController.text = parsed.street!;
+    }
+    if (parsed.district != null &&
+        _districtController.text.trim().isEmpty) {
+      _districtController.text = parsed.district!;
+    }
+    if (parsed.landmark != null &&
+        _landmarkController.text.trim().isEmpty) {
+      _landmarkController.text = parsed.landmark!;
+    }
+
+    // Phone
+    if (parsed.phoneNumber != null &&
+        _phoneController.text.trim().isEmpty) {
+      _phoneController.text = parsed.phoneNumber!;
+    }
+
+    // Province — match the geocoded name to a dropdown value when possible.
+    if (parsed.province != null && _selectedProvince == null) {
+      for (final p in _provinces) {
+        if (p.toLowerCase() == parsed.province!.toLowerCase()) {
+          _selectedProvince = p;
+          break;
+        }
+      }
+    }
+
+    // Categories — Places API "types" matched against our category list.
+    if (parsed.matchedCategories != null &&
+        parsed.matchedCategories!.isNotEmpty &&
+        _selectedCategories.isEmpty) {
+      for (final cat in parsed.matchedCategories!) {
+        if (_availableCategories.contains(cat) &&
+            !_selectedCategories.contains(cat)) {
+          _selectedCategories.add(cat);
+          _selectedSubServices[cat] = [];
+        }
+      }
+    }
+
+    // Photo — hand off to the existing upload pipeline by setting the bytes.
+    if (photoBytes != null) {
+      _selectedImageBytes = photoBytes;
+      _imageError = null;
+    }
+  }
+
   /// Compute form progress grouped into 4 logical sections.
   /// Used by [FormProgressHeader] to show completion percentage.
   List<FormSectionProgress> _computeProgress(BuildContext context) {
-    // Section 1: Basics — name, description, photo, categories
+    // Section 1: Basics — name, photo, categories.
+    // (description is optional, so it doesn't count toward progress.)
     int basicsDone = 0;
-    const basicsRequired = 4;
+    const basicsRequired = 3;
     if (_nameController.text.trim().isNotEmpty) basicsDone++;
-    if (_descriptionController.text.trim().isNotEmpty) basicsDone++;
     if (_selectedImageBytes != null) basicsDone++;
     if (_selectedCategories.isNotEmpty) basicsDone++;
 
@@ -404,7 +590,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
           ),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).cardColor,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, size: 20),
@@ -430,42 +616,63 @@ class _AddShopScreenState extends State<AddShopScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Quick-import from Google Maps — one-tap fill
+                      _buildImportFromMapsButton(),
+                      const SizedBox(height: 12),
                       // Progress header — shows % complete + section chips
                       FormProgressHeader(
                         sections: _computeProgress(context),
                       ),
-                      // Warning message
-                      Container(
-                    padding: ResponsiveSize.getScaledPadding(
-                      const EdgeInsets.all(12),
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.amber[800]),
-                        SizedBox(width: ResponsiveSize.getWidth(3)),
-                        Expanded(
-                          child: Text(
-                            'shop_review_notice'.tr(context),
-                            style: TextStyle(
-                              color: Colors.amber[900],
-                              fontSize: 14,
-                            ),
+                      // Warning message — manual amber palette so it
+                      // doesn't follow the dark theme; wrap in a
+                      // Builder + brightness check to flip in dark.
+                      Builder(builder: (context) {
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        final bg = isDark
+                            ? const Color(0xFF2A2418)
+                            : Colors.amber.shade50;
+                        final border = isDark
+                            ? const Color(0xFF6B5114)
+                            : Colors.amber.shade200;
+                        final iconColor = isDark
+                            ? const Color(0xFFE6B85B)
+                            : Colors.amber[800]!;
+                        final textColor = isDark
+                            ? const Color(0xFFF1D89E)
+                            : Colors.amber[900]!;
+                        return Container(
+                          padding: ResponsiveSize.getScaledPadding(
+                            const EdgeInsets.all(12),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+                          decoration: BoxDecoration(
+                            color: bg,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: border),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline, color: iconColor),
+                              SizedBox(width: ResponsiveSize.getWidth(3)),
+                              Expanded(
+                                child: Text(
+                                  'shop_review_notice'.tr(context),
+                                  style: TextStyle(
+                                    color: textColor,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
                   SizedBox(height: ResponsiveSize.getHeight(6)),
 
                   // Introduction
                   Text(
                     'add_shop_directory'.tr(context),
-                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                   SizedBox(height: ResponsiveSize.getHeight(6)),
 
@@ -487,18 +694,15 @@ class _AddShopScreenState extends State<AddShopScreen> {
                   ),
                   SizedBox(height: ResponsiveSize.getHeight(4)),
 
-                  // Description
+                  // Description — optional. Google Maps imports rarely
+                  // include a description, so requiring it would block
+                  // the common "import → save" flow.
                   _buildTextFormField(
                     controller: _descriptionController,
-                    label: 'shop_description_label'.tr(context),
+                    label: '${'shop_description_label'.tr(context)} (${'optional'.tr(context)})',
                     hint: 'enter_description_hint'.tr(context),
                     maxLines: 3,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'please_enter_description'.tr(context);
-                      }
-                      return null;
-                    },
+                    validator: (_) => null,
                   ),
                   SizedBox(height: ResponsiveSize.getHeight(4)),
 
@@ -511,7 +715,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: Colors.grey[800],
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       SizedBox(height: ResponsiveSize.getHeight(2)),
@@ -521,10 +725,10 @@ class _AddShopScreenState extends State<AddShopScreen> {
                           width: double.infinity,
                           height: 180, // 6x4 aspect ratio (approximately)
                           decoration: BoxDecoration(
-                            color: Colors.grey[200],
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: Colors.grey[300]!,
+                              color: Theme.of(context).dividerColor,
                               width: 1,
                             ),
                           ),
@@ -565,7 +769,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: Colors.grey[800],
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                       SizedBox(height: ResponsiveSize.getHeight(2)),
@@ -636,7 +840,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                   'coord_paste_instruction'.tr(context),
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.grey[600],
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                                     fontStyle: FontStyle.italic,
                                   ),
                                 ),
@@ -722,7 +926,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                         borderSide: BorderSide.none,
                       ),
                       filled: true,
-                      fillColor: Colors.grey[100],
+                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                       contentPadding: ResponsiveSize.getScaledPadding(
                         const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -820,7 +1024,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
-                      color: Colors.grey[800],
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   Wrap(
@@ -884,9 +1088,9 @@ class _AddShopScreenState extends State<AddShopScreen> {
                       bottom: ResponsiveSize.getHeight(4),
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade200),
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
                     child: Row(
                       children: [
@@ -945,7 +1149,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.grey[800],
+                                  color: Theme.of(context).colorScheme.onSurface,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -953,7 +1157,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                 'use_monday_hours'.tr(context),
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.grey[600],
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -973,9 +1177,9 @@ class _AddShopScreenState extends State<AddShopScreen> {
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade200),
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
                     child: Row(
                       children: [
@@ -997,7 +1201,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.grey[800],
+                                  color: Theme.of(context).colorScheme.onSurface,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -1005,7 +1209,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                 'irregular_hours_hint'.tr(context),
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.grey[600],
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
@@ -1079,7 +1283,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: Colors.grey[800],
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
@@ -1087,9 +1291,9 @@ class _AddShopScreenState extends State<AddShopScreen> {
           controller: controller,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.grey[400]),
+            hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
             filled: true,
-            fillColor: Colors.grey[100],
+            fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
@@ -1117,7 +1321,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: Colors.grey[800],
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 8),
@@ -1148,20 +1352,20 @@ class _AddShopScreenState extends State<AddShopScreen> {
                       color:
                           isSelected
                               ? AppConstants.primaryColor
-                              : Colors.grey[100],
+                              : Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color:
                             isSelected
                                 ? AppConstants.primaryColor
-                                : Colors.grey[300]!,
+                                : Theme.of(context).dividerColor,
                         width: 1,
                       ),
                     ),
                     child: Text(
                       _getCategoryDisplayName(category),
                       style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.grey[800],
+                        color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
                         fontWeight:
                             isSelected ? FontWeight.w600 : FontWeight.normal,
                       ),
@@ -1188,9 +1392,9 @@ class _AddShopScreenState extends State<AddShopScreen> {
             margin: const EdgeInsets.only(bottom: 24),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.grey[50],
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[200]!),
+              border: Border.all(color: Theme.of(context).dividerColor),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1215,7 +1419,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                 const SizedBox(height: 12),
                 Text(
                   'select_specific_services_hint'.tr(context),
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -1253,13 +1457,13 @@ class _AddShopScreenState extends State<AddShopScreen> {
                               color:
                                   isSelected
                                       ? AppConstants.primaryColor
-                                      : Colors.white,
+                                      : Theme.of(context).cardColor,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color:
                                     isSelected
                                         ? AppConstants.primaryColor
-                                        : Colors.grey[300]!,
+                                        : Theme.of(context).dividerColor,
                                 width: 1,
                               ),
                             ),
@@ -1274,7 +1478,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                   color:
                                       isSelected
                                           ? Colors.white
-                                          : Colors.grey[600],
+                                          : Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
@@ -1283,7 +1487,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                     color:
                                         isSelected
                                             ? Colors.white
-                                            : Colors.grey[800],
+                                            : Theme.of(context).colorScheme.onSurface,
                                     fontWeight:
                                         isSelected
                                             ? FontWeight.w600
@@ -1373,7 +1577,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                           _getDayDisplayName(day),
                           style: TextStyle(
                             fontWeight: FontWeight.w500,
-                            color: Colors.grey[800],
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -1410,7 +1614,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                       Text(
                         'closed_label'.tr(context),
                         style: TextStyle(
-                          color: isClosed ? Colors.red[700] : Colors.grey[800],
+                          color: isClosed ? Colors.red[700] : Theme.of(context).colorScheme.onSurface,
                           fontWeight:
                               isClosed ? FontWeight.w500 : FontWeight.normal,
                         ),
@@ -1458,7 +1662,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                   'opening_time_label'.tr(context),
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.grey[600],
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -1476,14 +1680,14 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                           isSyncedWithMonday
                                               ? AppConstants.primaryColor
                                                   .withValues(alpha: 0.05)
-                                              : Colors.grey[100],
+                                              : Theme.of(context).colorScheme.surfaceContainerHighest,
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
                                         color:
                                             isSyncedWithMonday
                                                 ? AppConstants.primaryColor
                                                     .withValues(alpha: 0.3)
-                                                : Colors.grey[300]!,
+                                                : Theme.of(context).dividerColor,
                                         width: 1,
                                       ),
                                     ),
@@ -1498,13 +1702,13 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                           style: TextStyle(
                                             color:
                                                 openingController.text.isEmpty
-                                                    ? Colors.grey[400]
-                                                    : Colors.black87,
+                                                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                                                    : Theme.of(context).colorScheme.onSurface,
                                           ),
                                         ),
                                         Icon(
                                           Icons.access_time,
-                                          color: Colors.grey[600],
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                                           size: 18,
                                         ),
                                       ],
@@ -1525,7 +1729,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                   'closing_time_label'.tr(context),
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.grey[600],
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -1543,14 +1747,14 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                           isSyncedWithMonday
                                               ? AppConstants.primaryColor
                                                   .withValues(alpha: 0.05)
-                                              : Colors.grey[100],
+                                              : Theme.of(context).colorScheme.surfaceContainerHighest,
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
                                         color:
                                             isSyncedWithMonday
                                                 ? AppConstants.primaryColor
                                                     .withValues(alpha: 0.3)
-                                                : Colors.grey[300]!,
+                                                : Theme.of(context).dividerColor,
                                         width: 1,
                                       ),
                                     ),
@@ -1565,13 +1769,13 @@ class _AddShopScreenState extends State<AddShopScreen> {
                                           style: TextStyle(
                                             color:
                                                 closingController.text.isEmpty
-                                                    ? Colors.grey[400]
-                                                    : Colors.black87,
+                                                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                                                    : Theme.of(context).colorScheme.onSurface,
                                           ),
                                         ),
                                         Icon(
                                           Icons.access_time,
-                                          color: Colors.grey[600],
+                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                                           size: 18,
                                         ),
                                       ],
@@ -2126,7 +2330,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
             const SizedBox(height: 12),
             Text(
               'Processing image...',
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -2167,20 +2371,20 @@ class _AddShopScreenState extends State<AddShopScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.add_photo_alternate, size: 48, color: Colors.grey[400]),
+        Icon(Icons.add_photo_alternate, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
         const SizedBox(height: 12),
         Text(
           'upload_shop_photo_label'.tr(context),
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: Colors.grey[600],
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           'shop_photo_format_hint'.tr(context),
-          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
       ],
     );

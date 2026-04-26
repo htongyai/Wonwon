@@ -141,6 +141,7 @@ class OptimizedFormWidget extends StatelessWidget {
     Color color,
   ) {
     if (field.radioOptions == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,15 +152,15 @@ class OptimizedFormWidget extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w500,
-              color: Colors.grey[700],
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: theme.dividerColor),
             borderRadius: BorderRadius.circular(12),
-            color: Colors.grey.shade50,
+            color: theme.colorScheme.surfaceContainerHighest,
           ),
           child: Column(
             children:
@@ -182,9 +183,10 @@ class OptimizedFormWidget extends StatelessWidget {
                                 children: [
                                   Text(
                                     option.title.tr(context),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: 16,
+                                      color: theme.colorScheme.onSurface,
                                     ),
                                   ),
                                   if (option.subtitle != null)
@@ -192,7 +194,7 @@ class OptimizedFormWidget extends StatelessWidget {
                                       option.subtitle!.tr(context),
                                       style: TextStyle(
                                         fontSize: 14,
-                                        color: Colors.grey[600],
+                                        color: theme.colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                 ],
@@ -206,7 +208,7 @@ class OptimizedFormWidget extends StatelessWidget {
                         activeColor: color,
                       ),
                       if (index < field.radioOptions!.length - 1)
-                        Divider(height: 1, color: Colors.grey.shade300),
+                        Divider(height: 1, color: theme.dividerColor),
                     ],
                   );
                 }).toList(),

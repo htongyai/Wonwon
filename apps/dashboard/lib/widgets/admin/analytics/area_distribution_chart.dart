@@ -41,7 +41,7 @@ class AreaDistributionChart extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Text(
-                'Geographic Distribution',
+                'geographic_distribution_title'.tr(context),
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -87,19 +87,22 @@ class AreaDistributionChart extends StatelessWidget {
                           bottomTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
+                              reservedSize: 56,
                               getTitlesWidget: (value, meta) {
                                 final index = value.toInt();
                                 if (index >= 0 && index < data.keys.length) {
                                   final area = data.keys.elementAt(index);
                                   return Padding(
                                     padding: const EdgeInsets.only(top: 8),
-                                    child: Text(
-                                      area.length > 8
-                                          ? '${area.substring(0, 8)}...'
-                                          : area,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 10,
-                                        color: const Color(0xFF64748B),
+                                    child: Transform.rotate(
+                                      angle: -0.5,
+                                      alignment: Alignment.topCenter,
+                                      child: Text(
+                                        area,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10,
+                                          color: const Color(0xFF64748B),
+                                        ),
                                       ),
                                     ),
                                   );

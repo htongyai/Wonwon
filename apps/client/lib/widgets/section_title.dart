@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared/constants/app_constants.dart';
 
 class SectionTitle extends StatelessWidget {
   final String text;
@@ -17,6 +16,7 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: padding,
       child: Text(
@@ -24,7 +24,7 @@ class SectionTitle extends StatelessWidget {
         style: TextStyle(
           fontSize: fontSize,
           fontWeight: FontWeight.bold,
-          color: color ?? AppConstants.darkColor,
+          color: color ?? theme.colorScheme.onSurface,
         ),
       ),
     );

@@ -13,6 +13,7 @@ class SortSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final options = [
       _SortOption(ShopSortMode.distance, Icons.near_me_rounded),
       _SortOption(ShopSortMode.rating, Icons.star_rounded),
@@ -21,9 +22,9 @@ class SortSheet extends StatelessWidget {
     ];
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
         top: false,
@@ -36,7 +37,7 @@ class SortSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: theme.dividerColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -49,7 +50,7 @@ class SortSheet extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: AppConstants.darkColor,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -90,6 +91,7 @@ class _OptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -104,7 +106,7 @@ class _OptionTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? AppConstants.primaryColor.withValues(alpha: 0.12)
-                      : Colors.grey.shade100,
+                      : theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -112,7 +114,7 @@ class _OptionTile extends StatelessWidget {
                   size: 18,
                   color: isSelected
                       ? AppConstants.primaryColor
-                      : Colors.grey.shade600,
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 14),
@@ -123,7 +125,7 @@ class _OptionTile extends StatelessWidget {
                     fontSize: 15,
                     fontWeight:
                         isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: AppConstants.darkColor,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
               ),

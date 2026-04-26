@@ -18,6 +18,9 @@ class InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final linkColor = isDark ? Colors.lightBlueAccent : Colors.blue;
     return InkWell(
       onTap: onTap,
       mouseCursor: onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
@@ -26,13 +29,13 @@ class InfoRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 18, color: iconColor ?? Colors.brown),
+            Icon(icon, size: 18, color: iconColor ?? theme.primaryColor),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 text,
-                style: (textStyle ?? const TextStyle(fontSize: 15)).copyWith(
-                  color: onTap != null ? Colors.blue : null,
+                style: (textStyle ?? TextStyle(fontSize: 15, color: theme.colorScheme.onSurface)).copyWith(
+                  color: onTap != null ? linkColor : null,
                   decoration: onTap != null ? TextDecoration.underline : null,
                 ),
               ),

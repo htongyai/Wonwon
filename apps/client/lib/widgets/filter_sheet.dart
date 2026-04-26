@@ -30,6 +30,7 @@ class _FilterSheetState extends State<FilterSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final mediaQuery = MediaQuery.of(context);
     return Padding(
       padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
@@ -37,9 +38,9 @@ class _FilterSheetState extends State<FilterSheet> {
         constraints: BoxConstraints(
           maxHeight: mediaQuery.size.height * 0.85,
         ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: SafeArea(
           top: false,
@@ -80,17 +81,21 @@ class _FilterSheetState extends State<FilterSheet> {
 
   // ── Pieces ────────────────────────────────────────────────────────────────
 
-  Widget _buildHandle() => Container(
-        margin: const EdgeInsets.only(top: 10, bottom: 8),
-        width: 40,
-        height: 4,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade300,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      );
+  Widget _buildHandle() {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(top: 10, bottom: 8),
+      width: 40,
+      height: 4,
+      decoration: BoxDecoration(
+        color: theme.dividerColor,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+  }
 
   Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 12),
       child: Row(
@@ -100,7 +105,7 @@ class _FilterSheetState extends State<FilterSheet> {
             style: GoogleFonts.inter(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: AppConstants.darkColor,
+              color: theme.colorScheme.onSurface,
             ),
           ),
           const Spacer(),
@@ -128,6 +133,7 @@ class _FilterSheetState extends State<FilterSheet> {
   }
 
   Widget _sectionTitle(String title) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 10),
       child: Text(
@@ -135,7 +141,7 @@ class _FilterSheetState extends State<FilterSheet> {
         style: GoogleFonts.inter(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: Colors.grey.shade700,
+          color: theme.colorScheme.onSurfaceVariant,
           letterSpacing: 0.4,
         ),
       ),
@@ -143,6 +149,7 @@ class _FilterSheetState extends State<FilterSheet> {
   }
 
   Widget _buildOpenNowToggle(BuildContext context) {
+    final theme = Theme.of(context);
     return _Row(
       child: SwitchListTile(
         contentPadding: EdgeInsets.zero,
@@ -150,14 +157,14 @@ class _FilterSheetState extends State<FilterSheet> {
         title: Row(
           children: [
             Icon(Icons.access_time_rounded,
-                size: 18, color: Colors.grey.shade600),
+                size: 18, color: theme.colorScheme.onSurfaceVariant),
             const SizedBox(width: 10),
             Text(
               'filter_open_now'.tr(context),
               style: GoogleFonts.inter(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
-                color: AppConstants.darkColor,
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ],
@@ -237,12 +244,13 @@ class _FilterSheetState extends State<FilterSheet> {
   }
 
   Widget _buildFooter(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         border: Border(
-          top: BorderSide(color: Colors.grey.shade200, width: 1),
+          top: BorderSide(color: theme.dividerColor, width: 1),
         ),
       ),
       child: SizedBox(
@@ -280,12 +288,13 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: child,
     );
@@ -305,6 +314,7 @@ class _PillChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -316,12 +326,12 @@ class _PillChoice extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? AppConstants.primaryColor
-                : Colors.white,
+                : theme.cardColor,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: selected
                   ? AppConstants.primaryColor
-                  : Colors.grey.shade300,
+                  : theme.dividerColor,
             ),
           ),
           child: Text(
@@ -329,7 +339,7 @@ class _PillChoice extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: selected ? Colors.white : AppConstants.darkColor,
+              color: selected ? Colors.white : theme.colorScheme.onSurface,
             ),
           ),
         ),

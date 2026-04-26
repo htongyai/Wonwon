@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared/constants/app_colors.dart';
 import 'package:shared/constants/app_text_styles.dart';
 import 'package:shared/constants/app_constants.dart';
 import 'package:wonwon_client/screens/login_screen.dart';
 import 'package:wonwon_client/screens/terms_of_use_screen.dart';
 import 'package:wonwon_client/screens/privacy_policy_screen.dart';
 import 'package:wonwon_client/screens/saved_locations_screen.dart';
+import 'package:wonwon_client/screens/about_screen.dart';
 import 'package:shared/services/auth_service.dart';
 import 'package:wonwon_client/localization/app_localizations.dart' as localization;
 import 'package:wonwon_client/localization/app_localizations_wrapper.dart';
@@ -18,6 +18,8 @@ import 'package:shared/state/app_state_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:wonwon_client/widgets/auth_gate.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared/utils/reload_stub.dart'
+    if (dart.library.html) 'package:shared/utils/reload_web.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -130,15 +132,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final scaffoldBg = isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF2F2F7);
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F2F7),
+      backgroundColor: scaffoldBg,
       appBar: AppBar(
         title: Text(
           'settings'.tr(context),
-          style: AppTextStyles.heading.copyWith(color: AppColors.text, fontSize: 17),
+          style: AppTextStyles.heading.copyWith(
+            color: theme.colorScheme.onSurface,
+            fontSize: 17,
+          ),
         ),
         centerTitle: true,
-        backgroundColor: const Color(0xFFF2F2F7),
+        backgroundColor: scaffoldBg,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
@@ -194,7 +202,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     _buildNavTile(
                       icon: _isResettingPassword ? Icons.hourglass_top : Icons.key_outlined,
-                      iconColor: Colors.blue,
+                      iconColor: AppConstants.primaryColor,
                       title: _isResettingPassword ? '${'change_password'.tr(context)}...' : 'change_password'.tr(context),
                       onTap: _isResettingPassword ? null : () async {
                         final email = _auth.currentUser?.email;
@@ -237,6 +245,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // Appearance section (dark mode)
               _buildAppearanceSection(),
 
+              // About section
+              _buildSectionHeader('about_section_header'.tr(context)),
+              _buildGroupedContainer(
+                children: [
+                  _buildNavTile(
+                    icon: Icons.eco_rounded,
+                    iconColor: AppConstants.primaryColor,
+                    title: 'about_title'.tr(context),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const AboutScreen(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
               // Legal section
               _buildSectionHeader('legal'.tr(context)),
               _buildGroupedContainer(
@@ -272,9 +297,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     _buildDestructiveTile(
                       icon: Icons.logout,
-                      iconColor: Colors.grey.shade600,
+                      iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
                       title: 'logout'.tr(context),
-                      titleColor: Colors.grey.shade800,
+                      titleColor: Theme.of(context).colorScheme.onSurface,
                       onTap: () => _showLogoutConfirmation(context),
                     ),
                   ],
@@ -300,7 +325,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'WonWon v$_appVersion',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade400,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -325,7 +350,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: Colors.grey.shade600,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           letterSpacing: 0.5,
         ),
       ),
@@ -337,11 +362,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildGroupedContainer({required List<Widget> children}) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200, width: 0.5),
+        border: Border.all(color: theme.dividerColor, width: 0.5),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -356,11 +382,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildProfileCard() {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200, width: 0.5),
+        border: Border.all(color: theme.dividerColor, width: 0.5),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
@@ -392,12 +419,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 2),
                 Text(
                   _userEmail ?? 'user_label'.tr(context),
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
           ),
-          Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 22),
+          Icon(
+            Icons.chevron_right,
+            color: theme.colorScheme.onSurfaceVariant,
+            size: 22,
+          ),
         ],
       ),
     );
@@ -408,6 +442,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildSignInCard() {
+    final theme = Theme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -415,9 +450,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       onTap: _handleLogin,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200, width: 0.5),
+          border: Border.all(color: theme.dividerColor, width: 0.5),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         child: Row(
@@ -426,10 +461,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: Colors.grey.shade200,
+                color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: Icon(Icons.person_outline, color: Colors.grey.shade500, size: 26),
+              child: Icon(
+                Icons.person_outline,
+                color: theme.colorScheme.onSurfaceVariant,
+                size: 26,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -443,7 +482,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 2),
                   Text(
                     'login_to_access'.tr(context),
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -512,13 +554,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 1),
                     Text(
                       subtitle,
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
+            Icon(
+              Icons.chevron_right,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -577,15 +626,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildAppearanceSection() {
     return Consumer<AppStateManager>(
       builder: (context, appState, _) {
+        final theme = Theme.of(context);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildSectionHeader('appearance'.tr(context)),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.cardColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200, width: 0.5),
+                border: Border.all(color: theme.dividerColor, width: 0.5),
               ),
               child: Padding(
                 padding:
@@ -612,10 +662,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Expanded(
                       child: Text(
                         'dark_mode'.tr(context),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
-                          color: Colors.black,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -635,15 +685,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildLanguageSection() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader('language'.tr(context)),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200, width: 0.5),
+            border: Border.all(color: theme.dividerColor, width: 0.5),
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -666,11 +717,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: DropdownButton<String>(
                       value: _selectedLanguage,
                       isExpanded: true,
-                      icon: Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
-                      style: const TextStyle(
+                      dropdownColor: theme.cardColor,
+                      icon: Icon(
+                        Icons.chevron_right,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        size: 20,
+                      ),
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
-                        color: Colors.black,
+                        color: theme.colorScheme.onSurface,
                       ),
                       items: [
                         DropdownMenuItem(
@@ -682,17 +738,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           child: Text('thai'.tr(context)),
                         ),
                       ],
-                      onChanged: (value) {
+                      onChanged: (value) async {
                         if (value != null) {
                           AnalyticsService.safeLog(() => AnalyticsService().logLanguageChange(value));
                           setState(() {
                             _selectedLanguage = value;
                           });
-                          localization.AppLocalizationsService.setLocale(value);
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(builder: (context) => const AuthGate()),
-                            (route) => false,
-                          );
+                          // await so prefs actually persist before we reload
+                          await localization.AppLocalizationsService.setLocale(value);
+                          // On web the StreamBuilder rebuild isn't enough on
+                          // Safari — many cached widget subtrees hold stale
+                          // translations. A hard reload picks up the new
+                          // language code from SharedPreferences on boot.
+                          // No-op on mobile (reload_stub.dart).
+                          reload();
                         }
                       },
                     ),
@@ -724,7 +783,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextButton(
               child: Text(
                 "cancel".tr(context),
-                style: TextStyle(color: Colors.grey[600]),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               onPressed: () => Navigator.of(context).pop(),
             ),
@@ -762,7 +823,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             TextButton(
               child: Text(
                 "cancel".tr(context),
-                style: TextStyle(color: Colors.grey[600]),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               onPressed: () => Navigator.of(dialogContext).pop(),
             ),

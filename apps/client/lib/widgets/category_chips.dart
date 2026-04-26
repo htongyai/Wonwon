@@ -25,6 +25,8 @@ class CategoryChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final categories = _cachedCategories;
     final allSubServices = _cachedSubServices;
     final hasSubServices = selectedCategoryId != 'all' &&
@@ -52,12 +54,12 @@ class CategoryChips extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isSelected
                         ? AppConstants.primaryColor
-                        : Colors.white,
+                        : theme.cardColor,
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(
                       color: isSelected
                           ? AppConstants.primaryColor
-                          : const Color(0xFFE8E8E8),
+                          : theme.dividerColor,
                       width: 1,
                     ),
                     boxShadow: isSelected
@@ -71,7 +73,8 @@ class CategoryChips extends StatelessWidget {
                           ]
                         : [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.03),
+                              color: Colors.black
+                                  .withValues(alpha: isDark ? 0.2 : 0.03),
                               blurRadius: 6,
                               offset: const Offset(0, 1),
                             ),
@@ -85,7 +88,7 @@ class CategoryChips extends StatelessWidget {
                         size: 14,
                         color: isSelected
                             ? Colors.white
-                            : const Color(0xFF757575),
+                            : theme.colorScheme.onSurfaceVariant,
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -95,7 +98,7 @@ class CategoryChips extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           color: isSelected
                               ? Colors.white
-                              : const Color(0xFF424242),
+                              : theme.colorScheme.onSurface,
                           letterSpacing: -0.1,
                         ),
                       ),
@@ -121,6 +124,10 @@ class CategoryChips extends StatelessWidget {
 
   Widget _buildSubServiceRow(
       BuildContext context, List<RepairSubService> subServices) {
+    final theme = Theme.of(context);
+    final idleBg = theme.colorScheme.surfaceContainerHighest;
+    final idleBorder = theme.dividerColor;
+    final idleFg = theme.colorScheme.onSurfaceVariant;
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: SizedBox(
@@ -143,12 +150,12 @@ class CategoryChips extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isSelected
                         ? AppConstants.primaryColor.withValues(alpha: 0.15)
-                        : const Color(0xFFF5F5F5),
+                        : idleBg,
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(
                       color: isSelected
                           ? AppConstants.primaryColor.withValues(alpha: 0.4)
-                          : const Color(0xFFE8E8E8),
+                          : idleBorder,
                     ),
                   ),
                   child: Text(
@@ -159,7 +166,7 @@ class CategoryChips extends StatelessWidget {
                           isSelected ? FontWeight.w600 : FontWeight.w500,
                       color: isSelected
                           ? AppConstants.primaryColor
-                          : const Color(0xFF757575),
+                          : idleFg,
                     ),
                   ),
                 ),
@@ -178,12 +185,12 @@ class CategoryChips extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? AppConstants.primaryColor.withValues(alpha: 0.15)
-                      : const Color(0xFFF5F5F5),
+                      : idleBg,
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
                     color: isSelected
                         ? AppConstants.primaryColor.withValues(alpha: 0.4)
-                        : const Color(0xFFE8E8E8),
+                        : idleBorder,
                   ),
                 ),
                 child: Text(
@@ -194,7 +201,7 @@ class CategoryChips extends StatelessWidget {
                         isSelected ? FontWeight.w600 : FontWeight.w500,
                     color: isSelected
                         ? AppConstants.primaryColor
-                        : const Color(0xFF757575),
+                        : idleFg,
                   ),
                 ),
               ),

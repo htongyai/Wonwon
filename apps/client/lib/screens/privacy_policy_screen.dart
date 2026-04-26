@@ -6,11 +6,13 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text('privacy_policy'.tr(context)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
       ),
       body: Padding(
@@ -21,15 +23,16 @@ class PrivacyPolicyScreen extends StatelessWidget {
             children: [
               Text(
                 'privacy_policy'.tr(context),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
                 'Last updated: ${DateTime.now().year}',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 24),
               _buildSection(

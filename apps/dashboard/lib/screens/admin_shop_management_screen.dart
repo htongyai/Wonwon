@@ -38,7 +38,7 @@ class _AdminShopManagementScreenState
   final ShopService _shopService = ShopService();
 
   String _searchQuery = '';
-  String _statusFilter = 'all'; // all, approved, pending
+  String _statusFilter = 'all'; // all, approved, pending, rejected
   String _categoryFilter = 'all';
   String _sortBy = 'name';
   bool _sortAscending = true;
@@ -357,9 +357,30 @@ class _AdminShopManagementScreenState
       }
 
       // Status filter
+      // Three-way: approved / pending / rejected. We key on
+      // shop.approvalStatus rather than the legacy bool because the
+      // bool can't distinguish "not yet reviewed" from "explicitly
+      // rejected" — both are `approved == false`. Without this branch
+      // the rejected items pollute the pending queue forever.
       if (_statusFilter != 'all') {
-        if (_statusFilter == 'approved' && !shop.approved) return false;
-        if (_statusFilter == 'pending' && shop.approved) return false;
+        if (_statusFilter == 'approved' &&
+            !(shop.approved && shop.approvalStatus != 'rejected')) {
+          return false;
+        }
+        if (_statusFilter == 'pending') {
+          // Pending = not yet reviewed: not approved AND not rejected.
+          if (shop.approved || shop.approvalStatus == 'rejected') {
+            return false;
+          }
+        }
+        if (_statusFilter == 'rejected' && shop.approvalStatus != 'rejected') {
+          return false;
+        }
+      } else {
+        // "all" should hide rejected by default — these are not
+        // actionable in the main list and have their own filter for
+        // when an admin needs to review them.
+        if (shop.approvalStatus == 'rejected') return false;
       }
 
       // Category filter
@@ -452,6 +473,7 @@ class _AdminShopManagementScreenState
         DropdownMenuItem(value: 'all', child: Text('admin_all_status'.tr(context))),
         DropdownMenuItem(value: 'approved', child: Text('approved'.tr(context))),
         DropdownMenuItem(value: 'pending', child: Text('admin_filter_pending'.tr(context))),
+        DropdownMenuItem(value: 'rejected', child: Text('admin_filter_rejected'.tr(context))),
       ],
       onChanged: (value) { safeSetState(() { _statusFilter = value!; }); },
     );
@@ -561,21 +583,27 @@ class _AdminShopManagementScreenState
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  shop.approved
+                              color: shop.approvalStatus == 'rejected'
+                                  ? const Color(0xFFEF4444).withValues(alpha: 0.1)
+                                  : shop.approved
                                       ? const Color(0xFF10B981).withValues(alpha: 0.1)
                                       : const Color(
-                                        0xFFF59E0B,
-                                      ).withValues(alpha: 0.1),
+                                          0xFFF59E0B,
+                                        ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              shop.approved ? 'admin_status_approved'.tr(context) : 'admin_status_pending'.tr(context),
+                              shop.approvalStatus == 'rejected'
+                                  ? 'admin_filter_rejected'.tr(context)
+                                  : shop.approved
+                                      ? 'admin_status_approved'.tr(context)
+                                      : 'admin_status_pending'.tr(context),
                               style: GoogleFonts.inter(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
-                                color:
-                                    shop.approved
+                                color: shop.approvalStatus == 'rejected'
+                                    ? const Color(0xFFEF4444)
+                                    : shop.approved
                                         ? const Color(0xFF10B981)
                                         : const Color(0xFDF59E0B),
                               ),
@@ -799,8 +827,13 @@ class _AdminShopManagementScreenState
                     'rating'.tr(context),
                     '${shop.rating.toStringAsFixed(1)} (${shop.reviewCount} reviews)',
                   ),
-                  _buildDetailRow('categories'.tr(context), shop.categories.join(', ')),
-                  _buildDetailRow('price_range'.tr(context), shop.priceRange),
+                  _buildDetailRow(
+                    'categories'.tr(context),
+                    shop.categories
+                        .map((c) => 'category_${c.toLowerCase()}'.tr(context))
+                        .join(', '),
+                  ),
+                  _buildDetailRow('price_range'.tr(context), shop.priceRange.trim().isEmpty ? 'not_set'.tr(context) : shop.priceRange),
                   _buildDetailRow(
                     'status_label'.tr(context),
                     shop.approved ? 'approved'.tr(context) : 'admin_filter_pending'.tr(context),
@@ -949,40 +982,58 @@ class _AdminShopManagementScreenState
 
   void _rejectShop(RepairShop shop) async {
     final reasonController = TextEditingController();
+    // Track validity reactively so the Reject button stays disabled
+    // until a non-empty reason is typed. We require a reason because:
+    //   - the shop owner needs to know what to fix on resubmission
+    //   - audit trail: future admins reviewing the queue need
+    //     context for why this was rejected
+    // Empty/whitespace-only is treated the same as no input.
     final result = await showDialog<String?>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('admin_reject_shop'.tr(context)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'admin_confirm_reject_shop'.tr(context).replaceAll('{shop_name}', shop.name),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final reasonValid = reasonController.text.trim().isNotEmpty;
+          return AlertDialog(
+            title: Text('admin_reject_shop'.tr(context)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'admin_confirm_reject_shop'.tr(context).replaceAll('{shop_name}', shop.name),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonController,
+                  decoration: InputDecoration(
+                    labelText: 'rejection_reason_label'.tr(context),
+                    hintText: 'rejection_reason_hint'.tr(context),
+                    border: const OutlineInputBorder(),
+                    errorText: reasonValid
+                        ? null
+                        : 'rejection_reason_required'.tr(context),
+                  ),
+                  maxLines: 3,
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: InputDecoration(
-                labelText: 'rejection_reason_label'.tr(context),
-                hintText: 'rejection_reason_hint'.tr(context),
-                border: const OutlineInputBorder(),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(null),
+                child: Text('cancel'.tr(context)),
               ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(null),
-            child: Text('cancel'.tr(context)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(reasonController.text),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            child: Text('admin_reject'.tr(context)),
-          ),
-        ],
+              ElevatedButton(
+                onPressed: reasonValid
+                    ? () => Navigator.of(context)
+                        .pop(reasonController.text.trim())
+                    : null,
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                child: Text('admin_reject'.tr(context)),
+              ),
+            ],
+          );
+        },
       ),
     );
     reasonController.dispose();
@@ -994,7 +1045,7 @@ class _AdminShopManagementScreenState
         await FirebaseFirestore.instance.collection('shops').doc(shop.id).update({
           'approved': false,
           'approvalStatus': 'rejected',
-          'rejectionReason': result.isNotEmpty ? result : null,
+          'rejectionReason': result,
         });
 
         if (!mounted) return;
@@ -3005,28 +3056,29 @@ class _EditShopDialogState extends State<_EditShopDialog> {
   }
 
   void _copyMondayHours() {
-    final mondayOpen = _openingTimes['monday'];
-    final mondayClose = _closingTimes['monday'];
+    // The time maps use 3-letter keys ('mon', 'tue', ...) — not full names.
+    final mondayOpen = _openingTimes['mon'];
+    final mondayClose = _closingTimes['mon'];
 
-    if (mondayOpen != null && mondayClose != null) {
-      setState(() {
-        for (String day in [
-          'tuesday',
-          'wednesday',
-          'thursday',
-          'friday',
-          'saturday',
-          'sunday',
-        ]) {
-          if (!_closedDays.containsKey(day) || !_closedDays[day]!) {
-            _openingTimes[day] = mondayOpen;
-            _closingTimes[day] = mondayClose;
-            _openingTimeControllers[day]?.text = mondayOpen.format(context);
-            _closingTimeControllers[day]?.text = mondayClose.format(context);
-          }
-        }
-      });
+    if (mondayOpen == null || mondayClose == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('admin_set_monday_first'.tr(context)),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
     }
+
+    setState(() {
+      for (final day in ['tue', 'wed', 'thu', 'fri', 'sat', 'sun']) {
+        if (_closedDays[day] == true) continue;
+        _openingTimes[day] = mondayOpen;
+        _closingTimes[day] = mondayClose;
+        _openingTimeControllers[day]?.text = mondayOpen.format(context);
+        _closingTimeControllers[day]?.text = mondayClose.format(context);
+      }
+    });
   }
 
   void _clearAllHours() {
@@ -3452,13 +3504,23 @@ class _AddShopDialogState extends State<_AddShopDialog> {
   }
 
   // Convert slider value to baht symbols
-  // Photo bytes from Google Maps extraction
+  // Photo bytes from Google Maps extraction (held transiently until uploaded)
   Uint8List? _prefillPhotoBytes;
+  // Shown under the Cover Image row while the prefill photo is uploading.
+  bool _isUploadingPrefillPhoto = false;
 
   @override
   void initState() {
     super.initState();
     _applyPrefillData();
+    // If the Maps import provided a photo, upload it in the background so
+    // the Cover Image field fills in without manual picking.
+    if (_prefillPhotoBytes != null) {
+      // Defer until after first frame so setState is safe.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _uploadPrefillPhoto();
+      });
+    }
   }
 
   /// Apply pre-filled data from Google Maps link extraction
@@ -3522,8 +3584,49 @@ class _AddShopDialogState extends State<_AddShopDialog> {
       }
     }
 
-    // Photo from extraction
+    // Photo from extraction — held here; uploaded in initState after first frame.
     _prefillPhotoBytes = widget.prefillPhoto;
+  }
+
+  /// Upload the Google-Maps-extracted photo bytes to Firebase Storage and
+  /// set [_uploadedImageUrl] so the Cover Image section renders the preview.
+  /// Fires on widget init if [widget.prefillPhoto] was provided.
+  Future<void> _uploadPrefillPhoto() async {
+    final bytes = _prefillPhotoBytes;
+    if (bytes == null) return;
+    if (!mounted) return;
+    setState(() => _isUploadingPrefillPhoto = true);
+    try {
+      final fileName =
+          'shop_import_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('shop_photos')
+          .child(fileName);
+      final uploadTask = storageRef.putData(
+        bytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      if (!mounted) return;
+      setState(() {
+        _uploadedImageUrl = downloadUrl;
+        _selectedImagePath = fileName;
+        _isUploadingPrefillPhoto = false;
+        // Drop the raw bytes — we have the URL now.
+        _prefillPhotoBytes = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUploadingPrefillPhoto = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${'admin_error_uploading_image'.tr(context)}: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   String _formatPriceRange(double value) {
@@ -3926,28 +4029,29 @@ class _AddShopDialogState extends State<_AddShopDialog> {
   }
 
   void _copyMondayHours() {
-    final mondayOpen = _openingTimes['monday'];
-    final mondayClose = _closingTimes['monday'];
+    // The time maps use 3-letter keys ('mon', 'tue', ...) — not full names.
+    final mondayOpen = _openingTimes['mon'];
+    final mondayClose = _closingTimes['mon'];
 
-    if (mondayOpen != null && mondayClose != null) {
-      setState(() {
-        for (String day in [
-          'tuesday',
-          'wednesday',
-          'thursday',
-          'friday',
-          'saturday',
-          'sunday',
-        ]) {
-          if (!_closedDays.containsKey(day) || !_closedDays[day]!) {
-            _openingTimes[day] = mondayOpen;
-            _closingTimes[day] = mondayClose;
-            _openingTimeControllers[day]?.text = mondayOpen.format(context);
-            _closingTimeControllers[day]?.text = mondayClose.format(context);
-          }
-        }
-      });
+    if (mondayOpen == null || mondayClose == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('admin_set_monday_first'.tr(context)),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
     }
+
+    setState(() {
+      for (final day in ['tue', 'wed', 'thu', 'fri', 'sat', 'sun']) {
+        if (_closedDays[day] == true) continue;
+        _openingTimes[day] = mondayOpen;
+        _closingTimes[day] = mondayClose;
+        _openingTimeControllers[day]?.text = mondayOpen.format(context);
+        _closingTimeControllers[day]?.text = mondayClose.format(context);
+      }
+    });
   }
 
   void _clearAllHours() {
@@ -4777,7 +4881,52 @@ class _AddShopDialogState extends State<_AddShopDialog> {
             ),
           ),
           const SizedBox(height: 12),
-          if (_uploadedImageUrl != null || _selectedImagePath != null) ...[
+          // While the Google-Maps photo is uploading, show a live preview of
+          // the bytes so the user sees immediate feedback.
+          if (_isUploadingPrefillPhoto && _prefillPhotoBytes != null) ...[
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(
+                    _prefillPhotoBytes!,
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(
+                            color: AppConstants.primaryColor,
+                            strokeWidth: 2.5,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'admin_uploading_image'.tr(context),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ] else if (_uploadedImageUrl != null || _selectedImagePath != null) ...[
             Container(
               width: double.infinity,
               height: 200,
@@ -4810,7 +4959,7 @@ class _AddShopDialogState extends State<_AddShopDialog> {
               Expanded(
                 flex: 3,
                 child: ElevatedButton.icon(
-                  onPressed: _pickImage,
+                  onPressed: _isUploadingPrefillPhoto ? null : _pickImage,
                   icon: const Icon(Icons.upload, size: 20),
                   label: Text(
                     _uploadedImageUrl != null || _selectedImagePath != null
@@ -4987,13 +5136,9 @@ class _GoogleMapsLinkExtractDialogState
       return;
     }
 
-    // Warn about shortened URLs on web
-    if (kIsWeb && GoogleMapsLinkService.isShortenedUrl(url)) {
-      setState(() {
-        _errorMessage = 'short_link_explanation'.tr(context);
-      });
-      return;
-    }
+    // Note: shortened URLs (maps.app.goo.gl, goo.gl) are now resolved
+    // server-side by the `resolveShortUrl` Cloud Function, so we no
+    // longer block them on web here.
 
     setState(() {
       _isExtracting = true;
@@ -5275,6 +5420,41 @@ class _GoogleMapsLinkExtractDialogState
           style: TextStyle(fontSize: 14, color: Colors.grey[600]),
         ),
         const SizedBox(height: 20),
+
+        // Soft warning if the imported coords fall outside the
+        // Thailand bounding box. Doesn't block the import — admin
+        // may legitimately add a non-Thai shop — but flags the
+        // common mistake of pasting the wrong link.
+        if (!GoogleMapsLinkService.isInsideThailandBounds(
+            result.latitude, result.longitude)) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFB45309).withValues(alpha: 0.45)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    size: 16, color: Color(0xFFB45309)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'import_outside_thailand_warning'.tr(context),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFB45309),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
 
         // Extracted data list
         Container(

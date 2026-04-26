@@ -430,18 +430,15 @@ class _AddShopScreenState extends State<AddShopScreen> {
                   ),
                   SizedBox(height: ResponsiveSize.getHeight(4)),
 
-                  // Description
+                  // Description — optional. Google Maps imports rarely
+                  // include a description, so requiring it would block
+                  // the common "import → save" flow.
                   _buildTextFormField(
                     controller: _descriptionController,
-                    label: 'shop_description_label'.tr(context),
+                    label: '${'shop_description_label'.tr(context)} (${'optional'.tr(context)})',
                     hint: 'enter_description_hint'.tr(context),
                     maxLines: 3,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'please_enter_description'.tr(context);
-                      }
-                      return null;
-                    },
+                    validator: (_) => null,
                   ),
                   SizedBox(height: ResponsiveSize.getHeight(4)),
 
@@ -1166,17 +1163,17 @@ class _AddShopScreenState extends State<AddShopScreen> {
         setState(() {
           _isExtractingLink = false;
         });
-        // Show specific message for shortened URLs on web
-        if (kIsWeb && GoogleMapsLinkService.isShortenedUrl(url)) {
-          _showShortenedUrlHelpDialog();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('location_extract_failed'.tr(context)),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        // Shortened URLs (maps.app.goo.gl, goo.gl) are now resolved
+        // server-side by the `resolveShortUrl` Cloud Function — see
+        // GoogleMapsLinkService._resolveViaCloudFunction. So a null
+        // result here is a real parse failure regardless of whether the
+        // input was a short URL.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('location_extract_failed'.tr(context)),
+            backgroundColor: Colors.red,
+          ),
+        );
         return;
       }
 
@@ -1427,6 +1424,37 @@ class _AddShopScreenState extends State<AddShopScreen> {
             children: [
               Text('fields_auto_filled'.tr(ctx).replaceAll('{count}', '$count'),
                   style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+              if (!GoogleMapsLinkService.isInsideThailandBounds(
+                  result.latitude, result.longitude)) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: const Color(0xFFB45309).withValues(alpha: 0.45)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          size: 16, color: Color(0xFFB45309)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'import_outside_thailand_warning'.tr(ctx),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFB45309),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               ...items.map((item) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -1460,86 +1488,6 @@ class _AddShopScreenState extends State<AddShopScreen> {
   }
 
   /// Try to match a geocoded province name to the dropdown values.
-  void _showShortenedUrlHelpDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.info_outline, color: Colors.orange[700], size: 24),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'short_link_title'.tr(ctx),
-                style: TextStyle(
-                  color: Colors.orange[700],
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'short_link_explanation'.tr(ctx),
-              style: TextStyle(color: Colors.grey[700], fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            _buildHelpStep(ctx, '1', 'short_link_step1'.tr(ctx)),
-            _buildHelpStep(ctx, '2', 'short_link_step2'.tr(ctx)),
-            _buildHelpStep(ctx, '3', 'short_link_step3'.tr(ctx)),
-          ],
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(
-              'ok_label'.tr(ctx),
-              style: TextStyle(color: AppConstants.primaryColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHelpStep(BuildContext ctx, String number, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: AppConstants.primaryColor,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              number,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(text, style: TextStyle(color: Colors.grey[700], fontSize: 14)),
-          ),
-        ],
-      ),
-    );
-  }
-
   String? _matchProvince(String province) {
     final normalized = province.trim().toLowerCase();
 

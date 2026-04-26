@@ -18,6 +18,67 @@ class SavedShopService {
     return _shopService.getShopsByIds(ids);
   }
 
+  /// Resolve the current user's saved shops using per-ID `doc.get()` so we
+  /// can distinguish three outcomes for each ID:
+  ///
+  /// * `shops` — documents that loaded cleanly.
+  /// * `confirmedMissing` — documents whose `doc.exists == false`, i.e. the
+  ///   shop has been deleted from Firestore.
+  /// * `unresolved` — the read threw (permission denied, offline, transient
+  ///   error). These IDs should NOT be auto-deleted from the user's saved
+  ///   list; the shop may come back online or an admin may re-approve it.
+  ///
+  /// QA bug: the previous implementation used a single `whereIn` query and
+  /// treated any ID that wasn't returned as an orphan, which incorrectly
+  /// deleted IDs for shops that were simply rules-blocked (e.g. pending
+  /// re-approval). The badge count had already been cached before the list
+  /// screen ran its cleanup, so the user saw a positive count alongside an
+  /// empty list.
+  Future<
+          ({
+            List<RepairShop> shops,
+            List<String> confirmedMissing,
+            List<String> unresolved,
+          })>
+      resolveSavedShopsSafely() async {
+    final ids = await getSavedShopIds();
+    if (ids.isEmpty) {
+      return (shops: <RepairShop>[], confirmedMissing: <String>[], unresolved: <String>[]);
+    }
+
+    final shops = <RepairShop>[];
+    final confirmedMissing = <String>[];
+    final unresolved = <String>[];
+
+    // Run per-ID reads in parallel; each one catches its own errors so a
+    // single bad doc can't poison the whole batch.
+    await Future.wait(ids.map((id) async {
+      try {
+        final doc = await _firestore.collection('shops').doc(id).get();
+        if (!doc.exists) {
+          confirmedMissing.add(id);
+          return;
+        }
+        final data = doc.data();
+        if (data == null) {
+          unresolved.add(id);
+          return;
+        }
+        data['id'] = doc.id;
+        shops.add(RepairShop.fromMap(data));
+      } catch (e) {
+        appLog('Failed to resolve saved shop $id: $e');
+        unresolved.add(id);
+      }
+    }));
+
+    return (
+      shops: shops,
+      confirmedMissing: confirmedMissing,
+      unresolved: unresolved,
+    );
+  }
+
   // Get all saved shops for the current user
   Future<List<String>> getSavedShopIds() async {
     // Check if user is logged in

@@ -13,10 +13,11 @@ class SearchAnalyticsWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     try {
+      final theme = Theme.of(context);
       return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -43,7 +44,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade800,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
             ],
@@ -60,6 +61,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
   }
 
   Widget _buildAnalyticsContent(BuildContext context) {
+    final theme = Theme.of(context);
     final analytics = searchService.getSearchAnalytics();
     final totalSearches = (analytics['totalSearches'] as int?) ?? 0;
     final uniqueSearches = (analytics['uniqueSearches'] as int?) ?? 0;
@@ -75,6 +77,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
           children: [
             Expanded(
               child: _buildStatCard(
+                context,
                 'total_searches'.tr(context),
                 totalSearches.toString(),
                 Icons.search,
@@ -83,6 +86,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
+                context,
                 'unique_terms'.tr(context),
                 uniqueSearches.toString(),
                 Icons.tag,
@@ -98,7 +102,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 8),
@@ -106,6 +110,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
               .take(5)
               .map(
                 (search) => _buildTopSearchItem(
+                  context,
                   search['term'] as String,
                   search['count'] as int,
                 ),
@@ -117,11 +122,17 @@ class SearchAnalyticsWidget extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
+                Icon(
+                  Icons.search_off,
+                  size: 48,
+                  color: theme.colorScheme.onSurfaceVariant
+                      .withValues(alpha: 0.6),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   'no_search_data'.tr(context),
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                  style: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
                 ),
               ],
             ),
@@ -130,7 +141,9 @@ class SearchAnalyticsWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon) {
+  Widget _buildStatCard(
+      BuildContext context, String label, String value, IconData icon) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -152,14 +165,16 @@ class SearchAnalyticsWidget extends StatelessWidget {
           ),
           Text(
             label,
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            style: TextStyle(
+                fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTopSearchItem(String term, int count) {
+  Widget _buildTopSearchItem(BuildContext context, String term, int count) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -167,7 +182,11 @@ class SearchAnalyticsWidget extends StatelessWidget {
           Expanded(
             child: Text(
               term,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: theme.colorScheme.onSurface,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -175,7 +194,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.grey.shade200,
+              color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -183,7 +202,7 @@ class SearchAnalyticsWidget extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: Colors.grey.shade700,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),

@@ -29,6 +29,7 @@ class EmptyStateWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: padding ?? const EdgeInsets.all(32),
       child: Column(
@@ -43,7 +44,7 @@ class EmptyStateWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(40),
             ),
             child: Center(
-              child: faIcon ?? 
+              child: faIcon ??
                 Icon(
                   icon ?? Icons.inbox_outlined,
                   size: 40,
@@ -51,27 +52,27 @@ class EmptyStateWidget extends StatelessWidget {
                 ),
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Title
           Text(
             title,
             style: GoogleFonts.montserrat(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[800],
+              color: theme.colorScheme.onSurface,
             ),
             textAlign: TextAlign.center,
           ),
-          
+
           if (subtitle != null) ...[
             const SizedBox(height: 8),
             Text(
               subtitle!,
               style: GoogleFonts.montserrat(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: theme.colorScheme.onSurfaceVariant,
                 height: 1.4,
               ),
               textAlign: TextAlign.center,

@@ -96,6 +96,21 @@ class ReviewService {
         transaction.update(shopRef, {'rating': newAverage, 'reviewCount': newCount});
       });
 
+      // Increment a denormalized reviewCount on the user document so the
+      // profile screen can reflect the change in realtime via its
+      // existing user-doc stream listener — no collectionGroup query or
+      // composite index required. Failures here must not block the
+      // review from being written.
+      try {
+        await _firestore
+            .collection('users')
+            .doc(review.userId)
+            .set({'reviewCount': FieldValue.increment(1)},
+                SetOptions(merge: true));
+      } catch (e) {
+        appLog('Error incrementing user reviewCount: $e');
+      }
+
       // Record review analytics
       try {
         await ShopAnalyticsService().recordReview(review.shopId);
@@ -171,6 +186,11 @@ class ReviewService {
       final deletedRating = reviewDoc.exists
           ? (reviewDoc.data()?['rating'] as num?)?.toDouble() ?? 0.0
           : 0.0;
+      // Capture the author uid before deletion so we can decrement their
+      // user-level reviewCount without a second read.
+      final reviewAuthorUid = reviewDoc.exists
+          ? (reviewDoc.data()?['userId'] as String? ?? reviewAuthorId)
+          : reviewAuthorId;
 
       // Delete the review
       await _firestore
@@ -179,6 +199,22 @@ class ReviewService {
           .collection('review')
           .doc(reviewId)
           .delete();
+
+      // Decrement the author's denormalized reviewCount so the profile
+      // screen updates in realtime. Clamp to zero via a transaction to
+      // avoid negative values if the counter was out of sync.
+      try {
+        final userRef = _firestore.collection('users').doc(reviewAuthorUid);
+        await _firestore.runTransaction((transaction) async {
+          final userDoc = await transaction.get(userRef);
+          final current =
+              (userDoc.data()?['reviewCount'] as num?)?.toInt() ?? 0;
+          final next = current > 0 ? current - 1 : 0;
+          transaction.set(userRef, {'reviewCount': next}, SetOptions(merge: true));
+        });
+      } catch (e) {
+        appLog('Error decrementing user reviewCount: $e');
+      }
 
       // Update average rating decrementally (no need to fetch all reviews)
       final shopRef = _firestore.collection('shops').doc(shopId);
