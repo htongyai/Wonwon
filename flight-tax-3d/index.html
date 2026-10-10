@@ -1,0 +1,240 @@
+<title>Thailand Departure Fee 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: full-width 3D airfield stage on top, scenario switch + route case-study table below */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --fg:#14202b; --muted:#5b6876; --line:#d3d9e0;
+  --base:#7f93a8; --old:#2f6db5; --hike:#d6342c; --prop:#e8a317;
+  --display:"Anuphan",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f151c; --panel:#18212b; --fg:#e6ecf2; --muted:#93a1b0; --line:#2a3644;
+  --base:#5d7187; --old:#4f8ad6; --hike:#ef5148; --prop:#f2b33a; color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f151c; --panel:#18212b; --fg:#e6ecf2; --muted:#93a1b0; --line:#2a3644;
+  --base:#5d7187; --old:#4f8ad6; --hike:#ef5148; --prop:#f2b33a; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--display);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 16px 48px;display:grid;gap:20px}
+h1{font-size:clamp(26px,4vw,40px);line-height:1.1;margin:0;text-wrap:balance}
+.lede{color:var(--muted);max-width:68ch;margin:6px 0 0}
+.big{color:var(--hike)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.stat b{font-family:var(--mono);font-size:22px;display:block;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:13px}
+.stage{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+#c{display:block;width:100%;height:min(560px,70vw);min-height:340px;cursor:grab;touch-action:none}
+.hint{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--muted);font-family:var(--mono)}
+#tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.15);max-width:240px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.seg{display:flex;flex-wrap:wrap;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px}
+.seg button{font:600 14px var(--display);border:0;background:transparent;color:var(--fg);padding:8px 12px;border-radius:6px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+button:focus-visible{outline:2px solid var(--old);outline-offset:2px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.tablebox{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:14px}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+th{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+td.num{font-family:var(--mono)}
+tr.sel td{background:color-mix(in srgb,var(--hike) 10%,transparent)}
+tbody tr{cursor:pointer}
+.bar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;min-width:80px}
+.bar div{height:100%;background:var(--hike)}
+.notes{font-size:13px;color:var(--muted);display:grid;gap:6px;max-width:80ch}
+.notes a{color:var(--old)}
+h2{font-size:20px;margin:0}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Leaving Thailand costs <span class="big">฿390 more</span> per ticket, and cheap flights carry most of it</h1>
+    <p class="lede">From 20 June 2026, Airports of Thailand raised the international passenger service charge from ฿730 to ฿1,120 at all six AOT airports. Each tower below is one real route. Its height is the total one‑way ticket. The red band is the increase.</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><b>฿730 → ฿1,120</b><span>International PSC, +53%</span></div>
+    <div class="stat"><b>฿130</b><span>Domestic PSC, unchanged</span></div>
+    <div class="stat"><b>~฿10 bn / yr</b><span>Extra AOT revenue (AOT estimate)</span></div>
+    <div class="stat"><b>+฿1,000</b><span>Proposed departure tax, under public comment to 29 Oct 2026</span></div>
+  </div>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Scenario">
+      <button id="s0" data-s="0">Before 20 Jun</button>
+      <button id="s1" data-s="1" aria-pressed="true">Now (฿1,120)</button>
+      <button id="s2" data-s="2">If ฿1,000 tax passes</button>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--base)"></i>Base fare + other taxes</span>
+      <span><i style="background:var(--old)"></i>Old PSC ฿730</span>
+      <span><i style="background:var(--hike)"></i>Increase ฿390</span>
+      <span><i style="background:var(--prop)"></i>Proposed ฿1,000</span>
+    </div>
+  </div>
+
+  <div class="stage">
+    <canvas id="c" aria-label="3D map of Thailand's six AOT airports with route towers"></canvas>
+    <div id="tip" hidden></div>
+    <div class="hint">Drag to rotate · scroll/pinch to zoom · tap a tower</div>
+  </div>
+
+  <h2>Route case studies</h2>
+  <div class="tablebox">
+    <table>
+      <thead><tr><th>Route</th><th>Who flies it</th><th>Typical fare*</th><th>Fees then</th><th>Fees now</th><th>Ticket change</th><th>Increase as % of fare</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <div class="notes">
+    <p>* Typical fares are approximate one‑way economy fares before the PSC, for illustration. They are not live quotes and vary with season and booking date. The PSC amounts (฿730, ฿1,120, ฿130) and the proposed ฿1,000 tax come from the sources below.</p>
+    <p>Minimum wage is roughly ฿400 a day, so the ฿390 increase is about one day's pay for a worker flying home to Yangon or Vientiane.</p>
+    <p>Sources: <a href="https://www.tatnews.org/2026/05/airports-of-thailand-to-raise-international-passenger-service-charge-from-20-june-2026/" target="_blank" rel="noopener">TAT Newsroom</a> · <a href="https://www.nationthailand.com/news/general/40059211" target="_blank" rel="noopener">Nation Thailand</a> · <a href="https://www.thailand-business-news.com/tourism/308365-airports-of-thailand-to-increase-international-passenger-service-fees-starting-june-20-2026" target="_blank" rel="noopener">Thailand Business News</a> · <a href="https://travelsmarterasia.com/guides/thailand-airport-departure-charge/" target="_blank" rel="noopener">Travel Smarter Asia</a> · <a href="https://www.nationthailand.com/news/policy/40072003" target="_blank" rel="noopener">Nation: fees could reach ฿2,570</a></p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const AIRPORTS={
+  BKK:{name:"Suvarnabhumi",lat:13.69,lon:100.75},
+  DMK:{name:"Don Mueang",lat:13.91,lon:100.61},
+  CNX:{name:"Chiang Mai",lat:18.77,lon:98.96},
+  CEI:{name:"Chiang Rai (Mae Fah Luang)",lat:19.95,lon:99.88},
+  HKT:{name:"Phuket",lat:8.11,lon:98.31},
+  HDY:{name:"Hat Yai",lat:6.93,lon:100.39}
+};
+const ROUTES=[
+  {from:"DMK",to:"Kuala Lumpur",fare:1500,who:"Budget travellers, students"},
+  {from:"DMK",to:"Yangon",fare:1800,who:"Myanmar migrant workers"},
+  {from:"DMK",to:"Vientiane",fare:1700,who:"Lao workers, cross-border family"},
+  {from:"BKK",to:"Singapore",fare:2800,who:"Business, tourists"},
+  {from:"BKK",to:"Tokyo",fare:8500,who:"Thai holidaymakers"},
+  {from:"BKK",to:"Seoul",fare:7000,who:"Thai holidaymakers, workers"},
+  {from:"BKK",to:"London",fare:22000,who:"Long-haul tourists, students"},
+  {from:"HKT",to:"Singapore",fare:2200,who:"Island tourists"},
+  {from:"HKT",to:"Sydney",fare:10500,who:"Australian tourists"},
+  {from:"CNX",to:"Taipei",fare:4200,who:"Northern Thai tourists"},
+  {from:"CEI",to:"Kunming",fare:3200,who:"Cross-border trade, tourists"},
+  {from:"HDY",to:"Kuala Lumpur",fare:1200,who:"Southern families, pilgrims"}
+];
+const OLD=730,NEW=1120,PROP=1000;
+let scenario=1,selected=-1;
+const fmt=n=>"฿"+Math.round(n).toLocaleString("en-US");
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* ---------- table ---------- */
+const tbody=document.getElementById("rows");
+function renderTable(){
+  tbody.innerHTML="";
+  ROUTES.forEach((r,i)=>{
+    const thenF=OLD, nowF=NEW+(scenario===2?PROP:0);
+    const delta=nowF-thenF, pct=delta/r.fare*100;
+    const tr=document.createElement("tr");
+    if(i===selected)tr.className="sel";
+    tr.innerHTML=`<td><b>${r.from}</b> → ${r.to}</td><td>${r.who}</td><td class="num">${fmt(r.fare)}</td><td class="num">${fmt(thenF)}</td><td class="num">${fmt(scenario===0?OLD:nowF)}</td><td class="num">${scenario===0?"—":"+"+fmt(delta)}</td>
+    <td><div style="display:flex;gap:8px;align-items:center"><div class="bar" style="flex:1"><div style="width:${scenario===0?0:Math.min(pct,100)}%"></div></div><span class="num" style="font-family:var(--mono);min-width:48px">${scenario===0?"0%":pct.toFixed(0)+"%"}</span></div></td>`;
+    tr.onclick=()=>select(i);
+    tbody.appendChild(tr);
+  });
+}
+
+/* ---------- 3D ---------- */
+const canvas=document.getElementById("c");
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(40,1,0.1,500);
+scene.add(new THREE.HemisphereLight(0xffffff,0x667788,0.9));
+const sun=new THREE.DirectionalLight(0xffffff,0.7);sun.position.set(20,40,15);scene.add(sun);
+
+const proj=(lat,lon)=>new THREE.Vector3((lon-100.2)*3.2,0,-(lat-13)*3.2);
+// ground
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(60,70),new THREE.MeshLambertMaterial({color:0x888888}));
+ground.rotation.x=-Math.PI/2;ground.position.y=-0.01;scene.add(ground);
+const grid=new THREE.GridHelper(60,30,0x999999,0x999999);grid.material.opacity=.25;grid.material.transparent=true;scene.add(grid);
+
+// airport pads + labels
+function label(text,size=28){
+  const c=document.createElement("canvas"),x=c.getContext("2d");
+  x.font=`600 ${size}px Anuphan, sans-serif`;const w=x.measureText(text).width+20;
+  c.width=w;c.height=size+16;x.font=`600 ${size}px Anuphan, sans-serif`;
+  x.fillStyle=css("--fg")||"#14202b";x.fillText(text,10,size);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false}));
+  s.scale.set(w/40,(size+16)/40,1);return s;
+}
+const labels=[];
+const SCALE=1/700; // height units per baht
+const groups=[];
+const byAirport={};
+ROUTES.forEach((r,i)=>{(byAirport[r.from]=byAirport[r.from]||[]).push(i)});
+Object.entries(AIRPORTS).forEach(([code,a])=>{
+  const p=proj(a.lat,a.lon);
+  const pad=new THREE.Mesh(new THREE.CylinderGeometry(2.6,2.6,.15,40),new THREE.MeshLambertMaterial({color:0xbfc7cf}));
+  pad.position.copy(p);scene.add(pad);
+  const l=label(code+" · "+a.name,24);l.position.set(p.x,0.6,p.z+3.4);scene.add(l);labels.push(l);
+  const idx=byAirport[code]||[];
+  idx.forEach((ri,k)=>{
+    const ang=idx.length===1?0:(k/idx.length)*Math.PI*2;
+    const rad=idx.length===1?0:1.4;
+    const g=new THREE.Group();g.position.set(p.x+Math.cos(ang)*rad,0,p.z+Math.sin(ang)*rad);
+    g.userData.i=ri;scene.add(g);groups[ri]=g;
+  });
+});
+const mats={};
+function mat(v){return mats[v]||(mats[v]=new THREE.MeshLambertMaterial({color:new THREE.Color(css(v))}))}
+const boxGeo=new THREE.BoxGeometry(.9,1,.9);
+const pickables=[];
+function seg(g,h,y,matv,i){
+  const m=new THREE.Mesh(boxGeo,mat(matv));m.scale.y=Math.max(h,0.001);m.position.y=y+h/2;m.userData.i=i;g.add(m);pickables.push(m);return y+h;
+}
+// animated heights
+const cur=ROUTES.map(()=>({b:0,o:0,h:0,p:0}));
+function target(r){return{b:r.fare*SCALE,o:OLD*SCALE,h:scenario>=1?(NEW-OLD)*SCALE:0,p:scenario===2?PROP*SCALE:0}}
+function build(){
+  pickables.length=0;
+  ROUTES.forEach((r,i)=>{
+    const g=groups[i];while(g.children.length)g.remove(g.children[0]);
+    const c=cur[i];let y=0;
+    y=seg(g,c.b,y,"--base",i);y=seg(g,c.o,y,"--old",i);y=seg(g,c.h,y,"--hike",i);y=seg(g,c.p,y,"--prop",i);
+    if(i===selected){const ring=new THREE.Mesh(new THREE.TorusGeometry(.9,.08,8,32),mat("--hike"));ring.rotation.x=Math.PI/2;ring.position.y=.05;g.add(ring)}
+  });
+}
+// camera orbit
+let theta=-0.6,phi=0.95,dist=62;const look=new THREE.Vector3(0,4,-4);
+function placeCam(){camera.position.set(look.x+dist*Math.sin(phi)*Math.sin(theta),look.y+dist*Math.cos(phi),look.z+dist*Math.sin(phi)*Math.cos(theta));camera.lookAt(look)}
+let drag=null,moved=0;
+canvas.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY};moved=0;canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener("pointermove",e=>{
+  if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;moved+=Math.abs(dx)+Math.abs(dy);theta-=dx*.006;phi=Math.min(1.45,Math.max(.25,phi-dy*.006));drag={x:e.clientX,y:e.clientY}}
+  else hover(e);
+});
+canvas.addEventListener("pointerup",e=>{if(moved<6)click(e);drag=null});
+canvas.addEventListener("wheel",e=>{e.preventDefault();dist=Math.min(110,Math.max(22,dist+e.deltaY*.05))},{passive:false});
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),tip=document.getElementById("tip");
+function pick(e){const r=canvas.getBoundingClientRect();mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mouse,camera);const h=ray.intersectObjects(pickables)[0];return h?h.object.userData.i:-1}
+function tipHTML(i){const r=ROUTES[i],fee=scenario===0?OLD:NEW+(scenario===2?PROP:0),d=fee-OLD;
+  return `<b>${r.from} → ${r.to}</b><br>Fare ~${fmt(r.fare)} + fees ${fmt(fee)}<br>Total ${fmt(r.fare+fee)}${d?`<br><span style="color:var(--hike)">+${fmt(d)} (${(d/r.fare*100).toFixed(0)}% of fare)</span>`:""}`}
+function hover(e){const i=pick(e);if(i<0){tip.hidden=true;canvas.style.cursor="grab";return}
+  canvas.style.cursor="pointer";const r=canvas.getBoundingClientRect();tip.innerHTML=tipHTML(i);tip.hidden=false;
+  tip.style.left=Math.min(e.clientX-r.left+14,r.width-250)+"px";tip.style.top=(e.clientY-r.top+14)+"px"}
+function click(e){const i=pick(e);if(i>=0)select(i)}
+function select(i){selected=i===selected?-1:i;renderTable();build()}
+function resize(){const w=canvas.clientWidth,h=canvas.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+addEventListener("resize",resize);
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+function loop(){
+  let changed=false;
+  ROUTES.forEach((r,i)=>{const t=target(r),c=cur[i];for(const k in t){const d=t[k]-c[k];if(Math.abs(d)>1e-4){c[k]+=reduce?d:d*.12;changed=true}}});
+  if(changed)build();
+  placeCam();renderer.render(scene,camera);requestAnimationFrame(loop);
+}
+document.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{
+  scenario=+b.dataset.s;document.querySelectorAll(".seg button").forEach(x=>x.setAttribute("aria-pressed",x===b));renderTable();
+});
+// theme changes
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>{for(const k in mats)mats[k].color.set(css(k))});
+resize();renderTable();build();loop();
+</script>
