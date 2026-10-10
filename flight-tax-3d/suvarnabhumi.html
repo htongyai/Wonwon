@@ -26,7 +26,7 @@ h1{font-size:clamp(24px,3.6vw,38px);line-height:1.1;margin:0;text-wrap:balance}
 .chip b{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .chip .r{color:var(--new)}
 .hint{position:absolute;right:10px;bottom:8px;font:12px var(--mono);color:var(--muted)}
-#tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.18);max-width:260px}
+#tip,#tip2{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.18);max-width:260px}
 .ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .ctl button{font:600 14px var(--display);border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:7px 12px;border-radius:6px;cursor:pointer}
 .ctl button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
@@ -49,6 +49,17 @@ button:focus-visible{outline:2px solid var(--old);outline-offset:2px}
 .kv b{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
 .notes{font-size:13px;color:var(--muted);display:grid;gap:6px;max-width:85ch}
 .notes a{color:var(--old)}
+.cabin{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:18px}
+@media (max-width:860px){.cabin{grid-template-columns:1fr}}
+.strip{background:#f6f1d8;color:#1b2430;border:1px solid #c9bf8f;border-left:10px solid #2f6db5;border-radius:4px;padding:12px 14px;font-family:var(--mono);font-size:13px;display:grid;gap:8px;align-content:start}
+.strip .cs{font-size:20px;font-weight:600;letter-spacing:.04em}
+.strip table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.strip td{padding:3px 4px;border-top:1px dashed #c9bf8f}
+.strip td:not(:first-child){text-align:right}
+.strip i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
+.strip .tot td{font-weight:600;border-top:1px solid #1b2430}
+.strip .muted{color:#5a5a48}
+#cab{display:block;width:100%;height:min(460px,70vw);min-height:300px;cursor:grab;touch-action:none}
 </style>
 
 <div class="wrap">
@@ -73,6 +84,17 @@ button:focus-visible{outline:2px solid var(--old);outline-offset:2px}
     </div>
     <div id="tip" hidden></div>
     <div class="hint">Drag to rotate · scroll to zoom · hover a plane</div>
+  </div>
+
+  <div>
+    <h2 style="font-size:20px;margin:0 0 4px">Who is on board</h2>
+    <p class="lede" style="margin:0 0 10px">Click any plane above to open its cabin. Each figure is one passenger, colored by why they are flying. The flight strip shows what each group now pays.</p>
+    <div class="cabin">
+      <div class="strip" id="strip"></div>
+      <div class="stage"><canvas id="cab" aria-label="Cutaway of the selected plane showing passengers by reason for travel"></canvas><div id="tip2" class="tip2" hidden></div>
+        <div class="hint">Drag to rotate · hover a passenger</div></div>
+    </div>
+    <p class="notes" style="margin:8px 0 0">The mix of travel reasons on each route is illustrative, not measured. It reflects known patterns: Thai workers mostly go to Taiwan, Korea, Japan, Israel and Malaysia; migrant workers fly home to Myanmar and Laos; students head to the UK. Fees are per passenger on a one-way departure.</p>
   </div>
 
   <div class="grid2">
@@ -231,7 +253,7 @@ function sample(path,t){
 }
 const V=(x,y,z)=>new THREE.Vector3(x,y,z);
 const flights=[];const pickables=[];
-let departed=0,extra=0,clock=0,nextDep=1,nextArr=4,seq=0,paused=false;
+let cabinFlight=null,departed=0,extra=0,clock=0,nextDep=1,nextArr=4,seq=0,paused=false;
 
 function freeGate(){const f=GATES.filter(g=>!g.busy);return f.length?f[Math.floor(Math.random()*f.length)]:null}
 function gatePos(g){return g.sat?V(g.x,0,g.z):V(g.x,0,g.z)}
@@ -258,6 +280,7 @@ function spawn(kind){
   fl.tag=label(txt,{size:20,color:"#ffffff",bg:"rgba(16,22,28,.82)",scale:.9});scene.add(fl.tag);
   mesh.traverse(o=>{if(o.isMesh){o.userData.f=fl;pickables.push(o)}});
   flights.push(fl);if(kind==="dep")renderBoard();
+  if(!cabinFlight&&kind==="dep"&&!fl.dom&&typeof showCabin==="function")showCabin(fl);
 }
 function remove(fl){scene.remove(fl.mesh);scene.remove(fl.tag);fl.mesh.traverse(o=>{const i=pickables.indexOf(o);if(i>=0)pickables.splice(i,1)});flights.splice(flights.indexOf(fl),1)}
 
@@ -303,9 +326,9 @@ function setView(k){goal={...VIEWS[k]};document.querySelectorAll("#v-over,#v-ter
 ["over","term","run"].forEach(k=>document.getElementById("v-"+k).onclick=()=>setView(k));
 document.getElementById("v-pause").onclick=e=>{paused=!paused;e.target.textContent=paused?"Resume":"Pause";e.target.setAttribute("aria-pressed",paused)};
 let drag=null;
-canvas.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)});
-canvas.addEventListener("pointermove",e=>{if(drag){goal.t-=(e.clientX-drag.x)*.006;goal.p=Math.min(1.45,Math.max(.2,goal.p-(e.clientY-drag.y)*.006));drag={x:e.clientX,y:e.clientY}}else hover(e)});
-canvas.addEventListener("pointerup",()=>drag=null);
+let mv=0;canvas.addEventListener("pointerdown",e=>{mv=0;drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener("pointermove",e=>{if(drag){mv+=Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y);goal.t-=(e.clientX-drag.x)*.006;goal.p=Math.min(1.45,Math.max(.2,goal.p-(e.clientY-drag.y)*.006));drag={x:e.clientX,y:e.clientY}}else hover(e)});
+canvas.addEventListener("pointerup",e=>{drag=null;if(mv<6){const r=canvas.getBoundingClientRect();mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mouse,camera);const h=ray.intersectObjects(pickables)[0];if(h)showCabin(h.object.userData.f)}});
 canvas.addEventListener("wheel",e=>{e.preventDefault();goal.d=Math.min(800,Math.max(50,goal.d*(1+e.deltaY*.001)))},{passive:false});
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),tip=document.getElementById("tip");
 function hover(e){
@@ -328,9 +351,104 @@ function loop(now){
   camera.position.set(cam.l.x+cam.d*Math.sin(cam.p)*Math.sin(cam.t),cam.l.y+cam.d*Math.cos(cam.p),cam.l.z+cam.d*Math.sin(cam.p)*Math.cos(cam.t));camera.lookAt(cam.l);
   renderer.render(scene,camera);requestAnimationFrame(loop);
 }
+
+/* ---------- cabin X-ray ---------- */
+const PURPOSE=[
+  {k:"work",n:"Work / migrant work",c:0xe4572e},{k:"study",n:"Study",c:0x7b4fd6},{k:"family",n:"Family visit",c:0x2a9d8f},
+  {k:"medical",n:"Medical",c:0xd6336c},{k:"business",n:"Business",c:0x3a6fd8},{k:"tourism",n:"Tourism",c:0xe9b949}];
+const MIX={
+  default:{tourism:.55,family:.15,business:.15,work:.08,study:.05,medical:.02},
+  Yangon:{work:.55,family:.25,tourism:.08,business:.07,study:.03,medical:.02},
+  Vientiane:{work:.5,family:.27,tourism:.12,business:.06,study:.03,medical:.02},
+  "Siem Reap":{tourism:.7,work:.12,family:.1,business:.08},
+  "Ho Chi Minh City":{tourism:.5,business:.2,family:.12,work:.13,study:.03,medical:.02},
+  Taipei:{work:.25,tourism:.5,family:.1,business:.1,study:.05},
+  "Seoul Incheon":{work:.22,tourism:.55,family:.08,business:.1,study:.05},
+  "Tokyo Narita":{work:.15,tourism:.6,family:.07,business:.12,study:.06},
+  "Tokyo Haneda":{work:.12,tourism:.6,family:.07,business:.15,study:.06},
+  "London Heathrow":{study:.2,tourism:.45,family:.15,business:.15,work:.05},
+  Dubai:{work:.25,tourism:.4,business:.18,family:.09,medical:.08},
+  Doha:{work:.28,tourism:.38,business:.18,family:.08,medical:.08},
+  Singapore:{business:.35,tourism:.4,family:.1,work:.08,study:.05,medical:.02},
+  "Hong Kong":{business:.3,tourism:.5,family:.12,work:.05,study:.03},
+  Shanghai:{business:.3,tourism:.5,family:.1,study:.05,work:.05},
+  domestic:{tourism:.5,family:.3,business:.15,medical:.05}
+};
+const ccv=document.getElementById("cab");
+const R2=new THREE.WebGLRenderer({canvas:ccv,antialias:true,alpha:true});R2.setPixelRatio(Math.min(devicePixelRatio,2));
+const S2=new THREE.Scene(),C2=new THREE.PerspectiveCamera(35,1,.5,500);
+S2.add(new THREE.HemisphereLight(0xffffff,0x667788,.95));{const d=new THREE.DirectionalLight(0xffffff,.6);d.position.set(10,30,10);S2.add(d)}
+let cabGroup=null,bodies=null,heads=null,seatInfo=[];
+let c2={t:-.5,p:.75,d:70};
+function rng(seed){return()=>{seed=(seed*16807)%2147483647;return seed/2147483647}}
+function showCabin(f){
+  cabinFlight=f;
+  const mix=f.dom?MIX.domestic:(MIX[f.dest]||MIX.default);
+  const rnd=rng(f.id*7919+13);
+  const list=[];PURPOSE.forEach(p=>{const n=Math.round((mix[p.k]||0)*f.pax);for(let i=0;i<n;i++)list.push(p)});
+  while(list.length<f.pax)list.push(PURPOSE[5]);list.length=f.pax;
+  for(let i=list.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[list[i],list[j]]=[list[j],list[i]]}
+  const wide=AC[f.ac].s>200,cols=wide?[-4,-3.2,-2.4,-.8,0,.8,2.4,3.2,4]:[-2.4,-1.6,-.8,.8,1.6,2.4];
+  const rows=Math.ceil(AC[f.ac].s/cols.length),pitch=1.05,L=rows*pitch+10,R=wide?5.4:3.4;
+  if(cabGroup)S2.remove(cabGroup);cabGroup=new THREE.Group();S2.add(cabGroup);
+  const white=new THREE.MeshLambertMaterial({color:0xe9edf1,side:THREE.DoubleSide,transparent:true,opacity:.55});
+  const shell=new THREE.Mesh(new THREE.CylinderGeometry(R,R,L,40,1,true,Math.PI/2,Math.PI),white);shell.rotation.x=Math.PI/2;cabGroup.add(shell);
+  const floor=new THREE.Mesh(new THREE.PlaneGeometry(R*1.9,L),new THREE.MeshLambertMaterial({color:0x8d98a3}));floor.rotation.x=-Math.PI/2;floor.position.y=-.01;cabGroup.add(floor);
+  const tail=AIRLINES[f.code].c;
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(R,32,16,0,Math.PI*2,0,Math.PI/2),white);nose.rotation.x=-Math.PI/2;nose.position.z=-L/2;nose.scale.set(1,1,1.6);cabGroup.add(nose);
+  const fin=new THREE.Mesh(new THREE.BoxGeometry(.3,R*1.6,4),new THREE.MeshLambertMaterial({color:tail}));fin.position.set(0,R*.8,L/2+1);cabGroup.add(fin);
+  const wing=new THREE.Mesh(new THREE.BoxGeometry(R*7,.2,4),new THREE.MeshLambertMaterial({color:0xcfd6dc,transparent:true,opacity:.6}));wing.position.set(0,-.3,-1);cabGroup.add(wing);
+  const seatM=new THREE.MeshLambertMaterial({color:0x5b6672});
+  const total=rows*cols.length;
+  const seats=new THREE.InstancedMesh(new THREE.BoxGeometry(.7,.5,.7),seatM,total);
+  bodies=new THREE.InstancedMesh(new THREE.CylinderGeometry(.22,.26,.7,8),new THREE.MeshLambertMaterial({color:0xffffff}),f.pax);
+  heads=new THREE.InstancedMesh(new THREE.SphereGeometry(.2,10,8),new THREE.MeshLambertMaterial({color:0xffffff}),f.pax);
+  const m=new THREE.Matrix4(),col=new THREE.Color();seatInfo=[];let k=0,idx=0;
+  for(let r=0;r<rows;r++)for(const x of cols){
+    const z=-L/2+6+r*pitch;m.makeTranslation(x,.25,z);seats.setMatrixAt(k++,m);
+    if(idx<f.pax){const p=list[idx];m.makeTranslation(x,.85,z);bodies.setMatrixAt(idx,m);m.makeTranslation(x,1.4,z);heads.setMatrixAt(idx,m);
+      col.setHex(p.c);bodies.setColorAt(idx,col);heads.setColorAt(idx,col);seatInfo[idx]={p,row:r+1,seat:"ABCDEFGHJK"[cols.indexOf(x)]};idx++}
+  }
+  seats.count=k;[bodies,heads].forEach(o=>{o.instanceColor.needsUpdate=true});
+  cabGroup.add(seats,bodies,heads);
+  c2.d=Math.max(40,L*1.05);
+  renderStrip(f,list);
+}
+function renderStrip(f,list){
+  const fee=f.dom?DOM:NEW,old=f.dom?DOM:OLD,cnt={};list.forEach(p=>cnt[p.k]=(cnt[p.k]||0)+1);
+  const rows=PURPOSE.filter(p=>cnt[p.k]).map(p=>`<tr><td><i style="background:#${p.c.toString(16).padStart(6,"0")}"></i>${p.n}</td><td>${cnt[p.k]}</td><td>${f.dom?"฿0":"+"+fmt((fee-old)*cnt[p.k])}</td></tr>`).join("");
+  document.getElementById("strip").innerHTML=`
+    <div class="muted">FLIGHT STRIP · DEP VTBS</div>
+    <div class="cs">${f.code} · ${f.dest.toUpperCase()}</div>
+    <div>${AIRLINES[f.code].n} · ${f.ac} · ${f.pax} pax</div>
+    <div>${f.dom?"Domestic charge ฿130, unchanged":`Charge per passenger <s>฿730</s> → <b style="color:#c0281f">฿1,120</b>`}</div>
+    <table><tr class="muted"><td>Reason</td><td>Pax</td><td>Extra paid</td></tr>${rows}
+    <tr class="tot"><td>Whole flight</td><td>${f.pax}</td><td>${f.dom?"฿0":"+"+fmt((fee-old)*f.pax)}</td></tr></table>
+    ${cnt.work&&!f.dom?`<div class="muted">For the ${cnt.work} people flying for work, ฿390 is about one day's minimum wage (~฿400).</div>`:""}`;
+}
+let d2=null;
+ccv.addEventListener("pointerdown",e=>{d2={x:e.clientX,y:e.clientY};ccv.setPointerCapture(e.pointerId)});
+ccv.addEventListener("pointerup",()=>d2=null);
+const tip2=document.getElementById("tip2"),ray2=new THREE.Raycaster(),m2=new THREE.Vector2();
+ccv.addEventListener("pointermove",e=>{
+  if(d2){c2.t-=(e.clientX-d2.x)*.006;c2.p=Math.min(1.4,Math.max(.15,c2.p-(e.clientY-d2.y)*.006));d2={x:e.clientX,y:e.clientY};return}
+  if(!bodies)return;const r=ccv.getBoundingClientRect();m2.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray2.setFromCamera(m2,C2);
+  const h=ray2.intersectObjects([heads,bodies])[0];if(!h||h.instanceId==null||!seatInfo[h.instanceId]){tip2.hidden=true;return}
+  const si=seatInfo[h.instanceId],f=cabinFlight;
+  tip2.innerHTML=`<b>Seat ${si.row}${si.seat}</b> · ${si.p.n}<br>${f.dom?"Pays ฿130, unchanged":`Pays ฿1,120, was ฿730 <span style="color:var(--new)">(+฿390)</span>`}`;
+  tip2.hidden=false;tip2.style.left=Math.min(e.clientX-r.left+14,r.width-240)+"px";tip2.style.top=(e.clientY-r.top+14)+"px";
+});
+function cabLoop(){
+  const w=ccv.clientWidth,h=ccv.clientHeight;if(ccv.width!==Math.floor(w*R2.getPixelRatio())){R2.setSize(w,h,false);C2.aspect=w/h;C2.updateProjectionMatrix()}
+  if(!d2&&!reduce&&!paused)c2.t+=.0015;
+  C2.position.set(c2.d*Math.sin(c2.p)*Math.sin(c2.t),c2.d*Math.cos(c2.p),c2.d*Math.sin(c2.p)*Math.cos(c2.t));C2.lookAt(0,0,0);
+  R2.render(S2,C2);requestAnimationFrame(cabLoop);
+}
 resize();renderBoard();
 // pre-warm so the page opens with traffic on the field
 for(let i=0;i<600;i++)step(1/20);
 departed=0;extra=0;hud();
 requestAnimationFrame(loop);
+if(!cabinFlight){const f=flights.find(x=>x.kind==="dep"&&!x.dom);if(f)showCabin(f)}
+requestAnimationFrame(cabLoop);
 </script>
