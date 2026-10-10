@@ -1,0 +1,336 @@
+<title>Suvarnabhumi Fee Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: airfield stage (3D) full width, departures board + running total below, notes last */
+:root{
+  --bg:#e9eef2; --panel:#ffffff; --fg:#13202c; --muted:#5a6979; --line:#cfd8e0;
+  --old:#2f6db5; --new:#d6342c; --same:#2e8b57;
+  --board:#11161c; --boardfg:#f3c34a; --boarddim:#8a96a3;
+  --display:"Anuphan",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0d1319; --panel:#17202a; --fg:#e5ebf1; --muted:#93a2b1; --line:#283543;
+  --old:#5c95e0; --new:#ef5148; --same:#4cbf80; color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1319; --panel:#17202a; --fg:#e5ebf1; --muted:#93a2b1; --line:#283543;
+  --old:#5c95e0; --new:#ef5148; --same:#4cbf80; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--display);font-size:15px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding:22px 16px 48px;display:grid;gap:18px}
+h1{font-size:clamp(24px,3.6vw,38px);line-height:1.1;margin:0;text-wrap:balance}
+.lede{color:var(--muted);max-width:72ch;margin:6px 0 0}
+.flag{display:inline-block;font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);border-radius:4px;padding:2px 8px;color:var(--muted);margin-bottom:8px}
+.stage{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:linear-gradient(var(--panel),var(--bg))}
+#c{display:block;width:100%;height:min(620px,78vw);min-height:360px;cursor:grab;touch-action:none}
+.hud{position:absolute;top:10px;left:10px;display:flex;flex-wrap:wrap;gap:8px;max-width:calc(100% - 20px)}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px}
+.chip b{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.chip .r{color:var(--new)}
+.hint{position:absolute;right:10px;bottom:8px;font:12px var(--mono);color:var(--muted)}
+#tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.18);max-width:260px}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ctl button{font:600 14px var(--display);border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:7px 12px;border-radius:6px;cursor:pointer}
+.ctl button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+button:focus-visible{outline:2px solid var(--old);outline-offset:2px}
+.grid2{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:18px}
+@media (max-width:860px){.grid2{grid-template-columns:1fr}}
+.board{background:var(--board);color:var(--boardfg);border-radius:10px;padding:12px;overflow-x:auto;font-family:var(--mono)}
+.board h2{font:600 14px var(--mono);letter-spacing:.12em;margin:0 0 8px;color:var(--boardfg)}
+.board table{border-collapse:collapse;width:100%;min-width:640px;font-size:13px;font-variant-numeric:tabular-nums}
+.board th{color:var(--boarddim);font-weight:400;text-align:left;padding:4px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.board td{color:var(--boardfg);padding:5px 8px;border-top:1px solid #26303a;white-space:nowrap}
+.board td.o{color:#8fb4e8;text-decoration:line-through}
+.board td.n{color:#ff7a70;font-weight:600}
+.board td.s{color:#7fd6a4}
+.board .st{color:var(--boarddim)}
+.board tr.dep .st{color:#ffffff}
+.side{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px;align-content:start}
+.side h2{font-size:17px;margin:0}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:14px}
+.kv b{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.notes{font-size:13px;color:var(--muted);display:grid;gap:6px;max-width:85ch}
+.notes a{color:var(--old)}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="flag">Simulation · real routes, not live traffic</span>
+    <h1>Suvarnabhumi: what every departure pays now</h1>
+    <p class="lede">A model of Bangkok's main airport with its terminal, concourses A–G, the SAT‑1 satellite terminal, the control tower and the runways. Planes fly real routes from BKK. Since 20 June 2026, each passenger leaving on an international flight pays a ฿1,120 service charge, up from ฿730. Domestic flights still pay ฿130.</p>
+  </header>
+
+  <div class="ctl" role="group" aria-label="View">
+    <button id="v-over" aria-pressed="true">Overview</button>
+    <button id="v-term">Terminal close-up</button>
+    <button id="v-run">Runway</button>
+    <button id="v-pause">Pause</button>
+  </div>
+
+  <div class="stage">
+    <canvas id="c" aria-label="3D model of Suvarnabhumi Airport with simulated flights"></canvas>
+    <div class="hud">
+      <div class="chip">Departed: <b id="h-dep">0</b></div>
+      <div class="chip">Extra fees since you opened this page: <b class="r" id="h-extra">฿0</b></div>
+    </div>
+    <div id="tip" hidden></div>
+    <div class="hint">Drag to rotate · scroll to zoom · hover a plane</div>
+  </div>
+
+  <div class="grid2">
+    <div class="board">
+      <h2>DEPARTURES · ขาออก</h2>
+      <table>
+        <thead><tr><th>Airline</th><th>To</th><th>Aircraft</th><th>Pax</th><th>Old fee</th><th>New fee</th><th>Extra / flight</th><th>Status</th></tr></thead>
+        <tbody id="board"></tbody>
+      </table>
+    </div>
+    <div class="side">
+      <h2>Per flight, the increase adds up</h2>
+      <div class="kv">
+        <span>A380 to Dubai, ~416 pax</span><b>+฿162,240</b>
+        <span>777 to London, ~296 pax</span><b>+฿115,440</b>
+        <span>A320 to Yangon, ~143 pax</span><b>+฿55,770</b>
+        <span>Domestic to Chiang Mai</span><b style="color:var(--same)">฿0</b>
+      </div>
+      <p class="notes" style="margin:0">Passenger numbers assume about 85% of seats are filled. The charge is included in the ticket price, so passengers don't pay it separately at the airport.</p>
+    </div>
+  </div>
+
+  <div class="notes">
+    <p>The flights are simulated. The routes and airlines are real services from Suvarnabhumi, but the timings, aircraft types and passenger numbers are approximate. The fees are the official AOT amounts. The airport layout is simplified, and building sizes are enlarged next to the 4 km runways so they are visible.</p>
+    <p>Sources: <a href="https://www.tatnews.org/2026/05/airports-of-thailand-to-raise-international-passenger-service-charge-from-20-june-2026/" target="_blank" rel="noopener">TAT Newsroom</a> · <a href="https://www.nationthailand.com/news/general/40059211" target="_blank" rel="noopener">Nation Thailand</a> · <a href="https://www.pattayamail.com/latestnews/news/flying-out-of-thailand-international-airport-departure-fee-jumps-to-1120-baht-from-june-20-549686" target="_blank" rel="noopener">Pattaya Mail</a></p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const OLD=730,NEW=1120,DOM=130,LOAD=.85;
+const fmt=n=>"฿"+Math.round(n).toLocaleString("en-US");
+const AIRLINES={
+  TG:{n:"Thai Airways",c:0x5b2a86},EK:{n:"Emirates",c:0xc8102e},SQ:{n:"Singapore Airlines",c:0x1d2f6f},
+  CX:{n:"Cathay Pacific",c:0x005d63},KE:{n:"Korean Air",c:0x2f9bd6},QR:{n:"Qatar Airways",c:0x5c0632},
+  BR:{n:"EVA Air",c:0x00704a},JL:{n:"Japan Airlines",c:0xcc0000},VZ:{n:"Thai Vietjet",c:0xe0261b},
+  PG:{n:"Bangkok Airways",c:0x1e64b4},"8M":{n:"Myanmar Airways Intl",c:0x1a4f9c},QV:{n:"Lao Airlines",c:0x0b3d91},
+  MU:{n:"China Eastern",c:0x1b3f8b}
+};
+const AC={A380:{s:489,len:7.3,span:8},"777":{s:348,len:7.4,span:6.5},A350:{s:321,len:6.7,span:6.4},"787":{s:264,len:6.2,span:6},
+  A330:{s:300,len:6.3,span:6},A321:{s:230,len:4.5,span:3.6},A320:{s:168,len:3.8,span:3.6},A319:{s:144,len:3.4,span:3.6}};
+const ROUTES=[
+  ["TG","Tokyo Narita","787"],["TG","London Heathrow","777"],["TG","Singapore","A350"],["EK","Dubai","A380"],
+  ["SQ","Singapore","A350"],["CX","Hong Kong","A330"],["KE","Seoul Incheon","777"],["QR","Doha","777"],
+  ["BR","Taipei","787"],["JL","Tokyo Haneda","787"],["VZ","Ho Chi Minh City","A321"],["PG","Siem Reap","A319"],
+  ["8M","Yangon","A320"],["QV","Vientiane","A320"],["MU","Shanghai","A330"],
+  ["TG","Chiang Mai","A320",1],["TG","Phuket","A320",1],["PG","Koh Samui","A319",1]
+];
+
+/* ---------- scene ---------- */
+const canvas=document.getElementById("c");
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(38,1,1,3000);
+scene.add(new THREE.HemisphereLight(0xffffff,0x5a6a5a,.85));
+const sun=new THREE.DirectionalLight(0xfff4e0,.75);sun.position.set(120,220,90);scene.add(sun);
+const M=c=>new THREE.MeshLambertMaterial({color:c});
+const box=(w,h,d,c,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));m.position.set(x,y+h/2,z);scene.add(m);return m};
+
+function label(text,{size=22,color="#13202c",bg=null,scale=1}={}){
+  const c=document.createElement("canvas"),x=c.getContext("2d");
+  const font=`600 ${size}px Anuphan, sans-serif`;x.font=font;
+  const lines=text.split("\n");const w=Math.max(...lines.map(l=>x.measureText(l).width))+20;
+  const h=lines.length*(size+6)+12;c.width=w;c.height=h;x.font=font;
+  if(bg){x.fillStyle=bg;x.beginPath();x.roundRect?x.roundRect(0,0,w,h,8):x.rect(0,0,w,h);x.fill()}
+  lines.forEach((l,i)=>{
+    const parts=l.split("|");let px=10;
+    parts.forEach((p,j)=>{x.fillStyle=j===0?color:(p.includes("→")||p.startsWith("฿1,120")?"#ff6b60":p.includes("no change")?"#6fd39a":"#9cc0f0");x.fillText(p,px,(i+1)*(size+6));px+=x.measureText(p).width});
+  });
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));
+  s.scale.set(w/9*scale,h/9*scale,1);s.renderOrder=10;return s;
+}
+function place(s,x,y,z){s.position.set(x,y,z);scene.add(s);return s}
+
+// ground
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(900,900),M(0x8fa784));ground.rotation.x=-Math.PI/2;scene.add(ground);
+const apron=new THREE.Mesh(new THREE.PlaneGeometry(170,150),M(0xb9bdc0));apron.rotation.x=-Math.PI/2;apron.position.set(0,.05,-35);scene.add(apron);
+
+// runways with painted markings
+function runwayTex(a,b){
+  const c=document.createElement("canvas");c.width=64;c.height=2048;const x=c.getContext("2d");
+  x.fillStyle="#3b4045";x.fillRect(0,0,64,2048);x.fillStyle="#f2f2f2";
+  for(let y=80;y<1968;y+=60)x.fillRect(30,y,4,30);
+  for(let i=0;i<6;i++){x.fillRect(6+i*9,8,5,40);x.fillRect(6+i*9,2000,5,40)}
+  x.font="bold 16px sans-serif";x.textAlign="center";
+  x.save();x.translate(32,64);x.fillText(b,0,0);x.restore();
+  x.save();x.translate(32,1984);x.rotate(Math.PI);x.fillText(a,0,0);x.restore();
+  const t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
+}
+function runway(x,len,a,b){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(6,len),new THREE.MeshLambertMaterial({map:runwayTex(a,b)}));
+  m.rotation.x=-Math.PI/2;m.position.set(x,.1,0);scene.add(m);
+  const tw=new THREE.Mesh(new THREE.PlaneGeometry(2.4,len),M(0x9aa0a4));tw.rotation.x=-Math.PI/2;tw.position.set(x+(x<0?15:-15),.08,0);scene.add(tw);
+  place(label(`Runway ${b}/${a}`,{size:20,color:"#ffffff",bg:"rgba(20,30,40,.7)"}),x,4,len/2-10);
+}
+runway(-110,400,"19R","01L");runway(110,370,"19L","01R");
+{const m=new THREE.Mesh(new THREE.PlaneGeometry(6,400),new THREE.MeshLambertMaterial({map:runwayTex("19","01")}));m.rotation.x=-Math.PI/2;m.position.set(175,.1,0);scene.add(m);
+ place(label("Third runway",{size:20,color:"#ffffff",bg:"rgba(20,30,40,.7)"}),175,4,190)}
+// taxi lane between concourses and SAT-1
+{const t=new THREE.Mesh(new THREE.PlaneGeometry(190,3),M(0x9aa0a4));t.rotation.x=-Math.PI/2;t.position.set(0,.09,-52);scene.add(t)}
+
+// concourse spine + fingers A–G
+const GLASS=0x9fc3d6,STEEL=0xd8dde2;
+box(124,3,6,GLASS,0,0,0);
+const FX=[-54,-36,-18,0,18,36,54],NAMES="ABCDEFG";
+const GATES=[];
+FX.forEach((fx,i)=>{
+  box(4.5,2.6,36,GLASS,fx,0,-19);box(5,.4,36.5,STEEL,fx,2.6,-19);
+  place(label(NAMES[i]+(i<2?" · domestic":""),{size:18,color:"#13202c",bg:"rgba(255,255,255,.85)"}),fx,6,-40);
+  [-12,-27].forEach(z=>[-1,1].forEach(s=>{
+    GATES.push({x:fx+s*9,z,heading:s,busy:false});
+    box(4,1.2,1.2,0x7d8790,fx+s*4.3,1.2,z); // jet bridge
+  }));
+});
+// main terminal: base, glass hall, curved roof, exposed trusses + pylons
+box(76,4,20,0xcfd5d9,0,0,15);box(70,5,16,GLASS,0,4,15);
+{const roof=new THREE.Mesh(new THREE.SphereGeometry(1,48,16,0,Math.PI*2,0,Math.PI/2),M(0xeef1f3));roof.scale.set(42,4,15);roof.position.set(0,9,15);scene.add(roof)}
+for(let i=0;i<8;i++){const x=-35+i*10;box(1.2,1.6,28,0x5d6670,x,13.6,15);
+  [-12,12].forEach(dz=>{const p=new THREE.Mesh(new THREE.CylinderGeometry(.5,.7,15,8),M(0x6d7680));p.position.set(x,7.5,15+dz);scene.add(p)})}
+place(label("Main passenger terminal",{size:22,color:"#13202c",bg:"rgba(255,255,255,.9)"}),0,22,15);
+// landside: curbs, roads, car parks
+box(90,1,3,0x6f767c,0,0,30);box(110,.3,8,0x55595d,0,0,38);
+box(30,6,18,0xbcc2c7,-40,0,56);box(30,6,18,0xbcc2c7,40,0,56);
+place(label("Car parks",{size:16,color:"#13202c",bg:"rgba(255,255,255,.8)"}),0,8,56);
+// SAT-1 satellite terminal
+box(84,3.4,10,GLASS,0,0,-82);box(86,.5,11,STEEL,0,3.4,-82);
+for(let i=0;i<7;i++){const x=-36+i*12;GATES.push({x,z:-69,heading:0,busy:false,sat:true});box(1.2,1.2,5,0x7d8790,x,1.2,-75)}
+place(label("SAT-1 satellite terminal",{size:20,color:"#13202c",bg:"rgba(255,255,255,.9)"}),0,8,-90);
+// control tower (132 m)
+{const x=82,z=-22;
+ const sh=new THREE.Mesh(new THREE.CylinderGeometry(1.4,2,12,16),M(0xd9dde0));sh.position.set(x,6,z);scene.add(sh);
+ const cab=new THREE.Mesh(new THREE.CylinderGeometry(3.2,2.4,2,16),M(0x2f4a5c));cab.position.set(x,13,z);scene.add(cab);
+ const cap=new THREE.Mesh(new THREE.CylinderGeometry(3.4,3.4,.4,16),M(0xeeeeee));cap.position.set(x,14.2,z);scene.add(cap);
+ const mast=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,4,6),M(0xcc3333));mast.position.set(x,16.4,z);scene.add(mast);
+ place(label("Control tower · 132 m",{size:18,color:"#13202c",bg:"rgba(255,255,255,.9)"}),x,21,z)}
+// apron service roads / perimeter trees for texture
+for(let i=0;i<70;i++){const t=new THREE.Mesh(new THREE.ConeGeometry(1.4,3.5,6),M(0x4f7a4a));const a=i/70*Math.PI*2;t.position.set(Math.cos(a)*260,1.75,Math.sin(a)*260);scene.add(t)}
+
+/* ---------- planes ---------- */
+function makePlane(code,ac){
+  const a=AC[ac],g=new THREE.Group(),white=M(0xf5f6f7),tail=M(AIRLINES[code].c);
+  const f=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,a.len,10),white);f.rotation.x=Math.PI/2;g.add(f);
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(.42,10,8),white);nose.position.z=-a.len/2;g.add(nose);
+  const w=new THREE.Mesh(new THREE.BoxGeometry(a.span,.12,1.3),white);w.position.z=.2;g.add(w);
+  const hs=new THREE.Mesh(new THREE.BoxGeometry(a.span*.38,.1,.7),white);hs.position.z=a.len/2-.4;g.add(hs);
+  const vs=new THREE.Mesh(new THREE.BoxGeometry(.12,1.3,1),tail);vs.position.set(0,.75,a.len/2-.5);g.add(vs);
+  const stripe=new THREE.Mesh(new THREE.CylinderGeometry(.43,.43,a.len*.7,10,1,true,-.6,1.2),tail);stripe.rotation.x=Math.PI/2;g.add(stripe);
+  [-1,1].forEach(s=>{const e=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,.8,8),M(0x9aa3ab));e.rotation.x=Math.PI/2;e.position.set(s*a.span*.25,-.25,-.1);g.add(e)});
+  return g;
+}
+function pathOf(pts){let L=0;const seg=pts.slice(1).map((p,i)=>{const d=p.p.distanceTo(pts[i].p);L+=d/p.v;return{a:pts[i].p,b:p.p,t:d/p.v,ease:p.ease}});return{seg,T:L}}
+function sample(path,t){
+  for(const s of path.seg){if(t<=s.t){let k=t/s.t;if(s.ease==="in")k=k*k;if(s.ease==="out")k=1-(1-k)*(1-k);return{p:s.a.clone().lerp(s.b,k),d:s.b.clone().sub(s.a)}}t-=s.t}
+  const s=path.seg[path.seg.length-1];return{p:s.b.clone(),d:s.b.clone().sub(s.a)};
+}
+const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+const flights=[];const pickables=[];
+let departed=0,extra=0,clock=0,nextDep=1,nextArr=4,seq=0,paused=false;
+
+function freeGate(){const f=GATES.filter(g=>!g.busy);return f.length?f[Math.floor(Math.random()*f.length)]:null}
+function gatePos(g){return g.sat?V(g.x,0,g.z):V(g.x,0,g.z)}
+function departurePath(g){
+  const lane=-52,twx=95;
+  return pathOf([{p:gatePos(g)},{p:V(g.x,0,lane),v:4},{p:V(twx,0,lane),v:7},{p:V(twx,0,182),v:8},{p:V(110,0,182),v:4},
+    {p:V(110,0,-20),v:30,ease:"in"},{p:V(110,45,-260),v:40},{p:V(110,110,-480),v:55}]);
+}
+function arrivalPath(g){
+  const lane=-52,twx=-95;
+  return pathOf([{p:V(-110,90,520)},{p:V(-110,0,170),v:45},{p:V(-110,0,-60),v:22,ease:"out"},{p:V(twx,0,-60),v:5},
+    {p:V(twx,0,lane),v:6},{p:V(g.x,0,lane),v:7},{p:gatePos(g),v:4}]);
+}
+function spawn(kind){
+  const g=freeGate();if(!g)return;g.busy=true;
+  const r=ROUTES[Math.floor(Math.random()*ROUTES.length)],[code,dest,ac,dom]=r;
+  const pax=Math.round(AC[ac].s*LOAD),mesh=makePlane(code,ac);scene.add(mesh);
+  const oldF=dom?DOM:OLD,newF=dom?DOM:NEW;
+  const fl={id:++seq,kind,code,dest,ac,dom:!!dom,pax,oldF,newF,gate:g,mesh,t:0,
+    path:kind==="dep"?departurePath(g):arrivalPath(g),wait:kind==="dep"?4+Math.random()*4:0,status:kind==="dep"?"Boarding":"Landing"};
+  const txt=kind==="dep"
+    ?(dom?`${code} → ${dest}\n|฿130 domestic · no change`:`${code} → ${dest}\n|฿730 |→ ฿1,120 /pax`)
+    :`${code} from ${dest}\n|arriving · pays on departure`;
+  fl.tag=label(txt,{size:20,color:"#ffffff",bg:"rgba(16,22,28,.82)",scale:.9});scene.add(fl.tag);
+  mesh.traverse(o=>{if(o.isMesh){o.userData.f=fl;pickables.push(o)}});
+  flights.push(fl);if(kind==="dep")renderBoard();
+}
+function remove(fl){scene.remove(fl.mesh);scene.remove(fl.tag);fl.mesh.traverse(o=>{const i=pickables.indexOf(o);if(i>=0)pickables.splice(i,1)});flights.splice(flights.indexOf(fl),1)}
+
+function step(dt){
+  clock+=dt;
+  if(clock>nextDep){spawn("dep");nextDep=clock+5+Math.random()*4}
+  if(clock>nextArr){spawn("arr");nextArr=clock+7+Math.random()*5}
+  for(const fl of [...flights]){
+    if(fl.wait>0){fl.wait-=dt}else fl.t+=dt;
+    const s=sample(fl.path,fl.t);
+    fl.mesh.position.copy(s.p).add(V(0,.6,0));
+    if(fl.t===0){fl.mesh.rotation.set(0,fl.gate.heading?-fl.gate.heading*Math.PI/2:Math.PI,0)}
+    else if(s.d.lengthSq()>1e-6){fl.mesh.rotation.y=Math.atan2(-s.d.x,-s.d.z);const flat=Math.hypot(s.d.x,s.d.z);fl.mesh.rotation.x=Math.atan2(s.d.y,flat)}
+    fl.tag.position.copy(fl.mesh.position).add(V(0,5,0));
+    if(fl.kind==="dep"){
+      const prev=fl.status;
+      if(fl.wait>0)fl.status="Boarding";else if(fl.t<fl.path.seg.slice(0,4).reduce((a,s)=>a+s.t,0))fl.status="Taxiing";
+      else if(fl.mesh.position.y<1)fl.status="Take-off";else fl.status="Departed";
+      if(prev!==fl.status){
+        if(prev==="Boarding")fl.gate.busy=false;
+        if(fl.status==="Departed"&&!fl.counted){fl.counted=true;departed++;extra+=(fl.newF-fl.oldF)*fl.pax;hud()}
+        renderBoard();
+      }
+      if(fl.t>fl.path.T)remove(fl),renderBoard();
+    }else{
+      if(fl.t>fl.path.T+3){fl.gate.busy=false;remove(fl)}
+    }
+  }
+}
+function hud(){document.getElementById("h-dep").textContent=departed;document.getElementById("h-extra").textContent=fmt(extra)}
+function renderBoard(){
+  const rows=flights.filter(f=>f.kind==="dep").slice(-9).reverse();
+  document.getElementById("board").innerHTML=rows.map(f=>`<tr class="${f.status==="Departed"?"dep":""}">
+    <td>${AIRLINES[f.code].n}</td><td>${f.dest}</td><td>${f.ac}</td><td>${f.pax}</td>
+    ${f.dom?`<td class="s">฿130</td><td class="s">฿130</td><td class="s">no change</td>`:`<td class="o">฿730</td><td class="n">฿1,120</td><td class="n">+${fmt((f.newF-f.oldF)*f.pax)}</td>`}
+    <td class="st">${f.status}</td></tr>`).join("")||`<tr><td colspan="8" class="st">First flights are boarding…</td></tr>`;
+}
+
+/* ---------- camera ---------- */
+const VIEWS={over:{t:-.7,p:.95,d:420,l:V(20,0,-10)},term:{t:-.45,p:1.05,d:150,l:V(0,0,-20)},run:{t:-1.9,p:1.2,d:170,l:V(110,0,40)}};
+let cam={...VIEWS.over},goal={...VIEWS.over};
+function setView(k){goal={...VIEWS[k]};document.querySelectorAll("#v-over,#v-term,#v-run").forEach(b=>b.setAttribute("aria-pressed",b.id==="v-"+k))}
+["over","term","run"].forEach(k=>document.getElementById("v-"+k).onclick=()=>setView(k));
+document.getElementById("v-pause").onclick=e=>{paused=!paused;e.target.textContent=paused?"Resume":"Pause";e.target.setAttribute("aria-pressed",paused)};
+let drag=null;
+canvas.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener("pointermove",e=>{if(drag){goal.t-=(e.clientX-drag.x)*.006;goal.p=Math.min(1.45,Math.max(.2,goal.p-(e.clientY-drag.y)*.006));drag={x:e.clientX,y:e.clientY}}else hover(e)});
+canvas.addEventListener("pointerup",()=>drag=null);
+canvas.addEventListener("wheel",e=>{e.preventDefault();goal.d=Math.min(800,Math.max(50,goal.d*(1+e.deltaY*.001)))},{passive:false});
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),tip=document.getElementById("tip");
+function hover(e){
+  const r=canvas.getBoundingClientRect();mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mouse,camera);
+  const h=ray.intersectObjects(pickables)[0];if(!h){tip.hidden=true;return}
+  const f=h.object.userData.f,a=AIRLINES[f.code].n;
+  tip.innerHTML=f.kind==="arr"?`<b>${a}</b> from ${f.dest}<br>${f.ac} · ~${f.pax} passengers<br>Arriving: they pay the charge when they leave Thailand`
+    :f.dom?`<b>${a}</b> to ${f.dest}<br>Domestic · ฿130 per passenger, unchanged`
+    :`<b>${a}</b> to ${f.dest}<br>${f.ac} · ~${f.pax} passengers<br>Old: ${fmt(OLD*f.pax)} · New: ${fmt(NEW*f.pax)}<br><span style="color:var(--new)">+${fmt((NEW-OLD)*f.pax)} on this flight</span>`;
+  tip.hidden=false;tip.style.left=Math.min(e.clientX-r.left+14,r.width-270)+"px";tip.style.top=(e.clientY-r.top+14)+"px";
+}
+function resize(){const w=canvas.clientWidth,h=canvas.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+addEventListener("resize",resize);
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  if(!paused)step(dt);
+  const k=reduce?1:.08;for(const key of ["t","p","d"])cam[key]+=(goal[key]-cam[key])*k;cam.l=cam.l.clone().lerp(goal.l,k);
+  camera.position.set(cam.l.x+cam.d*Math.sin(cam.p)*Math.sin(cam.t),cam.l.y+cam.d*Math.cos(cam.p),cam.l.z+cam.d*Math.sin(cam.p)*Math.cos(cam.t));camera.lookAt(cam.l);
+  renderer.render(scene,camera);requestAnimationFrame(loop);
+}
+resize();renderBoard();
+// pre-warm so the page opens with traffic on the field
+for(let i=0;i<600;i++)step(1/20);
+departed=0;extra=0;hud();
+requestAnimationFrame(loop);
+</script>
