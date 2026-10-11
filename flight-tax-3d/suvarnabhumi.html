@@ -94,6 +94,28 @@ button:focus-visible{outline:2px solid var(--old);outline-offset:2px}
 .grab:active{cursor:grabbing}
 #radial .grab{position:absolute;left:50%;top:-22px;transform:translateX(-50%);width:80px;height:22px;margin:0;z-index:2}
 .hud{background:rgba(7,18,30,.6);border:1px solid rgba(143,214,255,.45);border-radius:8px;padding:4px 6px 6px}
+
+/* full-screen 3D: the map is the main screen, everything else is an overlay */
+html,body{height:100%;overflow:hidden}
+.wrap{display:block;max-width:none;padding:0}
+.wrap>header,.wrap>.ctl{display:none}
+#mainStage{position:fixed;inset:0;border:0;border-radius:0}
+#c{height:100%!important;min-height:0}
+.ttl{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);text-align:center;color:#E3E8EC;font:500 12px "IBM Plex Mono",monospace;letter-spacing:.14em;pointer-events:none;max-width:calc(100% - 420px)}
+.ttl b{display:block;font:600 clamp(16px,2.2vw,24px) Anuphan,system-ui,sans-serif;letter-spacing:0;color:#fff}.ttl b s{color:#8fb4e8}.ttl b em{font-style:normal;color:#ff6b60}
+.ovb{position:absolute;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.ovb button{font:600 11px "IBM Plex Mono",monospace;letter-spacing:.12em;background:rgba(7,18,30,.78);color:#8FD6FF;border:1px solid rgba(143,214,255,.6);border-radius:6px;padding:7px 10px;cursor:pointer}
+.ovb button[aria-pressed="true"]{background:#8FD6FF;color:#07121E}
+.ov{position:absolute;background:rgba(7,14,22,.9);color:#E3E8EC;border:1px solid rgba(143,214,255,.45);border-radius:10px;padding:12px;overflow:auto;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.ov .lede,.ov .notes,.ov p{color:#B8C2CB}.ov h2{color:#fff}.ov a{color:#8FD6FF}
+#ovBoard{right:12px;bottom:58px;width:min(760px,calc(100% - 24px));max-height:52vh}
+#ovBoard .grid2{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}#ovBoard .side{background:transparent;border-color:rgba(143,214,255,.3);color:#E3E8EC}
+#ovCab{left:12px;top:70px;width:min(820px,calc(100% - 24px));max-height:calc(100% - 140px)}
+#ovCab .stage{background:#0b121a;border-color:rgba(143,214,255,.3)}
+#ovInfo{right:12px;bottom:58px;width:min(520px,calc(100% - 24px));max-height:52vh}
+.hud{top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%)}
+.clock{bottom:58px}
+@media (max-width:760px){.ttl{max-width:calc(100% - 200px);font-size:10px}.hud{display:none}#ovBoard .grid2{grid-template-columns:1fr}}
 </style>
 
 <div class="wrap">
@@ -114,7 +136,7 @@ button:focus-visible{outline:2px solid var(--old);outline-offset:2px}
   <div class="stage" id="mainStage">
     <canvas id="c" aria-label="3D model of Suvarnabhumi Airport with simulated flights"></canvas>
     <i class="fr tl"></i><i class="fr tr"></i><i class="fr bl"></i><i class="fr br"></i>
-    <div id="radial" class="dragp"><div class="grab" aria-hidden="true"></div>
+    <div id="radial" class="dragp">
       <svg id="rsv" viewBox="-150 -150 300 300" aria-label="Map controls"><g id="segs"></g>
         <circle r="104" class="r-ring"/><circle r="100" class="r-ring dash"/><circle r="66" class="r-ring y"/><g id="rTicks"></g></svg>
       <button id="compass" type="button" aria-label="Compass. Click to turn the map north-up.">
@@ -127,14 +149,16 @@ button:focus-visible{outline:2px solid var(--old);outline-offset:2px}
           <circle r="3" class="c-hub"/><path d="M0,-60 L-4,-66 L4,-66Z" class="c-lub"/></svg></button>
       <div class="r-read"><span>HDG</span><b id="cHdg2">000°</b><em>T</em></div>
     </div>
-    <div class="clock dragp" aria-live="polite"><div class="grab" aria-hidden="true"></div><span class="k">BANGKOK TIME · ICT</span><b id="ck">--:--</b><span id="ckRate"></span>
+    <div class="clock dragp" aria-live="polite"><span class="k">BANGKOK TIME · ICT</span><b id="ck">--:--</b><span id="ckRate"></span>
       <input id="ckIn" type="range" min="0" max="23.75" step="0.25" aria-label="Time of day"><button id="ckNow" type="button">NOW</button></div>
-    <div class="hud dragp"><div class="grab" aria-hidden="true"></div>
+    <div class="hud dragp">
       <div class="chip">Departed: <b id="h-dep">0</b></div>
       <div class="chip">Extra fees since you opened this page: <b class="r" id="h-extra">฿0</b></div>
     </div>
     <div id="tip" hidden></div>
-    <div class="hint">Drag to rotate · scroll to zoom · hover a plane</div>
+    <div class="hint" style="display:none"></div>
+    <div class="ttl"><span>SUVARNABHUMI · BKK · DEPARTURE FEE</span><b><s>฿730</s> → <em>฿1,120</em> per international passenger</b><span>Drag to rotate · scroll to zoom · click a plane</span></div>
+    <div class="ovb"><button id="oB" type="button" aria-pressed="false">DEPARTURES</button><button id="oC" type="button" aria-pressed="false">WHO'S ON BOARD</button><button id="oI" type="button" aria-pressed="false">SOURCES</button></div>
   </div>
 
   <div>
@@ -491,7 +515,7 @@ function compassTick(){const az=cam.t*180/Math.PI;document.getElementById("cRose
 let drag=null;
 let mv=0;canvas.addEventListener("pointerdown",e=>{mv=0;drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)});
 canvas.addEventListener("pointermove",e=>{if(drag){mv+=Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y);goal.t-=(e.clientX-drag.x)*.006;goal.p=Math.min(1.45,Math.max(.2,goal.p-(e.clientY-drag.y)*.006));drag={x:e.clientX,y:e.clientY}}else hover(e)});
-canvas.addEventListener("pointerup",e=>{drag=null;if(mv<6){const r=canvas.getBoundingClientRect();mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mouse,camera);const h=ray.intersectObjects(pickables)[0];if(h)showCabin(h.object.userData.f)}});
+canvas.addEventListener("pointerup",e=>{drag=null;if(mv<6){const r=canvas.getBoundingClientRect();mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mouse,camera);const h=ray.intersectObjects(pickables)[0];if(h){showCabin(h.object.userData.f);openCabin()}}});
 canvas.addEventListener("wheel",e=>{e.preventDefault();goal.d=Math.min(2200,Math.max(50,goal.d*(1+e.deltaY*.001)))},{passive:false});
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),tip=document.getElementById("tip");
 function hover(e){
@@ -704,12 +728,17 @@ const PARK=[];{const RC2=Object.keys(AIRLINES),AC2=["A320","A321","787","A330","
   GATES.forEach((g,i)=>{if(i%2)return;const pl=makePlane(RC2[i%RC2.length],AC2[i%AC2.length]);pl.position.set(g.x,.6,g.z);pl.rotation.y=g.face;pl.userData.gate=g;scene.add(pl);PARK.push(pl)})}
 applyTime();setInterval(()=>{if(useNow)applyTime()},30000);
 
-/* draggable panels: grab the bar to move a panel anywhere over the map */
-document.querySelectorAll("#mainStage .dragp").forEach(el=>{const h=el.querySelector(".grab");let st=null;
-  h.addEventListener("pointerdown",e=>{e.preventDefault();e.stopPropagation();h.setPointerCapture(e.pointerId);const r=el.getBoundingClientRect(),pr=el.parentElement.getBoundingClientRect();
-    st={x:e.clientX,y:e.clientY,l:r.left-pr.left,t:r.top-pr.top,pw:pr.width,ph:pr.height,w:r.width,hh:r.height};el.style.right="auto";el.style.bottom="auto";el.style.left=st.l+"px";el.style.top=st.t+"px";el.style.transformOrigin="left top"});
-  h.addEventListener("pointermove",e=>{if(!st)return;const l=Math.min(st.pw-40,Math.max(-st.w+40,st.l+e.clientX-st.x)),t=Math.min(st.ph-30,Math.max(0,st.t+e.clientY-st.y));el.style.left=l+"px";el.style.top=t+"px"});
-  h.addEventListener("pointerup",()=>st=null)});
+
+/* move the page sections into overlays on the 3D screen */
+{const st=document.getElementById("mainStage"),mk=id=>{const d=document.createElement("div");d.id=id;d.className="ov";d.hidden=true;st.appendChild(d);return d};
+ const oB=mk("ovBoard"),oC=mk("ovCab"),oI=mk("ovInfo");
+ oB.appendChild(document.querySelector(".wrap>.grid2"));
+ oC.appendChild(document.getElementById("cab").closest(".cabin").parentElement);
+ oI.appendChild(document.querySelector(".wrap>.notes"));
+ const pairs=[["oB",oB],["oC",oC],["oI",oI]];
+ const show=(k)=>pairs.forEach(([b,o])=>{const on=b===k&&o.hidden;o.hidden=!on;document.getElementById(b).setAttribute("aria-pressed",on)});
+ pairs.forEach(([b,o])=>document.getElementById(b).onclick=()=>{const was=!o.hidden;pairs.forEach(([bb,oo])=>{oo.hidden=true;document.getElementById(bb).setAttribute("aria-pressed","false")});if(!was){o.hidden=false;document.getElementById(b).setAttribute("aria-pressed","true")}});
+ window.openCabin=()=>{pairs.forEach(([bb,oo])=>{oo.hidden=bb!=="oC";document.getElementById(bb).setAttribute("aria-pressed",bb==="oC")})};}
 resize();renderBoard();
 // pre-warm so the page opens with traffic on the field
 for(let i=0;i<600;i++)step(1/20);
