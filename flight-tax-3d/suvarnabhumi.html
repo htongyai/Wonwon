@@ -116,6 +116,78 @@ html,body{height:100%;overflow:hidden}
 .hud{top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%)}
 .clock{bottom:58px}
 @media (max-width:760px){.ttl{max-width:calc(100% - 200px);font-size:10px}.hud{display:none}#ovBoard .grid2{grid-template-columns:1fr}}
+
+/* ===== flood-map chrome ===== */
+#mainStage{--cy:#8FD6FF;--rd:#E0363F;--or:#F28C38;--ink:#EAF2F8;--ink2:#9FB0BE;--line:rgba(143,214,255,.28);--pane:rgba(7,18,30,.72);--num:"IBM Plex Mono",ui-monospace,monospace;font-family:var(--num);color:var(--ink)}
+#mainStage .ttl,#mainStage .ovb,#mainStage .hud,#mainStage .clock,#mainStage .hint{display:none!important}
+.tbar{position:absolute;left:0;right:0;top:0;display:flex;align-items:stretch;gap:6px;padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top,0px));font:600 10.5px var(--num);letter-spacing:.14em;background:linear-gradient(rgba(4,10,16,.85),rgba(4,10,16,0));z-index:5;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.tbar>*{flex:none;display:flex;align-items:center;gap:6px;padding:0 10px;height:30px;border:1px solid var(--line);color:var(--ink2);background:rgba(7,18,30,.55);white-space:nowrap}
+.tbar .st{background:var(--rd);border-color:var(--rd);color:#fff}
+.tbar .lv i{width:8px;height:8px;border-radius:50%;background:var(--rd);box-shadow:0 0 8px var(--rd);animation:pl 1.6s infinite}
+@keyframes pl{50%{opacity:.3}}
+.tbar .sn{border-color:var(--rd);color:#ff9aa1}.tbar .sn b{color:#fff;font-weight:500}
+.tbar button{font:600 10.5px var(--num);letter-spacing:.14em;cursor:pointer}.tbar button.cur{border-color:var(--rd);color:#ff6b78;background:rgba(224,54,63,.15)}
+.tbar .sp{flex:1;border:0;background:none;padding:0}
+.tbar .clk{border:0;background:none;color:var(--ink);font:300 22px var(--num);letter-spacing:.02em}.tbar .clk small{font:500 10px var(--num);color:var(--ink2);letter-spacing:.12em;line-height:1.2}
+.chips{position:absolute;left:12px;right:12px;top:calc(50px + env(safe-area-inset-top,0px));display:flex;gap:6px;flex-wrap:wrap;z-index:5;align-items:center}
+.chips button{font:500 11px Anuphan,system-ui,sans-serif;display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);background:rgba(7,18,30,.6);color:var(--ink2);cursor:pointer}
+.chips button i{width:9px;height:9px;border-radius:50%;background:var(--c);opacity:.35}.chips button[aria-pressed="true"]{color:var(--ink);border-color:rgba(242,140,56,.7)}.chips button[aria-pressed="true"] i{opacity:1;box-shadow:0 0 6px var(--c)}
+.chips .ctr{margin-left:auto;text-align:right;font:600 10.5px var(--num);letter-spacing:.14em;color:var(--ink);line-height:1.4}.chips .ctr span{display:block;color:var(--ink2);font-weight:400}
+.lcol{position:absolute;left:14px;top:calc(96px + env(safe-area-inset-top,0px));width:250px;display:grid;gap:8px;z-index:4;pointer-events:none}
+.lcol>*{pointer-events:auto}
+.brand h1{font:400 15px var(--num);letter-spacing:.2em;margin:0;color:var(--ink)}.brand p{margin:4px 0 0;font:400 12px Anuphan,sans-serif;color:var(--ink2)}.brand small{display:block;margin-top:6px;font:500 9.5px var(--num);letter-spacing:.16em;color:var(--ink2)}.brand small b{color:var(--rd)}
+#mainStage #radial{position:relative!important;right:auto!important;top:auto!important;left:-6px;width:300px;height:300px;transform:scale(.62);transform-origin:left top;margin-bottom:-114px}
+.cells .c-h{font:600 9px var(--num);letter-spacing:.14em;color:var(--rd)}.cells .cap{display:block;font:400 10px Anuphan,sans-serif;color:var(--ink2);margin:2px 0 6px}
+#cellList button{display:flex;justify-content:space-between;width:100%;font:400 11.5px var(--num);color:var(--ink);background:rgba(7,18,30,.55);border:1px solid var(--line);padding:6px 8px;margin-bottom:4px;cursor:pointer;text-align:left}
+#cellList button b{font-weight:500;color:#ff8a90}#cellList button:hover{border-color:var(--or)}
+.rcol{position:absolute;right:14px;top:calc(96px + env(safe-area-inset-top,0px));bottom:40px;width:340px;display:flex;flex-direction:column;gap:10px;z-index:4}
+#info{background:var(--pane);border:1px solid var(--line);padding:12px 14px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#info .ix{display:flex;align-items:center;gap:8px;font:600 9.5px var(--num);letter-spacing:.16em;color:var(--rd)}#info .ix i{flex:1;height:1px;background:var(--line)}#info .ix em{font-style:normal;color:var(--ink2)}
+#info h2{font:300 26px/1.1 var(--num);letter-spacing:.06em;margin:8px 0 4px;color:var(--ink);text-transform:uppercase}
+#info .sub{font:500 10px var(--num);letter-spacing:.16em;color:var(--ink2)}#info p{font:400 12.5px/1.5 Anuphan,sans-serif;color:var(--ink);margin:8px 0 0}
+#info .fee{display:flex;gap:10px;align-items:baseline;margin-top:8px;font:300 22px var(--num)}#info .fee s{color:#8fb4e8}#info .fee b{color:#ff6b60;font-weight:400}
+#info .ref{display:flex;gap:8px;align-items:center;margin-top:10px;font:400 11px var(--num);color:var(--ink2)}#info .ref span{background:var(--rd);color:#fff;font-weight:600;padding:2px 6px}
+#info button.go{margin-top:10px;font:600 10px var(--num);letter-spacing:.16em;color:var(--cy);background:transparent;border:1px solid var(--cy);padding:7px 12px;cursor:pointer}
+.feed{flex:1;min-height:0;overflow:auto;background:var(--pane);border:1px solid var(--line);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.feed .f-h{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font:600 10px var(--num);letter-spacing:.16em;color:var(--rd);background:rgba(7,18,30,.95);border-bottom:1px solid var(--line)}.feed .f-h b{color:var(--ink2);font-weight:500}
+.card{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);cursor:pointer}.card:hover{background:rgba(255,255,255,.04)}
+.card .ic{width:34px;height:34px;border-radius:50%;border:1px solid var(--or);display:grid;place-items:center;color:var(--or);font:600 10px var(--num)}
+.card .tg{display:flex;justify-content:space-between;font:600 9.5px var(--num);letter-spacing:.14em;color:var(--or)}.card .tg em{font-style:normal;color:var(--ink2)}
+.card.dp .tg{color:#ff6b78}.card.dp .ic{border-color:var(--rd);color:var(--rd)}.card.dm .tg{color:#6fd39a}.card.dm .ic{border-color:#6fd39a;color:#6fd39a}
+.card h4{margin:3px 0 2px;font:500 13.5px Anuphan,sans-serif;color:var(--ink)}.card p{margin:0;font:400 11px var(--num);color:var(--ink2)}.card p b{color:#ff8a90;font-weight:500}
+.console{position:absolute;left:14px;right:370px;bottom:34px;padding:12px 16px 10px;background:linear-gradient(rgba(7,18,30,.55),rgba(7,18,30,.85));border:1px solid var(--line);z-index:4;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kpi>div{display:grid;grid-template-columns:40px 1fr;gap:10px;align-items:center}
+.kpi svg{width:40px;height:40px;transform:rotate(-90deg)}.kpi .kb{fill:none;stroke:rgba(255,255,255,.12);stroke-width:3}.kpi .kc{fill:none;stroke:var(--rd);stroke-width:3;stroke-linecap:round}.kpi .kc.c{stroke:var(--cy)}.kpi .kc.o{stroke:var(--or)}
+.kpi .lb{display:flex;gap:8px;align-items:center;font:600 9.5px var(--num);letter-spacing:.16em;color:var(--or)}.kpi .lb em{font-style:normal;background:var(--rd);color:#fff;padding:1px 5px;font-size:8.5px}
+.kpi b{display:block;font:300 28px/1.1 var(--num);color:var(--ink);font-variant-numeric:tabular-nums}.kpi b.r{color:#ff6b60}.kpi small{font:400 10px var(--num);color:var(--ink2);letter-spacing:.08em}
+.ruler{margin-top:12px;display:grid;gap:4px}.ruler .rh{display:flex;justify-content:space-between;font:600 9.5px var(--num);letter-spacing:.14em;color:var(--ink2)}.ruler .rh b{color:var(--ink);font-weight:500}
+.scale{position:relative;height:18px;background:repeating-linear-gradient(90deg,rgba(143,214,255,.5) 0 10px,rgba(143,214,255,.25) 10px 12px);border:1px solid var(--line)}
+.scale .z{position:absolute;top:0;bottom:0;border-right:2px solid}
+.scale u{position:absolute;top:-5px;bottom:-5px;width:2px;background:#fff;box-shadow:0 0 8px #fff;text-decoration:none}
+.scale u::after{content:attr(data-v);position:absolute;top:-15px;left:4px;font:600 10px var(--num);color:#fff;white-space:nowrap}
+.scale .tk{position:absolute;top:2px;font:500 9.5px var(--num);color:#07121E;transform:translateX(-50%)}
+.ruler .rl{display:flex;justify-content:space-between;font:600 9px var(--num);letter-spacing:.14em}.ruler .rl span:nth-child(1){color:#6fd39a}.ruler .rl span:nth-child(2){color:var(--cy)}.ruler .rl span:nth-child(3){color:var(--or)}.ruler .rl span:nth-child(4){color:var(--rd)}
+.trow{display:flex;align-items:center;gap:10px;margin-top:8px;font:600 9.5px var(--num);letter-spacing:.14em;color:var(--ink2)}.trow input{flex:1;accent-color:var(--cy)}.trow button{font:600 9.5px var(--num);letter-spacing:.14em;color:var(--cy);background:transparent;border:1px solid var(--cy);padding:3px 8px;cursor:pointer}
+.zbtn{position:absolute;right:370px;bottom:200px;display:grid;gap:10px;z-index:5}
+.zbtn button{width:42px;height:42px;border-radius:50%;background:rgba(7,18,30,.85);border:1px solid rgba(255,255,255,.3);color:#fff;font:400 20px var(--num);cursor:pointer}
+.foot{position:absolute;left:0;right:0;bottom:0;height:28px;display:flex;align-items:center;justify-content:center;gap:14px;font:400 10px var(--num);letter-spacing:.06em;color:var(--ink2);background:rgba(4,10,16,.85);z-index:5;padding-bottom:env(safe-area-inset-bottom,0px);white-space:nowrap;overflow:hidden}
+.foot b{color:var(--rd)}.foot em{font-style:normal;color:#ff8a90}.foot button{font:600 10px var(--num);letter-spacing:.14em;color:var(--cy);background:none;border:1px solid var(--line);padding:2px 8px;cursor:pointer}
+.tabs{display:none}
+#ovCab,#ovInfo,#ovBoard{z-index:8}
+@media (max-width:860px){
+ .chips,.lcol .cells,.brand,.console,.rcol,.zbtn{display:none}
+ .tbar .hide-m{display:none}
+ .lcol{top:calc(50px + env(safe-area-inset-top,0px))}
+ body[data-tab="flights"] .rcol{display:flex;left:10px;right:10px;width:auto;top:calc(50px + env(safe-area-inset-top,0px));bottom:64px}
+ body[data-tab="fees"] .console{display:block;left:10px;right:10px;bottom:64px}
+ body[data-tab="fees"] .kpi{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .foot{display:none}
+ .tabs{display:grid;grid-template-columns:repeat(5,1fr);position:absolute;left:0;right:0;bottom:0;background:#0a1018;border-top:1px solid var(--line);z-index:9;padding-bottom:env(safe-area-inset-bottom,0px)}
+ .tabs button{background:none;border:0;color:var(--ink2);font:600 9.5px var(--num);letter-spacing:.12em;padding:10px 0 12px;display:grid;justify-items:center;gap:4px;cursor:pointer}
+ .tabs button span{font-size:17px;line-height:1}.tabs button[aria-pressed="true"]{color:#ff6b78;background:rgba(224,54,63,.12);box-shadow:inset 0 2px 0 var(--rd)}
+ #ovCab,#ovInfo{left:8px;right:8px;width:auto;top:calc(50px + env(safe-area-inset-top,0px));bottom:64px;max-height:none}
+}
 </style>
 
 <div class="wrap">
@@ -157,6 +229,55 @@ html,body{height:100%;overflow:hidden}
     </div>
     <div id="tip" hidden></div>
     <div class="hint" style="display:none"></div>
+    <div class="tbar">
+      <span class="hide-m">MODE · FEE WATCH · 20 JUN 2026</span>
+      <span class="st">STATUS · FEE +53%</span>
+      <span class="lv"><i></i>SIMULATION</span>
+      <span class="sn hide-m">● BANGKOK TIME · <b id="tbT">--:--</b> · <b id="tbR">--</b> MOVES/HR</span>
+      <button class="hide-m cur" data-view="over">OVERVIEW</button><button class="hide-m" data-view="term">TERMINAL</button><button class="hide-m" data-view="run">RUNWAY</button><button class="hide-m" data-view="sat">SAT-1</button>
+      <button id="tbPause">❚❚ PAUSE</button>
+      <span class="sp"></span>
+      <span class="clk"><b id="tbClk" style="font-weight:300">--:--:--</b><small id="tbDate">ICT</small></span>
+    </div>
+    <div class="chips" role="group" aria-label="Layers">
+      <button data-ly="lbl" aria-pressed="true" style="--c:#8FD6FF"><i></i>Flight tags</button>
+      <button data-ly="cars" aria-pressed="true" style="--c:#E8B830"><i></i>Road traffic</button>
+      <button data-ly="train" aria-pressed="true" style="--c:#2f6db5"><i></i>Airport Rail Link</button>
+      <button data-ly="crew" aria-pressed="true" style="--c:#F28C38"><i></i>Ground crew &amp; buses</button>
+      <button data-ly="lights" aria-pressed="true" style="--c:#ffd696"><i></i>Floodlights</button>
+      <button data-ly="rim" aria-pressed="true" style="--c:#3FF0E0"><i></i>Holo rim</button>
+      <div class="ctr">CENTRE · SUVARNABHUMI (BKK)<span>13.690° N · 100.750° E</span></div>
+    </div>
+    <div class="lcol">
+      <div class="brand"><h1>AUGMENTED SUVARNABHUMI FEE MAP</h1><p>Departure charge · ฿730 → ฿1,120 · ค่าธรรมเนียมผู้โดยสารขาออก</p><small><b>⋀</b> CREATED BY AUGMA IMAGINARIUM CO., LTD.</small></div>
+      <div id="radialSlot"></div>
+      <div class="cells"><div class="c-h">EXTRA FEES · PER FLIGHT · ฿</div><span class="cap">Biggest increases per departure. Tap one to see who's on board.</span><div id="cellList"></div></div>
+    </div>
+    <div class="rcol">
+      <div id="info"><div class="ix"><span>INDEX</span><i></i><em id="iK">FLIGHT · 01</em></div>
+        <h2 id="iN">Pick a flight</h2><div class="sub">FEE REPORT · ค่าธรรมเนียม</div>
+        <p id="iB">Tap a plane on the map or a departure below. Each card shows what its passengers paid before and after 20 June 2026.</p>
+        <div class="fee" id="iF"><s>฿730</s><span>→</span><b>฿1,120</b></div>
+        <div class="ref"><span>REF</span>AOT international passenger service charge</div>
+        <button class="go" id="iGo" type="button">◎ WHO'S ON BOARD</button></div>
+      <div class="feed"><div class="f-h"><span>DEPARTURES · ขาออก</span><b id="fN">0</b></div><div id="feedList"></div></div>
+    </div>
+    <div class="zbtn"><button id="zIn" type="button" aria-label="Zoom in">+</button><button id="zOut" type="button" aria-label="Zoom out">−</button><button id="zC" type="button" aria-label="Centre the map">◎</button></div>
+    <div class="console">
+      <div class="kpi">
+        <div><svg viewBox="0 0 40 40"><circle class="kb" cx="20" cy="20" r="16"/><circle class="kc" id="k1" cx="20" cy="20" r="16" stroke-dasharray="0 101"/></svg><div><div class="lb">DEPARTED · SINCE OPEN</div><b id="kDep">0</b><small>international + domestic</small></div></div>
+        <div><svg viewBox="0 0 40 40"><circle class="kb" cx="20" cy="20" r="16"/><circle class="kc o" id="k2" cx="20" cy="20" r="16" stroke-dasharray="0 101"/></svg><div><div class="lb">EXTRA FEES <em>NEW</em></div><b class="r" id="kExt">฿0</b><small>paid on top of the old ฿730</small></div></div>
+        <div><svg viewBox="0 0 40 40"><circle class="kb" cx="20" cy="20" r="16"/><circle class="kc c" id="k3" cx="20" cy="20" r="16" stroke-dasharray="0 101"/></svg><div><div class="lb">MOVEMENTS · THIS HOUR</div><b id="kHr">--</b><small>of ~1,016 a day (2025)</small></div></div>
+        <div><svg viewBox="0 0 40 40"><circle class="kb" cx="20" cy="20" r="16"/><circle class="kc" cx="20" cy="20" r="16" stroke-dasharray="53 101"/></svg><div><div class="lb">FEE NOW <em>+53%</em></div><b>฿1,120</b><small>was ฿730 · domestic ฿130</small></div></div>
+      </div>
+      <div class="ruler"><div class="rh"><span>DEPARTURE CHARGE PER PASSENGER (฿) · ▲ marker = now</span><b>฿1,120 · +฿390 · +53%</b></div>
+        <div class="scale"><span class="z" style="left:0;width:5.2%;border-color:#6fd39a"></span><span class="z" style="left:0;width:29.2%;border-color:#8FD6FF"></span><span class="z" style="left:0;width:44.8%;border-color:#F28C38"></span><span class="z" style="left:0;width:84.8%;border-color:#E0363F"></span>
+          <u style="left:44.8%" data-v="NOW ฿1,120"></u><span class="tk" style="left:20%">500</span><span class="tk" style="left:60%">1,500</span><span class="tk" style="left:80%">2,000</span></div>
+        <div class="rl"><span>฿130 DOMESTIC</span><span>฿730 BEFORE 20 JUN</span><span>฿1,120 NOW</span><span>฿2,120 IF ฿1,000 TAX PASSES</span></div>
+        <div class="trow"><span>TIME</span><input id="tIn" type="range" min="0" max="23.75" step="0.25" aria-label="Time of day"><button id="tNow" type="button">NOW</button></div></div>
+    </div>
+    <div class="foot"><span><b>⋀</b> © 2026 Augma Imaginarium Co., Ltd.</span><span>Suvarnabhumi Fee Map · simulation on real routes</span><span>Map data © OpenStreetMap contributors · fees: AOT</span><button id="fSrc" type="button">SOURCES</button><em>Fee figures are official; flights, timings and passenger mix are illustrative.</em></div>
+    <nav class="tabs"><button data-tab="map" aria-pressed="true"><span>◎</span>MAP</button><button data-tab="flights" aria-pressed="false"><span>✈</span>FLIGHTS</button><button data-tab="cabin" aria-pressed="false"><span>▦</span>CABIN</button><button data-tab="fees" aria-pressed="false"><span>฿</span>FEES</button><button data-tab="sources" aria-pressed="false"><span>ⓘ</span>SOURCES</button></nav>
     <div class="ttl"><span>SUVARNABHUMI · BKK · DEPARTURE FEE</span><b><s>฿730</s> → <em>฿1,120</em> per international passenger</b><span>Drag to rotate · scroll to zoom · click a plane</span></div>
     <div class="ovb"><button id="oB" type="button" aria-pressed="false">DEPARTURES</button><button id="oC" type="button" aria-pressed="false">WHO'S ON BOARD</button><button id="oI" type="button" aria-pressed="false">SOURCES</button></div>
   </div>
@@ -515,7 +636,7 @@ function compassTick(){const az=cam.t*180/Math.PI;document.getElementById("cRose
 let drag=null;
 let mv=0;canvas.addEventListener("pointerdown",e=>{mv=0;drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)});
 canvas.addEventListener("pointermove",e=>{if(drag){mv+=Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y);goal.t-=(e.clientX-drag.x)*.006;goal.p=Math.min(1.45,Math.max(.2,goal.p-(e.clientY-drag.y)*.006));drag={x:e.clientX,y:e.clientY}}else hover(e)});
-canvas.addEventListener("pointerup",e=>{drag=null;if(mv<6){const r=canvas.getBoundingClientRect();mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mouse,camera);const h=ray.intersectObjects(pickables)[0];if(h){showCabin(h.object.userData.f);openCabin()}}});
+canvas.addEventListener("pointerup",e=>{drag=null;if(mv<6){const r=canvas.getBoundingClientRect();mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mouse,camera);const h=ray.intersectObjects(pickables)[0];if(h){pickFlight(h.object.userData.f);openCabin()}}});
 canvas.addEventListener("wheel",e=>{e.preventDefault();goal.d=Math.min(2200,Math.max(50,goal.d*(1+e.deltaY*.001)))},{passive:false});
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),tip=document.getElementById("tip");
 function hover(e){
@@ -643,7 +764,7 @@ function stairs(){const g=new THREE.Group();bx(g,.8,.35,1.8,0xf2f2f2,0,.1);
   [-.3,.3].forEach(x=>{const r=new THREE.Mesh(new THREE.BoxGeometry(.05,.5,2.6),vm(0xd6342c));r.rotation.x=-.55;r.position.set(x,1.35,-.3);g.add(r)});return g}
 function fuelTruck(){const g=new THREE.Group();bx(g,.8,.7,.8,0xf2f2f2,0,.1,-1.2);const t=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,2,12),vm(0xd9dde0));t.rotation.x=Math.PI/2;t.position.set(0,.6,.3);g.add(t);bx(g,.82,.08,2.4,0x2b3238,0,.1,0);return g}
 function catering(){const g=new THREE.Group();bx(g,.85,.7,.8,0xf2f2f2,0,.1,-1);bx(g,.9,.9,1.6,0xffffff,0,.9,.3);bx(g,.95,.15,1.65,0x2a9d8f,0,.85,.3);bx(g,.85,.7,.2,0x6b7680,0,.2,.3);return g}
-function put(o,x,z,ry){o.position.set(x,.1,z);o.rotation.y=ry;scene.add(o);return o}
+const CREW=[],LIGHTS=[];function put(o,x,z,ry){o.position.set(x,.1,z);o.rotation.y=ry;scene.add(o);CREW.push(o);return o}
 const movers=[];
 // equipment at every contact stand
 GATES.forEach((g,i)=>{const side=V(g.out.z,0,-g.out.x),base=V(g.x,0,g.z),ry=Math.atan2(g.out.x,g.out.z);
@@ -676,8 +797,8 @@ GATES.filter((g,i)=>i%4===0).forEach((g,i)=>{const A=V(g.x,0,g.z).add(g.out.clon
  const gm=new THREE.SpriteMaterial({map:new THREE.CanvasTexture(gc),blending:THREE.AdditiveBlending,depthWrite:false,transparent:true});
  const pts=[];GATES.forEach((g,i)=>{if(i%3===0)pts.push(V(g.x,0,g.z).add(g.out.clone().multiplyScalar(9)))});remote.forEach(c=>pts.push(c.clone().add(RD.clone().multiplyScalar(8))));
  const pole=new THREE.InstancedMesh(new THREE.CylinderGeometry(.08,.12,4,6),M(0x4a525a),pts.length),m=new THREE.Matrix4();
- pts.forEach((p,i)=>{m.makeTranslation(p.x,2,p.z);pole.setMatrixAt(i,m);const sp=new THREE.Sprite(gm);sp.position.set(p.x,4.1,p.z);sp.scale.set(5,5,1);scene.add(sp);
-   const pool=new THREE.Sprite(gm);pool.position.set(p.x,.3,p.z);pool.scale.set(16,16,1);pool.material=gm;scene.add(pool)});scene.add(pole)}
+ pts.forEach((p,i)=>{m.makeTranslation(p.x,2,p.z);pole.setMatrixAt(i,m);const sp=new THREE.Sprite(gm);sp.position.set(p.x,4.1,p.z);sp.scale.set(5,5,1);scene.add(sp);LIGHTS.push(sp);
+   const pool=new THREE.Sprite(gm);pool.position.set(p.x,.3,p.z);pool.scale.set(16,16,1);pool.material=gm;scene.add(pool);LIGHTS.push(pool)});scene.add(pole);LIGHTS.push(pole)}
 function moveAll(dt){for(const m of movers){m.t+=dt/m.T;const k=m.t%2,f=k<1?k:2-k,s=f*f*(3-2*f);
   const p=m.A.clone().lerp(m.B,s);const d=(k<1?m.B.clone().sub(m.A):m.A.clone().sub(m.B));m.o.position.set(p.x,.1,p.z);m.o.rotation.y=Math.atan2(-d.x,-d.z)}}
 // cars on the road network, following connected segments
@@ -739,6 +860,46 @@ applyTime();setInterval(()=>{if(useNow)applyTime()},30000);
  const show=(k)=>pairs.forEach(([b,o])=>{const on=b===k&&o.hidden;o.hidden=!on;document.getElementById(b).setAttribute("aria-pressed",on)});
  pairs.forEach(([b,o])=>document.getElementById(b).onclick=()=>{const was=!o.hidden;pairs.forEach(([bb,oo])=>{oo.hidden=true;document.getElementById(bb).setAttribute("aria-pressed","false")});if(!was){o.hidden=false;document.getElementById(b).setAttribute("aria-pressed","true")}});
  window.openCabin=()=>{pairs.forEach(([bb,oo])=>{oo.hidden=bb!=="oC";document.getElementById(bb).setAttribute("aria-pressed",bb==="oC")})};}
+
+/* ===== flood-map chrome wiring ===== */
+{const $=id=>document.getElementById(id);
+ $("radialSlot").appendChild($("radial"));
+ // views
+ document.querySelectorAll(".tbar [data-view]").forEach(b=>b.onclick=()=>{setView(b.dataset.view);document.querySelectorAll(".tbar [data-view]").forEach(x=>x.classList.toggle("cur",x===b))});
+ $("tbPause").onclick=()=>{$("v-pause").click();$("tbPause").textContent=paused?"▶ RESUME":"❚❚ PAUSE"};
+ $("zIn").onclick=()=>goal.d=Math.max(50,goal.d*.75);$("zOut").onclick=()=>goal.d=Math.min(2200,goal.d*1.33);$("zC").onclick=()=>setView("over");
+ // layers
+ const LY={lbl:v=>{SHOWLBL=v;LBL.forEach(l=>l.visible=v)},cars:v=>cars.visible=v,train:v=>train.forEach(g=>g.userData.off=!v),
+   crew:v=>CREW.forEach(o=>o.visible=v),lights:v=>LIGHTS.forEach(o=>o.visible=v),rim:v=>(window.RIMLBL||[]).forEach(o=>o.visible=v)};
+ document.querySelectorAll(".chips [data-ly]").forEach(b=>b.onclick=()=>{const v=b.getAttribute("aria-pressed")!=="true";b.setAttribute("aria-pressed",v);LY[b.dataset.ly](v)});
+ // time
+ const tIn=$("tIn");tIn.value=ckIn.value;tIn.oninput=()=>{ckIn.value=tIn.value;ckIn.oninput()};$("tNow").onclick=()=>$("ckNow").click();
+ setInterval(()=>{const d=new Date(Date.now()+7*3600e3);$("tbClk").textContent=d.toISOString().slice(11,19);$("tbDate").textContent=d.toUTCString().slice(0,11).toUpperCase()+" · ICT"},1000);
+ // biggest per-flight increases
+ const top=ROUTES.filter(r=>!r[3]).map(r=>({r,v:Math.round(AC[r[2]].s*LOAD)*390})).sort((a,b)=>b.v-a.v).filter((x,i,a)=>a.findIndex(y=>y.r[1]===x.r[1])===i).slice(0,6);
+ $("cellList").innerHTML=top.map((x,i)=>`<button data-i="${i}">${x.r[0]} · ${x.r[1]}<b>+${fmt(x.v)}</b></button>`).join("");
+ $("cellList").querySelectorAll("button").forEach(b=>b.onclick=()=>{const x=top[+b.dataset.i],[code,dest,ac]=x.r;pickFlight({id:900+ +b.dataset.i,code,dest,ac,dom:false,pax:Math.round(AC[ac].s*LOAD),kind:"dep",status:"Scheduled"})});
+ // index panel
+ let n=0;window.pickFlight=f=>{n++;$("iK").textContent="FLIGHT · "+String(n).padStart(2,"0");$("iN").textContent=`${f.code} → ${f.dest}`;
+   $("iB").textContent=`${AIRLINES[f.code].n} · ${f.ac} · about ${f.pax} passengers · ${f.status||""}. `+(f.dom?"Domestic flight: the charge stays at ฿130 per passenger.":`Together they now pay ${fmt(NEW*f.pax)} in departure charges, up from ${fmt(OLD*f.pax)}: ${fmt((NEW-OLD)*f.pax)} more on this one flight.`);
+   $("iF").innerHTML=f.dom?`<b style="color:#6fd39a">฿130 · no change</b>`:`<s>฿730</s><span>→</span><b>฿1,120</b>`;window._pf=f;showCabin(f)};
+ $("iGo").onclick=()=>{if(window._pf)openCabin()};
+ // feed + KPIs hooked into the existing board/hud refresh
+ const oldBoard=renderBoard;renderBoard=function(){oldBoard();const rows=flights.filter(f=>f.kind==="dep").slice(-12).reverse();$("fN").textContent=rows.length+" ACTIVE";
+   $("feedList").innerHTML=rows.map(f=>`<div class="card ${f.dom?"dm":f.status==="Departed"?"dp":""}" data-id="${f.id}"><div class="ic">${f.code}</div><div><div class="tg"><span>${f.dom?"DOMESTIC":f.status.toUpperCase()}</span><em>${f.ac} · ${f.pax} PAX</em></div><h4>${AIRLINES[f.code].n} to ${f.dest}</h4><p>${f.dom?"฿130 per passenger · unchanged":`฿730 → ฿1,120 · <b>+${fmt((f.newF-f.oldF)*f.pax)}</b> this flight`}</p></div></div>`).join("");
+   $("feedList").querySelectorAll(".card").forEach(c=>c.onclick=()=>{const f=flights.find(x=>x.id==c.dataset.id);if(f)pickFlight(f)})};
+ const oldHud=hud;hud=function(){oldHud();$("kDep").textContent=departed;$("kExt").textContent=fmt(extra);
+   $("k1").setAttribute("stroke-dasharray",`${Math.min(101,departed*5)} 101`);$("k2").setAttribute("stroke-dasharray",`${Math.min(101,extra/2e4)} 101`)};
+ const oldApply=applyTime;applyTime=function(){oldApply();const r=Math.round(perHour(hourNow()));$("kHr").textContent=r;$("tbR").textContent=r;$("tbT").textContent=$("ck").textContent;
+   $("k3").setAttribute("stroke-dasharray",`${Math.min(101,r/70*101)} 101`);if(useNow)tIn.value=ckIn.value};
+ // tabs (phones) + sources
+ const tabs=document.querySelectorAll(".tabs button");
+ tabs.forEach(b=>b.onclick=()=>{tabs.forEach(x=>x.setAttribute("aria-pressed",x===b));document.body.dataset.tab=b.dataset.tab;
+   ["ovCab","ovInfo","ovBoard"].forEach(i=>$(i).hidden=true);if(b.dataset.tab==="cabin"){if(!window._pf&&flights[0])pickFlight(flights.find(f=>f.kind==="dep")||flights[0]);$("ovCab").hidden=false}if(b.dataset.tab==="sources")$("ovInfo").hidden=false});
+ $("fSrc").onclick=()=>{$("ovInfo").hidden=!$("ovInfo").hidden};
+ // close buttons on overlays
+ ["ovCab","ovInfo"].forEach(i=>{const x=document.createElement("button");x.textContent="✕ CLOSE";x.style.cssText="float:right;font:600 10px IBM Plex Mono,monospace;letter-spacing:.14em;color:#8FD6FF;background:none;border:1px solid #8FD6FF;padding:4px 8px;cursor:pointer";x.onclick=()=>$(i).hidden=true;$(i).prepend(x)});
+ renderBoard();hud();applyTime();}
 resize();renderBoard();
 // pre-warm so the page opens with traffic on the field
 for(let i=0;i<600;i++)step(1/20);
