@@ -214,16 +214,60 @@ GEO.runway.forEach(r=>{
   RWY[r.ref]={S:V(a[0],0,a[1]),N:V(b[0],0,b[1]),dir:V(dx/L,0,dz/L),L};
   place(label("Runway "+r.ref,{size:20,color:"#ffffff",bg:"rgba(20,30,40,.75)"}),a[0],6,a[1]+12);
 });
-const GLASS=0x9fc3d6,EXAG=2.5,GATES=[];
-let TERM=null;
-GEO.terminal.forEach(t=>{
-  extrude(t.c,t.h/10*EXAG,GLASS);
-  const [cx,cz]=centroid(t.c);if(/Main/.test(t.n))TERM=V(cx,0,cz);
-  place(label(/Main/.test(t.n)?"Main passenger terminal":"SAT-1 satellite terminal",{size:22,color:"#13202c",bg:"rgba(255,255,255,.9)"}),cx,t.h/10*EXAG+10,cz);
-  // stands: terminal outline points pushed outward, nose-in
-  const q=t.c.map(P);for(let i=0;i<q.length-1;i++){const [x,z]=q[i],d=Math.hypot(x-cx,z-cz)||1,o=7;
-    if(d>8)GATES.push({x:x+(x-cx)/d*o,z:z+(z-cz)/d*o,face:Math.atan2(-(cx-x),-(cz-z)),busy:false})}
-});
+// ---------- buildings, modelled on the Murphy/Jahn design ----------
+// Frame aligned to the runways (heading ~14°): u across the field, v along the runways, in metres.
+const AZ=14*Math.PI/180,UD=V(Math.cos(AZ),0,Math.sin(AZ)),RD=V(Math.sin(AZ),0,-Math.cos(AZ)),HX=1.5; // heights ×1.5
+const UV=(u,v,y=0)=>UD.clone().multiplyScalar(u/10).add(RD.clone().multiplyScalar(v/10)).setY(y);
+const GATES=[];
+function bandTex(len){ // white membrane bays alternating with glazed bays, ~27 m apart
+  const c=document.createElement("canvas");c.width=8;c.height=64;const x=c.getContext("2d");
+  x.fillStyle="#f4f6f7";x.fillRect(0,0,8,64);x.fillStyle="#7fa3b8";x.fillRect(0,0,8,22);x.fillStyle="#c9d2d8";x.fillRect(0,22,8,3);
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(1,len/54);return t;
+}
+function concourse(u0,u1,v0,v1,{gates=true,sides=[1,-1]}={}){ // axis-aligned in (u,v)
+  const alongU=(u1-u0)>(v1-v0),len=alongU?u1-u0:v1-v0,w=alongU?v1-v0:u1-u0;
+  const g=new THREE.Group();g.position.copy(UV((u0+u1)/2,(v0+v1)/2));g.rotation.y=alongU?-AZ:Math.PI/2-AZ;scene.add(g);
+  const baseH=9*HX/10,L=len/10,W=w/10;
+  const base=new THREE.Mesh(new THREE.BoxGeometry(L,baseH,W),M(0x6f8fa3));base.position.y=baseH/2;g.add(base);
+  const tube=new THREE.Mesh(new THREE.CylinderGeometry(W/2,W/2,L,28,1,true,0,Math.PI),new THREE.MeshLambertMaterial({map:bandTex(len),side:THREE.DoubleSide}));
+  tube.rotation.z=Math.PI/2;tube.scale.set(1,1,1);tube.position.y=baseH;
+  const sq=new THREE.Group();sq.add(tube);sq.scale.y=.55;sq.position.y=baseH*.45;g.add(sq);
+  // arch ribs (5-pin arch trusses)
+  for(let i=0;i<=Math.floor(len/27);i++){const r=new THREE.Mesh(new THREE.TorusGeometry(W/2,.12,4,20,Math.PI),M(0x9aa6ae));r.rotation.y=Math.PI/2;r.position.set(-L/2+i*2.7,baseH,0);r.scale.set(1,.55,1);g.add(r)}
+  if(gates)for(const s of sides)for(let t=60;t<len-40;t+=75){
+    const along=alongU?UD:RD,out=(alongU?RD:UD).clone().multiplyScalar(s);
+    const c0=alongU?UV(u0+t,(v0+v1)/2):UV((u0+u1)/2,v0+t);
+    const pos=c0.clone().add(out.clone().multiplyScalar(W/2+4.5));
+    // jet bridge
+    const jb=new THREE.Mesh(new THREE.BoxGeometry(1.2,1,3.2),M(0x7d8790));jb.position.copy(c0.clone().add(out.clone().multiplyScalar(W/2+1.4))).setY(1.4);jb.lookAt(c0.clone().setY(1.4));scene.add(jb);
+    GATES.push({x:pos.x,z:pos.z,out,face:Math.atan2(out.x,out.z),busy:false});
+  }
+  return g;
+}
+// concourse spine and the two cross arms (double-X plan), from the OSM outline
+concourse(-305,1116,816,868,{sides:[-1]});
+concourse(-30,24,340,816);concourse(-30,24,868,1306,{gates:false});
+concourse(778,834,340,816);concourse(778,834,868,1298,{gates:false});
+// SAT-1 midfield satellite (opened 2023, 28 contact gates)
+concourse(-140,949,-243,-163);
+place(label("SAT-1 satellite terminal",{size:22,color:"#13202c",bg:"rgba(255,255,255,.9)"}),...UV(400,-203,14).toArray());
+// main terminal: 444 × 111 m glass hall under a 567 × 210 m floating roof on 8 super-trusses and 16 pylons
+const HC={u:397,v:944};const TERM=UV(HC.u,HC.v);
+{const hall=new THREE.Group();hall.position.copy(TERM);hall.rotation.y=-AZ;scene.add(hall);
+ const H=30*HX/10,RY=40*HX/10;
+ const glass=new THREE.Mesh(new THREE.BoxGeometry(44.4,H,11.1),new THREE.MeshLambertMaterial({color:0x8fb3c7,transparent:true,opacity:.85}));glass.position.y=H/2;hall.add(glass);
+ for(let i=0;i<=44;i++){const m=new THREE.Mesh(new THREE.BoxGeometry(.08,H,11.2),M(0x5d6a74));m.position.set(-22.2+i*1.01,H/2,0);hall.add(m)}
+ const roof=new THREE.Mesh(new THREE.BoxGeometry(56.7,.5,21),M(0xe6e9ec));roof.position.y=RY;hall.add(roof);
+ const under=new THREE.Mesh(new THREE.BoxGeometry(56.5,.1,20.8),M(0xb9a27a));under.position.y=RY-.3;hall.add(under); // louvered soffit
+ const sh=new THREE.Shape();// truss profile across the 210 m roof: 42 m cantilevers, 126 m span, deepest over the pylons
+ [[-10.5,0],[-6.3,1.7],[0,1.0],[6.3,1.7],[10.5,0],[6.3,0],[-6.3,0]].forEach(([a,b],i)=>i?sh.lineTo(a,b*HX):sh.moveTo(a,b*HX));
+ const tg=new THREE.ExtrudeGeometry(sh,{depth:.5,bevelEnabled:false});
+ for(let i=0;i<8;i++){const x=-24.5+i*7;
+   const t=new THREE.Mesh(tg,M(0x5b6670));t.rotation.y=Math.PI/2;t.position.set(x+.25,RY+.25,0);hall.add(t);
+   [-6.3,6.3].forEach(z=>{const py=new THREE.Mesh(new THREE.CylinderGeometry(.25,.6,RY+1.7*HX,8),M(0x6b7680));py.position.set(x,(RY+1.7*HX)/2,z);hall.add(py)})}
+ const curb=new THREE.Mesh(new THREE.BoxGeometry(50,1.2,2.5),M(0x7a8086));curb.position.set(0,.6,9);hall.add(curb);
+ place(label("Main passenger terminal",{size:22,color:"#13202c",bg:"rgba(255,255,255,.9)"}),TERM.x,RY+8,TERM.z);
+}
 GEO.tower.forEach(tw=>{const [x,z]=P(tw.c),h=tw.h/10;
   const sh=new THREE.Mesh(new THREE.CylinderGeometry(1.4,2,h-2,16),M(0xd9dde0));sh.position.set(x,(h-2)/2,z);scene.add(sh);
   const cab=new THREE.Mesh(new THREE.CylinderGeometry(3.2,2.4,2,16),M(0x2f4a5c));cab.position.set(x,h-1,z);scene.add(cab);
@@ -255,7 +299,7 @@ const gatePos=g=>V(g.x,0,g.z);
 function taxiLine(r){const p=V(-r.dir.z,0,r.dir.x);if(p.dot(TERM.clone().sub(r.S))<0)p.negate();return p.multiplyScalar(22)}
 function alongT(r,pt){return Math.min(1,Math.max(0,pt.clone().sub(r.S).dot(r.dir)/r.L))}
 function onLine(r,t,off){return r.S.clone().add(r.dir.clone().multiplyScalar(r.L*t)).add(off)}
-function pushback(g){const gp=gatePos(g);return gp.clone().add(gp.clone().sub(TERM).setY(0).normalize().multiplyScalar(14))}
+function pushback(g){return gatePos(g).add(g.out.clone().multiplyScalar(12))}
 function departurePath(g){
   const r=RWY["01/19"],off=taxiLine(r),pb=pushback(g),tg=alongT(r,pb);
   return pathOf([{p:gatePos(g)},{p:pb,v:3},{p:onLine(r,tg,off),v:7},{p:onLine(r,0,off),v:9},{p:r.S.clone(),v:4},
