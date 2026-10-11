@@ -60,6 +60,33 @@ button:focus-visible{outline:2px solid var(--old);outline-offset:2px}
 .strip .tot td{font-weight:600;border-top:1px solid #1b2430}
 .strip .muted{color:#5a5a48}
 #cab{display:block;width:100%;height:min(460px,70vw);min-height:300px;cursor:grab;touch-action:none}
+
+/* radial navigator + frame, from the flood map 3D view */
+#mainStage .fr{position:absolute;width:26px;height:26px;border:2px solid #8FD6FF;pointer-events:none;opacity:.9}
+#mainStage .fr.tl{left:8px;top:8px;border-right:0;border-bottom:0}#mainStage .fr.tr{right:8px;top:8px;border-left:0;border-bottom:0}
+#mainStage .fr.bl{left:8px;bottom:8px;border-right:0;border-top:0}#mainStage .fr.br{right:8px;bottom:8px;border-left:0;border-top:0}
+#radial{position:absolute;right:6px;top:6px;width:300px;height:300px;transform:scale(.62);transform-origin:right top;--num:"IBM Plex Mono",ui-monospace,monospace}
+#radial::before{content:"";position:absolute;inset:-6px;border-radius:50%;pointer-events:none;background:radial-gradient(closest-side,rgba(2,6,10,.62),rgba(2,6,10,.38) 55%,rgba(2,6,10,.1) 85%,transparent);-webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px)}
+#rsv{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.r-ring{fill:none;stroke:rgba(143,214,255,.6);stroke-width:1}.r-ring.dash{stroke-dasharray:1 4;stroke:#8FD6FF}.r-ring.y{stroke:#8FD6FF;opacity:.8}
+.seg path{fill:rgba(255,255,255,.04);stroke:rgba(255,255,255,.55);stroke-width:1;cursor:pointer;transition:fill .2s}
+.seg text{fill:rgba(255,255,255,.8);font:600 10px var(--num);letter-spacing:.14em;pointer-events:none;text-anchor:middle}
+.seg:hover path,.seg:focus path{fill:rgba(255,255,255,.12)}.seg:focus{outline:none}.seg:focus-visible path{stroke:#8FD6FF;stroke-width:1.6}
+.seg.on path{fill:rgba(255,59,78,.18);stroke:#FF3B4E}.seg.on text{fill:#FF6B78}
+#compass{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:132px;padding:0;background:none;border:0;cursor:pointer}
+#compass svg{overflow:visible;filter:drop-shadow(0 0 6px rgba(143,214,255,.7))}
+#compass .c-ring{fill:none;stroke:#8FD6FF;stroke-width:1.6;opacity:.9}#compass .c-ring.thin{opacity:.45;stroke-width:.6;stroke-dasharray:1.5 3}
+#compass .c-tk{stroke:#8FD6FF;stroke-width:1}#compass .c-tk.m{stroke-width:1.6}
+#compass .c-n{fill:#B8323A}#compass .c-nh{fill:#E0474F}#compass .c-s{stroke:#8FD6FF;fill:rgba(255,255,255,.08);stroke-width:1}#compass .c-d{fill:#E3E8EC;opacity:.35}
+#compass .c-t{fill:#C9D0D5;font:600 10px var(--num);text-anchor:middle;letter-spacing:.1em}#compass .c-t.n{fill:#E0474F;font-size:12px}
+#compass .c-hub{fill:#07121E;stroke:#8FD6FF;stroke-width:1.4}#compass .c-lub{fill:#F28C38}
+.r-read{position:absolute;left:50%;top:calc(50% + 78px);transform:translateX(-50%);display:flex;align-items:baseline;gap:6px;font:500 11px var(--num);letter-spacing:.16em;color:#C9D0D5;pointer-events:none}
+.r-read b{font:300 24px var(--num);color:#fff;letter-spacing:.04em}.r-read em{font-style:normal;color:#F28C38}
+@media (max-width:700px){#radial{transform:scale(.45)}}
+.clock{position:absolute;left:10px;bottom:34px;background:rgba(7,18,30,.78);color:#E3E8EC;border:1px solid rgba(143,214,255,.5);border-radius:8px;padding:8px 10px;font:500 12px "IBM Plex Mono",monospace;display:grid;gap:4px;max-width:calc(100% - 20px)}
+.clock b{font:300 22px "IBM Plex Mono",monospace;color:#fff}.clock .k{color:#8FD6FF;letter-spacing:.12em;font-size:10px}
+.clock input{width:200px;max-width:100%;accent-color:#8FD6FF}
+.clock button{font:600 11px "IBM Plex Mono",monospace;background:transparent;color:#8FD6FF;border:1px solid #8FD6FF;border-radius:4px;padding:2px 8px;cursor:pointer;justify-self:start}
 </style>
 
 <div class="wrap">
@@ -73,11 +100,28 @@ button:focus-visible{outline:2px solid var(--old);outline-offset:2px}
     <button id="v-over" aria-pressed="true">Overview</button>
     <button id="v-term">Terminal close-up</button>
     <button id="v-run">Runway</button>
+    <button id="v-sat">SAT-1</button>
     <button id="v-pause">Pause</button>
   </div>
 
-  <div class="stage">
+  <div class="stage" id="mainStage">
     <canvas id="c" aria-label="3D model of Suvarnabhumi Airport with simulated flights"></canvas>
+    <i class="fr tl"></i><i class="fr tr"></i><i class="fr bl"></i><i class="fr br"></i>
+    <div id="radial">
+      <svg id="rsv" viewBox="-150 -150 300 300" aria-label="Map controls"><g id="segs"></g>
+        <circle r="104" class="r-ring"/><circle r="100" class="r-ring dash"/><circle r="66" class="r-ring y"/><g id="rTicks"></g></svg>
+      <button id="compass" type="button" aria-label="Compass. Click to turn the map north-up.">
+        <svg viewBox="-60 -60 120 120" width="120" height="120" aria-hidden="true">
+          <circle r="56" class="c-ring"/><circle r="50" class="c-ring thin"/><circle r="22" class="c-ring thin"/><g id="cTicks"></g>
+          <g id="cRose"><path d="M0,-44 L7,-7 L0,0 L-7,-7Z" class="c-n"/><path d="M0,-44 L7,-7 L0,0Z" class="c-nh"/>
+            <path d="M0,44 L7,7 L0,0 L-7,7Z" class="c-s"/><path d="M44,0 L7,7 L0,0 L7,-7Z" class="c-s"/><path d="M-44,0 L-7,7 L0,0 L-7,-7Z" class="c-s"/>
+            <path d="M26,-26 L4,-1 L1,-4Z M-26,26 L-4,1 L-1,4Z M26,26 L1,4 L4,1Z M-26,-26 L-1,-4 L-4,-1Z" class="c-d"/>
+            <text y="-47" class="c-t n">N</text><text y="53" class="c-t">S</text><text x="50" y="3.5" class="c-t">E</text><text x="-50" y="3.5" class="c-t">W</text></g>
+          <circle r="3" class="c-hub"/><path d="M0,-60 L-4,-66 L4,-66Z" class="c-lub"/></svg></button>
+      <div class="r-read"><span>HDG</span><b id="cHdg2">000°</b><em>T</em></div>
+    </div>
+    <div class="clock" aria-live="polite"><span class="k">BANGKOK TIME · ICT</span><b id="ck">--:--</b><span id="ckRate"></span>
+      <input id="ckIn" type="range" min="0" max="23.75" step="0.25" aria-label="Time of day"><button id="ckNow" type="button">NOW</button></div>
     <div class="hud">
       <div class="chip">Departed: <b id="h-dep">0</b></div>
       <div class="chip">Extra fees since you opened this page: <b class="r" id="h-extra">฿0</b></div>
@@ -118,6 +162,7 @@ button:focus-visible{outline:2px solid var(--old);outline-offset:2px}
   </div>
 
   <div class="notes">
+    <p>Traffic follows Bangkok time. The daily total is real: Suvarnabhumi handled 370,832 take-offs and landings in 2025, about 1,016 a day (<a href="https://en.wikipedia.org/wiki/Suvarnabhumi_Airport" target="_blank" rel="noopener">AOT via Wikipedia</a>). How that splits by hour is estimated, since live schedules can't be loaded here. Use the time slider to see another hour.</p>
     <p>The flights are simulated. The routes and airlines are real services from Suvarnabhumi, but the timings, aircraft types and passenger numbers are approximate. The fees are the official AOT amounts. The airport layout, runways, taxiways, aprons, terminals and roads come from OpenStreetMap, the same data as the flood map. Road colours show the iTIC traffic snapshot from 28 Sep 2026. The terminal access viaducts and the Airport Rail Link (blue) are raised; their heights are approximate. Building heights are exaggerated 2.5×, and taxi routes are approximate.</p>
     <p>Sources: <a href="https://www.tatnews.org/2026/05/airports-of-thailand-to-raise-international-passenger-service-charge-from-20-june-2026/" target="_blank" rel="noopener">TAT Newsroom</a> · <a href="https://www.nationthailand.com/news/general/40059211" target="_blank" rel="noopener">Nation Thailand</a> · Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> · <a href="https://www.pattayamail.com/latestnews/news/flying-out-of-thailand-international-airport-departure-fee-jumps-to-1120-baht-from-june-20-549686" target="_blank" rel="noopener">Pattaya Mail</a></p>
   </div>
@@ -169,7 +214,7 @@ function label(text,{size=22,color="#13202c",bg=null,scale=1}={}){
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));
   s.scale.set(w/9*scale,h/9*scale,1);s.renderOrder=10;return s;
 }
-function place(s,x,y,z){s.position.set(x,y,z);scene.add(s);return s}
+const LBL=[];let SHOWLBL=true;function place(s,x,y,z){s.position.set(x,y,z);scene.add(s);LBL.push(s);return s}
 
 // ---------- real layout from OpenStreetMap (via the flood map's airports.json) ----------
 const V=(x,y,z)=>new THREE.Vector3(x,y,z);
@@ -356,15 +401,15 @@ function remove(fl){scene.remove(fl.mesh);scene.remove(fl.tag);fl.mesh.traverse(
 
 let step=function(dt){
   clock+=dt;
-  if(clock>nextDep){spawn("dep");nextDep=clock+5+Math.random()*4}
-  if(clock>nextArr){spawn("arr");nextArr=clock+7+Math.random()*5}
+  if(clock>nextDep){spawn("dep");nextDep=clock+(5+Math.random()*4)*rateK()}
+  if(clock>nextArr){spawn("arr");nextArr=clock+(7+Math.random()*5)*rateK()}
   for(const fl of [...flights]){
     if(fl.wait>0){fl.wait-=dt}else fl.t+=dt;
     const s=sample(fl.path,fl.t);
     fl.mesh.position.copy(s.p).add(V(0,.6,0));
     if(fl.t===0){fl.mesh.rotation.set(0,fl.gate.face,0)}
     else if(s.d.lengthSq()>1e-6){fl.mesh.rotation.y=Math.atan2(-s.d.x,-s.d.z);const flat=Math.hypot(s.d.x,s.d.z);fl.mesh.rotation.x=Math.atan2(s.d.y,flat)}
-    fl.tag.position.copy(fl.mesh.position).add(V(0,5,0));
+    fl.tag.position.copy(fl.mesh.position).add(V(0,5,0));fl.tag.visible=SHOWLBL;
     if(fl.kind==="dep"){
       const prev=fl.status;
       if(fl.wait>0)fl.status="Boarding";else if(fl.t<fl.path.seg.slice(0,4).reduce((a,s)=>a+s.t,0))fl.status="Taxiing";
@@ -390,11 +435,29 @@ function renderBoard(){
 }
 
 /* ---------- camera ---------- */
-const VIEWS={over:{t:-.5,p:.9,d:620,l:TERM.clone()},term:{t:-.6,p:1.0,d:190,l:TERM.clone()},run:{t:-2.2,p:1.2,d:200,l:RWY["01/19"].S.clone().lerp(RWY["01/19"].N,.25)}};
+const VIEWS={over:{t:-.5,p:.9,d:620,l:TERM.clone()},term:{t:-.6,p:1.0,d:190,l:TERM.clone()},run:{t:-2.2,p:1.2,d:200,l:RWY["01/19"].S.clone().lerp(RWY["01/19"].N,.25)},sat:{t:.4,p:1.0,d:200,l:UV(400,-203)}};
 let cam={...VIEWS.over},goal={...VIEWS.over};
-function setView(k){goal={...VIEWS[k]};document.querySelectorAll("#v-over,#v-term,#v-run").forEach(b=>b.setAttribute("aria-pressed",b.id==="v-"+k))}
-["over","term","run"].forEach(k=>document.getElementById("v-"+k).onclick=()=>setView(k));
+function setView(k){goal={...VIEWS[k]};document.querySelectorAll("#v-over,#v-term,#v-run,#v-sat").forEach(b=>b.setAttribute("aria-pressed",b.id==="v-"+k))}
+["over","term","run","sat"].forEach(k=>document.getElementById("v-"+k).onclick=()=>setView(k));
 document.getElementById("v-pause").onclick=e=>{paused=!paused;e.target.textContent=paused?"Resume":"Pause";e.target.setAttribute("aria-pressed",paused)};
+
+/* ---------- radial navigator (same control as the flood map 3D view) ---------- */
+{const seg=document.getElementById("segs"),NS="http://www.w3.org/2000/svg";
+ const arc=(r0,r1,a0,a1)=>{const p=(r,a)=>`${(Math.cos(a)*r).toFixed(2)},${(Math.sin(a)*r).toFixed(2)}`;return `M${p(r1,a0)} A${r1},${r1} 0 0 1 ${p(r1,a1)} L${p(r0,a1)} A${r0},${r0} 0 0 0 ${p(r0,a0)}Z`};
+ const IN=[["OVERVIEW",()=>setView("over"),"over"],["TERMINAL",()=>setView("term"),"term"],["RUNWAY",()=>setView("run"),"run"],["SAT-1",()=>setView("sat"),"sat"],["PAUSE",()=>document.getElementById("v-pause").click(),"pause"]];
+ const OUT=[["LABELS",()=>{SHOWLBL=!SHOWLBL;LBL.forEach(l=>l.visible=SHOWLBL);return SHOWLBL},"lbl",true],["CARS",()=>(cars.visible=!cars.visible),"cars",true],["TRAIN",()=>{const v=!train[0].userData.off;train.forEach(g=>g.userData.off=v);return !v},"train",true],["NOW",()=>{useNow=true;return false},"now"]];
+ const ring=(list,r0,r1,start,span)=>list.forEach(([t,fn,k,on],i)=>{const w=span/list.length,a0=(start+i*w+.6)*Math.PI/180,a1=(start+(i+1)*w-.6)*Math.PI/180,am=(a0+a1)/2,rm=(r0+r1)/2;
+   const g=document.createElementNS(NS,"g");g.setAttribute("class","seg"+(on||k==="over"?" on":""));g.setAttribute("tabindex","0");g.setAttribute("role","button");g.setAttribute("aria-label",t);g.dataset.k=k;
+   const pa=document.createElementNS(NS,"path");pa.setAttribute("d",arc(r0,r1,a0,a1));g.appendChild(pa);
+   const tx=document.createElementNS(NS,"text");tx.setAttribute("x",(Math.cos(am)*rm).toFixed(1));tx.setAttribute("y",(Math.sin(am)*rm+3.5).toFixed(1));tx.textContent=t;g.appendChild(tx);
+   const go=()=>{const r=fn();if(typeof r==="boolean")g.classList.toggle("on",r);else{seg.querySelectorAll('.seg[data-v]').forEach(x=>x.classList.remove("on"));if(k!=="pause")g.classList.add("on");else g.classList.toggle("on",paused)}};
+   if(["over","term","run","sat"].includes(k))g.dataset.v=1;
+   g.addEventListener("click",go);g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}});seg.appendChild(g)});
+ ring(IN,70,100,-215,250);ring(OUT,108,140,-200,220);
+ let h="";for(let d=0;d<360;d+=5){const a=d*Math.PI/180,m=d%30===0,r0=m?47:d%10===0?51:53;h+=`<line class="c-tk${m?" m":""}" x1="${Math.sin(a)*r0}" y1="${-Math.cos(a)*r0}" x2="${Math.sin(a)*56}" y2="${-Math.cos(a)*56}"/>`}
+ document.getElementById("cTicks").innerHTML=h;
+ document.getElementById("compass").onclick=()=>{goal.t=0};}
+function compassTick(){const az=cam.t*180/Math.PI;document.getElementById("cRose").setAttribute("transform",`rotate(${az.toFixed(1)})`);document.getElementById("cHdg2").textContent=String(Math.round(((-az)%360+360)%360)).padStart(3,"0")+"°"}
 let drag=null;
 let mv=0;canvas.addEventListener("pointerdown",e=>{mv=0;drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)});
 canvas.addEventListener("pointermove",e=>{if(drag){mv+=Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y);goal.t-=(e.clientX-drag.x)*.006;goal.p=Math.min(1.45,Math.max(.2,goal.p-(e.clientY-drag.y)*.006));drag={x:e.clientX,y:e.clientY}}else hover(e)});
@@ -419,7 +482,7 @@ function loop(now){
   if(!paused)step(dt);
   const k=reduce?1:.08;for(const key of ["t","p","d"])cam[key]+=(goal[key]-cam[key])*k;cam.l=cam.l.clone().lerp(goal.l,k);
   camera.position.set(cam.l.x+cam.d*Math.sin(cam.p)*Math.sin(cam.t),cam.l.y+cam.d*Math.cos(cam.p),cam.l.z+cam.d*Math.sin(cam.p)*Math.cos(cam.t));camera.lookAt(cam.l);
-  renderer.render(scene,camera);requestAnimationFrame(loop);
+  compassTick();renderer.render(scene,camera);requestAnimationFrame(loop);
 }
 
 /* ---------- cabin X-ray ---------- */
@@ -575,8 +638,32 @@ let trS=0,trDir=1;
 function railAt(d){d=Math.max(0,Math.min(RLT,d));let i=1;while(i<RLd.length-1&&RLd[i]<d)i++;const a=RL[i-1],b=RL[i],k=(d-RLd[i-1])/((RLd[i]-RLd[i-1])||1);
   const x=a[0]+(b[0]-a[0])*k,z=a[1]+(b[1]-a[1])*k;return{x,z,y:railY(x,z),ang:Math.atan2(-(b[0]-a[0]),-(b[1]-a[1]))}}
 function moveTrain(dt){if(!RL.length)return;trS+=trDir*dt*14;if(trS>RLT+60){trDir=-1}if(trS<-60){trDir=1}
-  train.forEach((g,i)=>{const p=railAt(trS-trDir*i*2.1);g.position.set(p.x,p.y+.05,p.z);g.rotation.y=p.ang;g.visible=p.y>.2||trS<RLT})}
+  train.forEach((g,i)=>{const p=railAt(trS-trDir*i*2.1);g.position.set(p.x,p.y+.05,p.z);g.rotation.y=p.ang;g.visible=!g.userData.off})}
 {const baseStep=step;step=function(dt){baseStep(dt);moveAll(dt);moveCars(dt);moveTrain(dt)}}
+
+/* ---------- time of day: Suvarnabhumi traffic by Bangkok hour ----------
+   Daily total is real (370,832 movements in 2025 ≈ 1,016 a day, AOT via Wikipedia).
+   The hour-by-hour shape is an estimate: late-night long-haul bank, quiet 3–5 am, steady day. */
+const SHAPE=[5.0,4.6,3.2,1.8,1.6,2.6,4.0,5.0,5.2,5.0,4.8,4.6,4.4,4.4,4.6,4.6,4.8,5.0,4.8,4.6,4.4,4.4,4.6,4.9];
+const SHSUM=SHAPE.reduce((a,b)=>a+b,0),DAILY=1016,perHour=h=>DAILY*SHAPE[Math.floor(h)%24]/SHSUM,AVG=DAILY/24;
+let useNow=true,simHour=0;
+const bkkHour=()=>{const d=new Date();return (d.getUTCHours()+7)%24+d.getUTCMinutes()/60};
+function hourNow(){return useNow?bkkHour():simHour}
+function rateK(){return AVG/perHour(hourNow())}
+const ckIn=document.getElementById("ckIn");ckIn.value=bkkHour();
+ckIn.oninput=()=>{useNow=false;simHour=+ckIn.value;applyTime()};document.getElementById("ckNow").onclick=()=>{useNow=true;applyTime()};
+const hemi=scene.children.find(o=>o.isHemisphereLight);
+function applyTime(){const h=hourNow();if(useNow)ckIn.value=h;
+  const hh=Math.floor(h),mm=Math.round((h-hh)*60)%60;document.getElementById("ck").textContent=String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0");
+  document.getElementById("ckRate").textContent=`~${Math.round(perHour(h))} take-offs + landings this hour`;
+  const day=Math.max(0,Math.sin((h-6)/12*Math.PI));hemi.intensity=.35+.55*day;sun.intensity=.15+.65*day;
+  scene.background=new THREE.Color(0x0e1a26).lerp(new THREE.Color(0xcfe0ea),Math.min(1,day*1.4));
+  // parked aircraft: more on stand overnight, fewer at the busy banks
+  const want=Math.round(PARK.length*(.35+.55*(1-perHour(h)/Math.max(...SHAPE.map((_,i)=>perHour(i))))));
+  PARK.forEach((p,i)=>{p.visible=i<want;p.userData.gate.busy=i<want})}
+const PARK=[];{const RC2=Object.keys(AIRLINES),AC2=["A320","A321","787","A330","777","A350"];
+  GATES.forEach((g,i)=>{if(i%2)return;const pl=makePlane(RC2[i%RC2.length],AC2[i%AC2.length]);pl.position.set(g.x,.6,g.z);pl.rotation.y=g.face;pl.userData.gate=g;scene.add(pl);PARK.push(pl)})}
+applyTime();setInterval(()=>{if(useNow)applyTime()},30000);
 resize();renderBoard();
 // pre-warm so the page opens with traffic on the field
 for(let i=0;i<600;i++)step(1/20);
