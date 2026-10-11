@@ -354,7 +354,7 @@ function spawn(kind){
 }
 function remove(fl){scene.remove(fl.mesh);scene.remove(fl.tag);fl.mesh.traverse(o=>{const i=pickables.indexOf(o);if(i>=0)pickables.splice(i,1)});flights.splice(flights.indexOf(fl),1)}
 
-function step(dt){
+let step=function(dt){
   clock+=dt;
   if(clock>nextDep){spawn("dep");nextDep=clock+5+Math.random()*4}
   if(clock>nextArr){spawn("arr");nextArr=clock+7+Math.random()*5}
@@ -514,6 +514,69 @@ function cabLoop(){
   C2.position.set(c2.d*Math.sin(c2.p)*Math.sin(c2.t),c2.d*Math.cos(c2.p),c2.d*Math.sin(c2.p)*Math.cos(c2.t));C2.lookAt(0,0,0);
   R2.render(S2,C2);requestAnimationFrame(cabLoop);
 }
+
+/* ---------- ground vehicles, stairs, buses, cars and the Airport Rail Link train ---------- */
+const VM={};const vm=c=>VM[c]||(VM[c]=M(c));
+function bx(g,w,h,l,c,x=0,y=0,z=0){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,l),vm(c));m.position.set(x,y+h/2,z);g.add(m);return m}
+function tugTrain(n=3){const g=new THREE.Group();bx(g,.55,.45,.8,0xe3b324);bx(g,.4,.25,.3,0x2b3238,0,.45,-.1);
+  for(let i=0;i<n;i++){bx(g,.6,.08,.85,0x5b6470,0,.18,1+i*1.05);bx(g,.55,.4,.7,[0x8fa1b3,0x3a6fd8,0xb0533c][i%3],0,.26,1+i*1.05)}return g}
+function bus(){const g=new THREE.Group();bx(g,.95,.95,3.4,0xf2f4f5,0,.15);bx(g,.97,.3,3.42,0x1f5fae,0,.55);bx(g,.96,.25,3.41,0x24323d,0,.82);return g}
+function stairs(){const g=new THREE.Group();bx(g,.8,.35,1.8,0xf2f2f2,0,.1);
+  const st=new THREE.Mesh(new THREE.BoxGeometry(.6,.12,2.6),vm(0xc9ced3));st.rotation.x=-.55;st.position.set(0,1.05,-.3);g.add(st);
+  [-.3,.3].forEach(x=>{const r=new THREE.Mesh(new THREE.BoxGeometry(.05,.5,2.6),vm(0xd6342c));r.rotation.x=-.55;r.position.set(x,1.35,-.3);g.add(r)});return g}
+function fuelTruck(){const g=new THREE.Group();bx(g,.8,.7,.8,0xf2f2f2,0,.1,-1.2);const t=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,2,12),vm(0xd9dde0));t.rotation.x=Math.PI/2;t.position.set(0,.6,.3);g.add(t);bx(g,.82,.08,2.4,0x2b3238,0,.1,0);return g}
+function catering(){const g=new THREE.Group();bx(g,.85,.7,.8,0xf2f2f2,0,.1,-1);bx(g,.9,.9,1.6,0xffffff,0,.9,.3);bx(g,.95,.15,1.65,0x2a9d8f,0,.85,.3);bx(g,.85,.7,.2,0x6b7680,0,.2,.3);return g}
+function put(o,x,z,ry){o.position.set(x,.1,z);o.rotation.y=ry;scene.add(o);return o}
+const movers=[];
+// equipment at every contact stand
+GATES.forEach((g,i)=>{const side=V(g.out.z,0,-g.out.x),base=V(g.x,0,g.z),ry=Math.atan2(g.out.x,g.out.z);
+  const t=tugTrain(2+i%3),p=base.clone().add(side.clone().multiplyScalar(4)).add(g.out.clone().multiplyScalar(1));put(t,p.x,p.z,ry+Math.PI/2);
+  const q=base.clone().add(side.clone().multiplyScalar(-4));put(i%3?catering():fuelTruck(),q.x,q.z,ry);
+});
+// remote stands on the aprons: parked aircraft, mobile stairs, apron buses
+const remote=[];
+GEO.apron.forEach(a=>{const q=a.c.map(P);let area=0;for(let i=0;i<q.length-1;i++)area+=q[i][0]*q[i+1][1]-q[i+1][0]*q[i][1];area=Math.abs(area)/2;
+  if(area<1500)return;const [cx,cz]=centroid(a.c);const c=V(cx,0,cz);
+  if(GATES.some(g=>Math.hypot(g.x-cx,g.z-cz)<45))return;remote.push(c)});
+const RC=Object.keys(AIRLINES),RA=["A320","A321","787","A330"];
+remote.forEach((c,i)=>{const ry=-AZ;
+  for(let k=-1;k<=1;k+=2){const pc=c.clone().add(UD.clone().multiplyScalar(k*9));
+    const pl=makePlane(RC[(i*3+k+5)%RC.length],RA[(i+k+2)%RA.length]);pl.position.copy(pc).setY(.6);pl.rotation.y=ry;scene.add(pl);
+    const sp=pc.clone().add(UD.clone().multiplyScalar(-1.2)).add(RD.clone().multiplyScalar(-1.6));put(stairs(),sp.x,sp.z,ry+Math.PI/2);
+    const sp2=pc.clone().add(UD.clone().multiplyScalar(-1.2)).add(RD.clone().multiplyScalar(2.2));put(stairs(),sp2.x,sp2.z,ry+Math.PI/2);
+    // apron bus shuttling between the stand and the nearest concourse gate
+    const gt=GATES.reduce((a,g)=>Math.hypot(g.x-pc.x,g.z-pc.z)<Math.hypot(a.x-pc.x,a.z-pc.z)?g:a,GATES[0]);
+    const A=pc.clone().add(UD.clone().multiplyScalar(-4)),B=V(gt.x,0,gt.z).add(gt.out.clone().multiplyScalar(-1)).add(V(gt.out.z,0,-gt.out.x).multiplyScalar(7));
+    const b=put(bus(),A.x,A.z,0);movers.push({o:b,A,B,t:Math.random()*2,T:A.distanceTo(B)/6})}
+});
+// tug trains circling the concourse service roads
+GATES.filter((g,i)=>i%4===0).forEach((g,i)=>{const A=V(g.x,0,g.z).add(g.out.clone().multiplyScalar(-2)),
+  B=A.clone().add(V(g.out.z,0,-g.out.x).multiplyScalar(30));movers.push({o:put(tugTrain(3),A.x,A.z,0),A,B,t:Math.random()*2,T:30/4})});
+function moveAll(dt){for(const m of movers){m.t+=dt/m.T;const k=m.t%2,f=k<1?k:2-k,s=f*f*(3-2*f);
+  const p=m.A.clone().lerp(m.B,s);const d=(k<1?m.B.clone().sub(m.A):m.A.clone().sub(m.B));m.o.position.set(p.x,.1,p.z);m.o.rotation.y=Math.atan2(-d.x,-d.z)}}
+// cars on the road network, following connected segments
+const RS=[];["1","2","3"].forEach(k=>(GEO.roads[k]||[]).forEach(a=>{const A=P([a[0],a[1]]),B=P([a[2],a[3]]);const L=Math.hypot(B[0]-A[0],B[1]-A[1]);if(L>.05)RS.push({A,B,L,k})}));
+const kk=p=>Math.round(p[0]*2)+","+Math.round(p[1]*2),START={};RS.forEach((r,i)=>(START[kk(r.A)]=START[kk(r.A)]||[]).push(i));
+const NC=Math.min(260,RS.length),cars=new THREE.InstancedMesh(new THREE.BoxGeometry(.6,.45,1.25),new THREE.MeshLambertMaterial({color:0xffffff}),NC);
+const CC=[0xf2f2f2,0x2b3238,0xb8bec4,0xd6342c,0x1f5fae,0xe8b830,0x9aa3ab,0x3d6b4f],carS=[];
+{const c=new THREE.Color();for(let i=0;i<NC;i++){c.setHex(CC[i%CC.length]);cars.setColorAt(i,c);carS.push({s:Math.floor(Math.random()*RS.length),t:Math.random(),v:3+Math.random()*4})}cars.instanceColor.needsUpdate=true;scene.add(cars)}
+const cm=new THREE.Matrix4(),cq=new THREE.Quaternion(),cy=new THREE.Vector3(0,1,0),one=new THREE.Vector3(1,1,1);
+function moveCars(dt){carS.forEach((c,i)=>{let r=RS[c.s];c.t+=dt*c.v*(r.k==="3"?.35:r.k==="2"?.65:1)/r.L;
+  if(c.t>=1){const nx=START[kk(r.B)];c.s=nx&&nx.length?nx[Math.floor(Math.random()*nx.length)]:Math.floor(Math.random()*RS.length);c.t=0;r=RS[c.s]}
+  const x=r.A[0]+(r.B[0]-r.A[0])*c.t,z=r.A[1]+(r.B[1]-r.A[1])*c.t;cq.setFromAxisAngle(cy,Math.atan2(-(r.B[0]-r.A[0]),-(r.B[1]-r.A[1])));
+  const off=V(r.B[1]-r.A[1],0,-(r.B[0]-r.A[0])).normalize().multiplyScalar(.45);
+  cm.compose(V(x+off.x,roadY(x,z)+.25,z+off.z),cq,one);cars.setMatrixAt(i,cm)});cars.instanceMatrix.needsUpdate=true}
+// Airport Rail Link train (City Line, 4 cars) running the line into the basement station
+const RL=(GEO.rail||[]).map(l=>l.map(P)).sort((a,b)=>b.length-a.length)[0]||[];
+const RLd=[0];for(let i=1;i<RL.length;i++)RLd.push(RLd[i-1]+Math.hypot(RL[i][0]-RL[i-1][0],RL[i][1]-RL[i-1][1]));
+const RLT=RLd[RLd.length-1]||1,train=[];
+for(let i=0;i<4;i++){const g=new THREE.Group();bx(g,.55,.5,2,0xf4f6f7,0,0);bx(g,.56,.08,2.01,0x1f5fae,0,.22);bx(g,.56,.05,2.01,0xd6342c,0,.12);bx(g,.57,.12,1.8,0x24323d,0,.32);scene.add(g);train.push(g)}
+let trS=0,trDir=1;
+function railAt(d){d=Math.max(0,Math.min(RLT,d));let i=1;while(i<RLd.length-1&&RLd[i]<d)i++;const a=RL[i-1],b=RL[i],k=(d-RLd[i-1])/((RLd[i]-RLd[i-1])||1);
+  const x=a[0]+(b[0]-a[0])*k,z=a[1]+(b[1]-a[1])*k;return{x,z,y:railY(x,z),ang:Math.atan2(-(b[0]-a[0]),-(b[1]-a[1]))}}
+function moveTrain(dt){if(!RL.length)return;trS+=trDir*dt*14;if(trS>RLT+60){trDir=-1}if(trS<-60){trDir=1}
+  train.forEach((g,i)=>{const p=railAt(trS-trDir*i*2.1);g.position.set(p.x,p.y+.05,p.z);g.rotation.y=p.ang;g.visible=p.y>.2||trS<RLT})}
+{const baseStep=step;step=function(dt){baseStep(dt);moveAll(dt);moveCars(dt);moveTrain(dt)}}
 resize();renderBoard();
 // pre-warm so the page opens with traffic on the field
 for(let i=0;i<600;i++)step(1/20);
