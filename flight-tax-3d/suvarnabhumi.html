@@ -19,7 +19,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--display);font-size:1
 h1{font-size:clamp(24px,3.6vw,38px);line-height:1.1;margin:0;text-wrap:balance}
 .lede{color:var(--muted);max-width:72ch;margin:6px 0 0}
 .flag{display:inline-block;font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);border-radius:4px;padding:2px 8px;color:var(--muted);margin-bottom:8px}
-.stage{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:linear-gradient(var(--panel),var(--bg))}
+.stage{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#121a22}
 #c{display:block;width:100%;height:min(620px,78vw);min-height:360px;cursor:grab;touch-action:none}
 .hud{position:absolute;top:10px;left:10px;display:flex;flex-wrap:wrap;gap:8px;max-width:calc(100% - 20px)}
 .chip{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px}
@@ -196,8 +196,8 @@ const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(38,1,1,3000);
-scene.add(new THREE.HemisphereLight(0xffffff,0x5a6a5a,.85));
-const sun=new THREE.DirectionalLight(0xfff4e0,.75);sun.position.set(120,220,90);scene.add(sun);
+scene.add(new THREE.HemisphereLight(0x9fb6d0,0x1a2028,.85));scene.fog=new THREE.Fog(0x1b2530,500,1700);
+const sun=new THREE.DirectionalLight(0xffd2a0,.75);sun.position.set(120,220,90);scene.add(sun);
 const M=c=>new THREE.MeshLambertMaterial({color:c});
 const box=(w,h,d,c,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));m.position.set(x,y+h/2,z);scene.add(m);return m};
 
@@ -235,7 +235,7 @@ function flat(c,color,y){const m=new THREE.Mesh(new THREE.ShapeGeometry(shapeOf(
 function extrude(c,h,color){const m=new THREE.Mesh(new THREE.ExtrudeGeometry(shapeOf(c),{depth:h,bevelEnabled:false}),M(color));m.rotation.x=-Math.PI/2;scene.add(m);return m}
 const centroid=c=>{const q=c.map(P);return q.reduce((a,b)=>[a[0]+b[0]/q.length,a[1]+b[1]/q.length],[0,0])};
 
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(2600,2600),M(0x6f8a63));ground.rotation.x=-Math.PI/2;scene.add(ground);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(2600,2600),M(0x2c3631));ground.rotation.x=-Math.PI/2;scene.add(ground);
 // elevation: the terminal access viaducts rise to the departures level (top floor) and meet Motorway 7 at grade
 const AZr=14*Math.PI/180,ud=[Math.cos(AZr),Math.sin(AZr)],rd=[Math.sin(AZr),-Math.cos(AZr)];
 const smooth=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t)};
@@ -258,19 +258,19 @@ function ribbonY(segs,w,color,yf,skirt){
 const pierPts=[];
 function addPiers(segs,yf,step){let acc=0;for(const [a,b] of segs){const L=Math.hypot(b[0]-a[0],b[1]-a[1]);acc+=L;if(acc>step){acc=0;const x=(a[0]+b[0])/2,z=(a[1]+b[1])/2,y=yf(x,z);if(y>.4)pierPts.push([x,y,z])}}}
 // roads, coloured by the iTIC traffic snapshot the flood map uses
-[["1",0x8d959c],["2",0xe9b949],["3",0xd6342c]].forEach(([k,c])=>{const segs=(GEO.roads[k]||[]).map(a=>[P([a[0],a[1]]),P([a[2],a[3]])]);ribbonY(segs,1.8,c,roadY,true);addPiers(segs,roadY,5)});
+[["1",0x5a636c],["2",0xe9b949],["3",0xd6342c]].forEach(([k,c])=>{const segs=(GEO.roads[k]||[]).map(a=>[P([a[0],a[1]]),P([a[2],a[3]])]);ribbonY(segs,1.8,c,roadY,true);addPiers(segs,roadY,5)});
 // Airport Rail Link: elevated along the motorway, dropping underground into the terminal basement
 const railY=(x,z)=>{const v=(x*rd[0]+z*rd[1])*10;return .05+2.2*smooth(1150,1900,v)};
 (GEO.rail||[]).forEach(l=>{const q=l.map(P),segs=q.slice(1).map((b,i)=>[q[i],b]);ribbonY(segs,1.2,0x2f6db5,railY,true);addPiers(segs,railY,4)});
 {const im=new THREE.InstancedMesh(new THREE.CylinderGeometry(.22,.3,1,8),M(0xa7adb2),pierPts.length),m=new THREE.Matrix4();
  pierPts.forEach(([x,y,z],i)=>{m.makeScale(1,y,1);m.setPosition(x,y/2,z);im.setMatrixAt(i,m)});scene.add(im)}
 // airside surfaces: light concrete aprons, asphalt taxiways with yellow centre lines
-GEO.apron.forEach(a=>flat(a.c,0xcfd1cf,.06));
-ribbon(GEO.taxiway.map(l=>l.map(P)),2.3,0x50565c,.09);
-ribbon(GEO.taxiway.map(l=>l.map(P)),.18,0xe8b830,.1);
+GEO.apron.forEach(a=>flat(a.c,0x434a51,.06));
+ribbon(GEO.taxiway.map(l=>l.map(P)),2.3,0x262b30,.09);
+ribbon(GEO.taxiway.map(l=>l.map(P)),.18,0xb8892a,.1);
 function runwayTex(south,north){
   const c=document.createElement("canvas");c.width=64;c.height=2048;const x=c.getContext("2d");
-  x.fillStyle="#3b4045";x.fillRect(0,0,64,2048);x.fillStyle="#f2f2f2";
+  x.fillStyle="#1f2428";x.fillRect(0,0,64,2048);x.fillStyle="#d9dde0";
   for(let y=110;y<1938;y+=60)x.fillRect(30,y,4,30);
   for(let i=0;i<6;i++){x.fillRect(6+i*9,8,5,40);x.fillRect(6+i*9,2000,5,40)}
   x.font="bold 18px sans-serif";x.textAlign="center";
@@ -282,7 +282,7 @@ GEO.runway.forEach(r=>{
   let a=P(r.c[0]),b=P(r.c[r.c.length-1]);if(a[1]<b[1])[a,b]=[b,a]; // a = south end (larger z)
   const [sId,nId]=r.ref.split("/");const dx=b[0]-a[0],dz=b[1]-a[1],L=Math.hypot(dx,dz);
   const g=new THREE.Group();g.position.set((a[0]+b[0])/2,.12,(a[1]+b[1])/2);g.rotation.y=Math.atan2(-dx,-dz);
-  const sh=new THREE.Mesh(new THREE.PlaneGeometry(r.w/10+3,L+6),new THREE.MeshBasicMaterial({color:0x8a8f86}));sh.rotation.x=-Math.PI/2;sh.position.y=-.01;g.add(sh);const m=new THREE.Mesh(new THREE.PlaneGeometry(r.w/10,L),new THREE.MeshBasicMaterial({map:runwayTex(sId,nId)}));m.rotation.x=-Math.PI/2;g.add(m);scene.add(g);
+  const sh=new THREE.Mesh(new THREE.PlaneGeometry(r.w/10+3,L+6),new THREE.MeshBasicMaterial({color:0x353b41}));sh.rotation.x=-Math.PI/2;sh.position.y=-.01;g.add(sh);const m=new THREE.Mesh(new THREE.PlaneGeometry(r.w/10,L),new THREE.MeshBasicMaterial({map:runwayTex(sId,nId)}));m.rotation.x=-Math.PI/2;g.add(m);scene.add(g);
   RWY[r.ref]={S:V(a[0],0,a[1]),N:V(b[0],0,b[1]),dir:V(dx/L,0,dz/L),L};
   place(label("Runway "+r.ref,{size:20,color:"#ffffff",bg:"rgba(20,30,40,.75)"}),a[0],6,a[1]+12);
 });
@@ -290,22 +290,23 @@ GEO.runway.forEach(r=>{
 // Frame aligned to the runways (heading ~14°): u across the field, v along the runways, in metres.
 const AZ=14*Math.PI/180,UD=V(Math.cos(AZ),0,Math.sin(AZ)),RD=V(Math.sin(AZ),0,-Math.cos(AZ)),HX=1.5; // heights ×1.5
 const UV=(u,v,y=0)=>UD.clone().multiplyScalar(u/10).add(RD.clone().multiplyScalar(v/10)).setY(y);
+const GLOW=new THREE.MeshStandardMaterial({color:0x2b3640,emissive:0xffa24a,emissiveIntensity:.6,roughness:.4});
 const GATES=[];
 function bandTex(len){ // white membrane bays alternating with glazed bays, ~27 m apart
   const c=document.createElement("canvas");c.width=8;c.height=64;const x=c.getContext("2d");
-  x.fillStyle="#f4f6f7";x.fillRect(0,0,8,64);x.fillStyle="#7fa3b8";x.fillRect(0,0,8,22);x.fillStyle="#c9d2d8";x.fillRect(0,22,8,3);
+  x.fillStyle="#b9c1c8";x.fillRect(0,0,8,64);x.fillStyle="#ffb15e";x.fillRect(0,0,8,9);x.fillStyle="#3c454d";x.fillRect(0,9,8,3);
   const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(1,len/54);return t;
 }
 function concourse(u0,u1,v0,v1,{gates=true,sides=[1,-1]}={}){ // axis-aligned in (u,v)
   const alongU=(u1-u0)>(v1-v0),len=alongU?u1-u0:v1-v0,w=alongU?v1-v0:u1-u0;
   const g=new THREE.Group();g.position.copy(UV((u0+u1)/2,(v0+v1)/2));g.rotation.y=alongU?-AZ:Math.PI/2-AZ;scene.add(g);
   const baseH=9*HX/10,L=len/10,W=w/10;
-  const base=new THREE.Mesh(new THREE.BoxGeometry(L,baseH,W),M(0x6f8fa3));base.position.y=baseH/2;g.add(base);
-  const tube=new THREE.Mesh(new THREE.CylinderGeometry(W/2,W/2,L,28,1,true,0,Math.PI),new THREE.MeshLambertMaterial({map:bandTex(len),side:THREE.DoubleSide}));
+  const base=new THREE.Mesh(new THREE.BoxGeometry(L,baseH,W),GLOW);base.position.y=baseH/2;g.add(base);
+  const tube=new THREE.Mesh(new THREE.CylinderGeometry(W/2,W/2,L,28,1,true,0,Math.PI),(()=>{const t=bandTex(len);return new THREE.MeshStandardMaterial({map:t,emissiveMap:t,emissive:0xffffff,emissiveIntensity:.2,metalness:.45,roughness:.35,side:THREE.DoubleSide})})());
   tube.rotation.z=Math.PI/2;tube.scale.set(1,1,1);tube.position.y=baseH;
   const sq=new THREE.Group();sq.add(tube);sq.scale.y=.55;sq.position.y=baseH*.45;g.add(sq);
   // arch ribs (5-pin arch trusses)
-  for(let i=0;i<=Math.floor(len/27);i++){const r=new THREE.Mesh(new THREE.TorusGeometry(W/2,.12,4,20,Math.PI),M(0x9aa6ae));r.rotation.y=Math.PI/2;r.position.set(-L/2+i*2.7,baseH,0);r.scale.set(1,.55,1);g.add(r)}
+  for(let i=0;i<=Math.floor(len/27);i++){const r=new THREE.Mesh(new THREE.TorusGeometry(W/2,.12,4,20,Math.PI),M(0x5c6670));r.rotation.y=Math.PI/2;r.position.set(-L/2+i*2.7,baseH,0);r.scale.set(1,.55,1);g.add(r)}
   if(gates)for(const s of sides)for(let t=60;t<len-40;t+=75){
     const along=alongU?UD:RD,out=(alongU?RD:UD).clone().multiplyScalar(s);
     const c0=alongU?UV(u0+t,(v0+v1)/2):UV((u0+u1)/2,v0+t);
@@ -327,15 +328,15 @@ place(label("SAT-1 satellite terminal",{size:22,color:"#13202c",bg:"rgba(255,255
 const HC={u:397,v:944};const TERM=UV(HC.u,HC.v);
 {const hall=new THREE.Group();hall.position.copy(TERM);hall.rotation.y=-AZ;scene.add(hall);
  const H=30*HX/10,RY=40*HX/10;
- const glass=new THREE.Mesh(new THREE.BoxGeometry(44.4,H,11.1),new THREE.MeshLambertMaterial({color:0x8fb3c7,transparent:true,opacity:.85}));glass.position.y=H/2;hall.add(glass);
+ const glass=new THREE.Mesh(new THREE.BoxGeometry(44.4,H,11.1),GLOW);glass.position.y=H/2;hall.add(glass);
  for(let i=0;i<=44;i++){const m=new THREE.Mesh(new THREE.BoxGeometry(.08,H,11.2),M(0x5d6a74));m.position.set(-22.2+i*1.01,H/2,0);hall.add(m)}
- const roof=new THREE.Mesh(new THREE.BoxGeometry(56.7,.5,21),M(0xe6e9ec));roof.position.y=RY;hall.add(roof);
- const under=new THREE.Mesh(new THREE.BoxGeometry(56.5,.1,20.8),M(0xb9a27a));under.position.y=RY-.3;hall.add(under); // louvered soffit
+ const roof=new THREE.Mesh(new THREE.BoxGeometry(56.7,.5,21),new THREE.MeshStandardMaterial({color:0xdfe5ea,metalness:.35,roughness:.3}));roof.position.y=RY;hall.add(roof);
+ const under=new THREE.Mesh(new THREE.BoxGeometry(56.5,.1,20.8),new THREE.MeshBasicMaterial({color:0xe7a35a}));under.position.y=RY-.3;hall.add(under); // louvered soffit
  const sh=new THREE.Shape();// truss profile across the 210 m roof: 42 m cantilevers, 126 m span, deepest over the pylons
  [[-10.5,0],[-6.3,1.7],[0,1.0],[6.3,1.7],[10.5,0],[6.3,0],[-6.3,0]].forEach(([a,b],i)=>i?sh.lineTo(a,b*HX):sh.moveTo(a,b*HX));
  const tg=new THREE.ExtrudeGeometry(sh,{depth:.5,bevelEnabled:false});
  for(let i=0;i<8;i++){const x=-24.5+i*7;
-   const t=new THREE.Mesh(tg,M(0x5b6670));t.rotation.y=Math.PI/2;t.position.set(x+.25,RY+.25,0);hall.add(t);
+   const t=new THREE.Mesh(tg,new THREE.MeshStandardMaterial({color:0x8d98a3,metalness:.7,roughness:.35}));t.rotation.y=Math.PI/2;t.position.set(x+.25,RY+.25,0);hall.add(t);
    [-6.3,6.3].forEach(z=>{const py=new THREE.Mesh(new THREE.CylinderGeometry(.25,.6,RY+1.7*HX,8),M(0x6b7680));py.position.set(x,(RY+1.7*HX)/2,z);hall.add(py)})}
  const curb=new THREE.Mesh(new THREE.BoxGeometry(50,1.2,2.5),M(0x7a8086));curb.position.set(0,.6,9);hall.add(curb);
  place(label("Main passenger terminal",{size:22,color:"#13202c",bg:"rgba(255,255,255,.9)"}),TERM.x,RY+8,TERM.z);
@@ -615,6 +616,15 @@ remote.forEach((c,i)=>{const ry=-AZ;
 // tug trains circling the concourse service roads
 GATES.filter((g,i)=>i%4===0).forEach((g,i)=>{const A=V(g.x,0,g.z).add(g.out.clone().multiplyScalar(-2)),
   B=A.clone().add(V(g.out.z,0,-g.out.x).multiplyScalar(30));movers.push({o:put(tugTrain(3),A.x,A.z,0),A,B,t:Math.random()*2,T:30/4})});
+
+// apron floodlight masts with warm glow
+{const gc=document.createElement("canvas");gc.width=gc.height=64;const x=gc.getContext("2d"),gr=x.createRadialGradient(32,32,0,32,32,32);
+ gr.addColorStop(0,"rgba(255,214,150,1)");gr.addColorStop(.3,"rgba(255,170,80,.45)");gr.addColorStop(1,"rgba(255,150,60,0)");x.fillStyle=gr;x.fillRect(0,0,64,64);
+ const gm=new THREE.SpriteMaterial({map:new THREE.CanvasTexture(gc),blending:THREE.AdditiveBlending,depthWrite:false,transparent:true});
+ const pts=[];GATES.forEach((g,i)=>{if(i%3===0)pts.push(V(g.x,0,g.z).add(g.out.clone().multiplyScalar(9)))});remote.forEach(c=>pts.push(c.clone().add(RD.clone().multiplyScalar(8))));
+ const pole=new THREE.InstancedMesh(new THREE.CylinderGeometry(.08,.12,4,6),M(0x4a525a),pts.length),m=new THREE.Matrix4();
+ pts.forEach((p,i)=>{m.makeTranslation(p.x,2,p.z);pole.setMatrixAt(i,m);const sp=new THREE.Sprite(gm);sp.position.set(p.x,4.1,p.z);sp.scale.set(5,5,1);scene.add(sp);
+   const pool=new THREE.Sprite(gm);pool.position.set(p.x,.3,p.z);pool.scale.set(16,16,1);pool.material=gm;scene.add(pool)});scene.add(pole)}
 function moveAll(dt){for(const m of movers){m.t+=dt/m.T;const k=m.t%2,f=k<1?k:2-k,s=f*f*(3-2*f);
   const p=m.A.clone().lerp(m.B,s);const d=(k<1?m.B.clone().sub(m.A):m.A.clone().sub(m.B));m.o.position.set(p.x,.1,p.z);m.o.rotation.y=Math.atan2(-d.x,-d.z)}}
 // cars on the road network, following connected segments
@@ -657,7 +667,7 @@ function applyTime(){const h=hourNow();if(useNow)ckIn.value=h;
   const hh=Math.floor(h),mm=Math.round((h-hh)*60)%60;document.getElementById("ck").textContent=String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0");
   document.getElementById("ckRate").textContent=`~${Math.round(perHour(h))} take-offs + landings this hour`;
   const day=Math.max(0,Math.sin((h-6)/12*Math.PI));hemi.intensity=.35+.55*day;sun.intensity=.15+.65*day;
-  scene.background=new THREE.Color(0x0e1a26).lerp(new THREE.Color(0xcfe0ea),Math.min(1,day*1.4));
+  scene.background=new THREE.Color(0x070c12).lerp(new THREE.Color(0x4a5b6c),Math.min(1,day*1.2));scene.fog.color.copy(scene.background);GLOW.emissiveIntensity=.35+.5*(1-day);
   // parked aircraft: more on stand overnight, fewer at the busy banks
   const want=Math.round(PARK.length*(.35+.55*(1-perHour(h)/Math.max(...SHAPE.map((_,i)=>perHour(i))))));
   PARK.forEach((p,i)=>{p.visible=i<want;p.userData.gate.busy=i<want})}
